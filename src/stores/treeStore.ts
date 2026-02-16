@@ -16,6 +16,7 @@ interface TreeStore {
   updateNodeTitle: (nodeId: string, title: string) => Promise<void>;
   updateNodeType: (nodeId: string, nodeType: NodeType) => Promise<void>;
   pasteAsNode: (parentId: string, contextId: string, data: { kind: "image"; blob: File; ext: string } | { kind: "text"; text: string }) => Promise<void>;
+  openOrAttachFile: (nodeId: string) => Promise<void>;
 }
 
 function patchNode(tree: TreeData, nodeId: string, patch: Partial<TreeData["node"]>): TreeData {
@@ -23,6 +24,15 @@ function patchNode(tree: TreeData, nodeId: string, patch: Partial<TreeData["node
     return { ...tree, node: { ...tree.node, ...patch } };
   }
   return { ...tree, children: tree.children.map(c => patchNode(c, nodeId, patch)) };
+}
+
+function findNode(tree: TreeData, id: string): TreeData | null {
+  if (tree.node.id === id) return tree;
+  for (const child of tree.children) {
+    const found = findNode(child, id);
+    if (found) return found;
+  }
+  return null;
 }
 
 function findParent(tree: TreeData, targetId: string): TreeData | null {
@@ -113,6 +123,32 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       await get().loadTree(contextId);
       set({ selectedNodeId: node.id });
       useUIStore.getState().setEditingNode(node.id);
+    }
+  },
+
+  openOrAttachFile: async (nodeId) => {
+    const { tree } = get();
+    if (!tree) return;
+    const target = findNode(tree, nodeId);
+    if (!target) return;
+    const { node } = target;
+    const type = node.node_type;
+    if (type !== "file" && type !== "markdown") return;
+
+    if (node.file_path) {
+      // Reveal in Finder
+      await ipc.revealFile(node.file_path);
+    } else {
+      // Open file picker
+      const filePath = await ipc.pickFile();
+      if (!filePath) return;
+      await ipc.updateNode(nodeId, { filePath });
+      // Update title to filename if title is empty or generic
+      const fileName = filePath.split("/").pop() || filePath;
+      if (!node.title || node.title === "Untitled") {
+        await ipc.updateNode(nodeId, { title: fileName });
+      }
+      set({ tree: patchNode(tree, nodeId, { file_path: filePath, title: node.title || fileName }) });
     }
   },
 }));

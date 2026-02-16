@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { Context, ContextSummary, TreeData, TreeNode } from "./types";
 
 export const ipc = {
@@ -43,4 +45,10 @@ export const ipc = {
 
   moveNode: (id: string, newParentId: string, position: number) =>
     invoke<void>("move_node", { id, newParentId, position }),
+
+  revealFile: (filePath: string) =>
+    revealItemInDir(filePath),
+
+  pickFile: () =>
+    openDialog({ multiple: false, directory: false }),
 };

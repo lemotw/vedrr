@@ -14,7 +14,7 @@ interface Props {
 
 export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
   const { letter, color } = NODE_TYPE_CONFIG[node.node_type as NodeType];
-  const { updateNodeTitle } = useTreeStore();
+  const { updateNodeTitle, openOrAttachFile } = useTreeStore();
   const { editingNodeId, setEditingNode, openTypePopover } = useUIStore();
   const isEditing = editingNodeId === node.id;
   const cardRef = useRef<HTMLDivElement>(null);
@@ -72,6 +72,7 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
     );
   }
 
+  const isFileish = node.node_type === "file" || node.node_type === "markdown";
   const isImage = node.node_type === "image" && node.file_path;
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [showLightbox, setShowLightbox] = useState(false);
@@ -151,6 +152,16 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
             <span className="text-[13px] text-text-primary">
               {node.title || "Untitled"}
             </span>
+          )}
+          {isFileish && (
+            <button
+              className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 cursor-pointer
+                bg-bg-elevated text-text-secondary hover:text-text-primary hover:ring-1 hover:ring-white/20 transition-colors"
+              onClick={(e) => { e.stopPropagation(); openOrAttachFile(node.id); }}
+              title={node.file_path ? "Reveal in Finder (O)" : "Attach file (O)"}
+            >
+              {node.file_path ? "open" : "attach"}
+            </button>
           )}
         </div>
       </div>

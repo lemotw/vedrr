@@ -30,7 +30,7 @@ function getSiblings(tree: TreeData, id: string): TreeData[] {
 
 export function useKeyboard() {
   const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover } = useUIStore();
-  const { tree, selectedNodeId, selectNode, addChild, addSibling, deleteNode, pasteAsNode } = useTreeStore();
+  const { tree, selectedNodeId, selectNode, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile } = useTreeStore();
   const { currentContextId } = useContextStore();
 
   useEffect(() => {
@@ -103,6 +103,11 @@ export function useKeyboard() {
           }
           break;
         }
+        case "o": {
+          e.preventDefault();
+          if (selectedNodeId) openOrAttachFile(selectedNodeId);
+          break;
+        }
         case "t": {
           e.preventDefault();
           if (selectedNodeId) openTypePopover(selectedNodeId);
@@ -157,5 +162,5 @@ export function useKeyboard() {
       window.removeEventListener("paste", handlePaste);
     };
   }, [tree, selectedNodeId, currentContextId, quickSwitcherOpen, editingNodeId, typePopoverNodeId,
-      openQuickSwitcher, selectNode, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode]);
+      openQuickSwitcher, selectNode, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile]);
 }
