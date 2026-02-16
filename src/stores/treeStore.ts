@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { TreeData } from "../lib/types";
+import type { TreeData, NodeType } from "../lib/types";
 import { ipc } from "../lib/ipc";
 import { useUIStore } from "./uiStore";
 
@@ -13,13 +13,14 @@ interface TreeStore {
   addSibling: (nodeId: string, contextId: string) => Promise<void>;
   deleteNode: (nodeId: string, contextId: string) => Promise<void>;
   updateNodeTitle: (nodeId: string, title: string) => Promise<void>;
+  updateNodeType: (nodeId: string, nodeType: NodeType) => Promise<void>;
 }
 
-function patchTitle(tree: TreeData, nodeId: string, title: string): TreeData {
+function patchNode(tree: TreeData, nodeId: string, patch: Partial<TreeData["node"]>): TreeData {
   if (tree.node.id === nodeId) {
-    return { ...tree, node: { ...tree.node, title } };
+    return { ...tree, node: { ...tree.node, ...patch } };
   }
-  return { ...tree, children: tree.children.map(c => patchTitle(c, nodeId, title)) };
+  return { ...tree, children: tree.children.map(c => patchNode(c, nodeId, patch)) };
 }
 
 function findParent(tree: TreeData, targetId: string): TreeData | null {
@@ -73,10 +74,17 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
 
   updateNodeTitle: async (nodeId, title) => {
     await ipc.updateNode(nodeId, { title });
-    // Update local tree state to reflect the change immediately
     const { tree } = get();
     if (tree) {
-      set({ tree: patchTitle(tree, nodeId, title) });
+      set({ tree: patchNode(tree, nodeId, { title }) });
+    }
+  },
+
+  updateNodeType: async (nodeId, nodeType) => {
+    await ipc.updateNode(nodeId, { nodeType });
+    const { tree } = get();
+    if (tree) {
+      set({ tree: patchNode(tree, nodeId, { node_type: nodeType }) });
     }
   },
 }));

@@ -32,7 +32,7 @@ function findParentInTree(tree: TreeData, id: string): TreeData | null {
 }
 
 export function useKeyboard() {
-  const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode } = useUIStore();
+  const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover } = useUIStore();
   const { tree, selectedNodeId, selectNode, addChild, addSibling, deleteNode } = useTreeStore();
   const { currentContextId } = useContextStore();
 
@@ -45,8 +45,8 @@ export function useKeyboard() {
         return;
       }
 
-      // Don't handle tree keys when switcher is open or editing
-      if (quickSwitcherOpen || editingNodeId) return;
+      // Don't handle tree keys when switcher is open, editing, or type popover open
+      if (quickSwitcherOpen || editingNodeId || typePopoverNodeId) return;
       if (!tree || !currentContextId) return;
 
       const flat = flattenTree(tree);
@@ -100,6 +100,11 @@ export function useKeyboard() {
           }
           break;
         }
+        case "t": {
+          e.preventDefault();
+          if (selectedNodeId) openTypePopover(selectedNodeId);
+          break;
+        }
         case "Backspace":
         case "Delete": {
           if (!selectedNodeId || selectedNodeId === tree.node.id) break;
@@ -112,6 +117,6 @@ export function useKeyboard() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [tree, selectedNodeId, currentContextId, quickSwitcherOpen, editingNodeId,
-      openQuickSwitcher, selectNode, addChild, addSibling, deleteNode, setEditingNode]);
+  }, [tree, selectedNodeId, currentContextId, quickSwitcherOpen, editingNodeId, typePopoverNodeId,
+      openQuickSwitcher, selectNode, addChild, addSibling, deleteNode, setEditingNode, openTypePopover]);
 }

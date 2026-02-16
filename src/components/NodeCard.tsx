@@ -14,7 +14,7 @@ interface Props {
 export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
   const { letter, color } = NODE_TYPE_CONFIG[node.node_type as NodeType];
   const { updateNodeTitle } = useTreeStore();
-  const { editingNodeId, setEditingNode } = useUIStore();
+  const { editingNodeId, setEditingNode, openTypePopover } = useUIStore();
   const isEditing = editingNodeId === node.id;
   const inputRef = useRef<HTMLInputElement>(null);
   const [editValue, setEditValue] = useState(node.title);
@@ -70,7 +70,11 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
       onClick={onClick}
       onDoubleClick={() => setEditingNode(node.id)}
     >
-      <div className="flex items-center justify-center w-5 h-5 rounded bg-bg-elevated shrink-0">
+      <div
+        className="flex items-center justify-center w-5 h-5 rounded bg-bg-elevated shrink-0 cursor-pointer hover:ring-1 hover:ring-white/20"
+        onClick={(e) => { e.stopPropagation(); openTypePopover(node.id); }}
+        title="Change type (T)"
+      >
         <span className="text-[10px] font-bold font-mono" style={{ color }}>
           {letter}
         </span>

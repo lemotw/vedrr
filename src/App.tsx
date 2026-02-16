@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { StatusBar } from "./components/StatusBar";
 import { TreeCanvas } from "./components/TreeCanvas";
 import { QuickSwitcher } from "./components/QuickSwitcher";
+import { NodeTypePopover } from "./components/NodeTypePopover";
 import { useContextStore } from "./stores/contextStore";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useUIStore } from "./stores/uiStore";
@@ -26,6 +27,7 @@ export default function App() {
         <TreeCanvas />
       </main>
       <QuickSwitcher />
+      <NodeTypePopover />
     </div>
   );
 }
