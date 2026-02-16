@@ -288,3 +288,23 @@ pub fn clone_subtree(
     let new_root_id = clone_recursive(&db, &source_id, &target_parent_id, &context_id)?;
     Ok(new_root_id)
 }
+
+#[tauri::command]
+pub fn restore_nodes(
+    state: State<'_, AppState>,
+    nodes: Vec<TreeNode>,
+) -> Result<(), MindFlowError> {
+    let db = state.db.lock().unwrap();
+    for node in &nodes {
+        db.execute(
+            "INSERT OR REPLACE INTO tree_nodes (id, context_id, parent_id, position, node_type, title, content, file_path, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            rusqlite::params![
+                node.id, node.context_id, node.parent_id, node.position,
+                node.node_type, node.title, node.content, node.file_path,
+                node.created_at, node.updated_at,
+            ],
+        )?;
+    }
+    Ok(())
+}

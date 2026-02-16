@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { ContextSummary } from "../lib/types";
 import { ipc } from "../lib/ipc";
 import { ContextStates } from "../lib/constants";
+import { useTreeStore } from "./treeStore";
 
 interface ContextStore {
   contexts: ContextSummary[];
@@ -35,6 +36,7 @@ export const useContextStore = create<ContextStore>((set, get) => ({
   switchContext: async (id: string) => {
     await ipc.switchContext(id);
     set({ currentContextId: id });
+    useTreeStore.getState().clearUndo();
     await get().loadContexts();
   },
 

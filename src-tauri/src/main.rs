@@ -38,6 +38,7 @@ fn main() {
             commands::node::delete_node,
             commands::node::move_node,
             commands::node::clone_subtree,
+            commands::node::restore_nodes,
             commands::file_ops::read_file_bytes,
             commands::file_ops::save_clipboard_image,
             commands::file_ops::import_image,

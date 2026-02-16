@@ -59,6 +59,9 @@ export const ipc = {
   cloneSubtree: (sourceId: string, targetParentId: string, contextId: string) =>
     invoke<string>(IpcCmd.CLONE_SUBTREE, { sourceId, targetParentId, contextId }),
 
+  restoreNodes: (nodes: TreeNode[]) =>
+    invoke<void>(IpcCmd.RESTORE_NODES, { nodes }),
+
   pickImage: () =>
     openDialog({
       multiple: false,

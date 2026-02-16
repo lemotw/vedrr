@@ -31,7 +31,7 @@ function getSiblings(tree: TreeData, id: string): TreeData[] {
 
 export function useKeyboard() {
   const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover, contentPanelFocused, markdownEditorNodeId, openMarkdownEditor, closeMarkdownEditor, nodeSearchOpen, openNodeSearch } = useUIStore();
-  const { tree, selectedNodeId, copiedNodeId, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile, reorderNode } = useTreeStore();
+  const { tree, selectedNodeId, copiedNodeId, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile, reorderNode, undo } = useTreeStore();
   const { currentContextId } = useContextStore();
 
   useEffect(() => {
@@ -47,6 +47,13 @@ export function useKeyboard() {
       if (e.metaKey && e.key === "f" && !e.shiftKey) {
         e.preventDefault();
         openNodeSearch();
+        return;
+      }
+
+      // ⌘Z — Undo (always active, unless editing text)
+      if (e.metaKey && e.key === "z" && !e.shiftKey && !editingNodeId && !contentPanelFocused) {
+        e.preventDefault();
+        undo();
         return;
       }
 
@@ -224,5 +231,5 @@ export function useKeyboard() {
       window.removeEventListener("paste", handlePaste);
     };
   }, [tree, selectedNodeId, copiedNodeId, currentContextId, quickSwitcherOpen, nodeSearchOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId,
-      openQuickSwitcher, openNodeSearch, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, openMarkdownEditor, closeMarkdownEditor]);
+      openQuickSwitcher, openNodeSearch, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, undo, openMarkdownEditor, closeMarkdownEditor]);
 }
