@@ -51,7 +51,7 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={commitEdit}
-            onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditingNode(null); }}
+            onKeyDown={(e) => { e.stopPropagation(); if (e.nativeEvent.isComposing) return; if (e.key === "Enter") { e.preventDefault(); commitEdit(); } if (e.key === "Escape") { e.preventDefault(); setEditingNode(null); } }}
             className="bg-transparent font-heading text-[28px] font-bold text-text-primary outline-none border-b border-accent-primary"
           />
         ) : (
@@ -81,7 +81,7 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={commitEdit}
-          onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditingNode(null); }}
+          onKeyDown={(e) => { e.stopPropagation(); if (e.nativeEvent.isComposing) return; if (e.key === "Enter") { e.preventDefault(); commitEdit(); } if (e.key === "Escape") { e.preventDefault(); setEditingNode(null); } }}
           className="bg-transparent text-[13px] text-text-primary outline-none border-b border-accent-primary min-w-[60px]"
         />
       ) : (

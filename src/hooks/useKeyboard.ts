@@ -53,18 +53,21 @@ export function useKeyboard() {
       const currentIndex = selectedNodeId ? flat.indexOf(selectedNodeId) : -1;
 
       switch (e.key) {
+        case "j":
         case "ArrowDown": {
           e.preventDefault();
           const next = currentIndex < flat.length - 1 ? flat[currentIndex + 1] : flat[0];
           selectNode(next);
           break;
         }
+        case "k":
         case "ArrowUp": {
           e.preventDefault();
           const prev = currentIndex > 0 ? flat[currentIndex - 1] : flat[flat.length - 1];
           selectNode(prev);
           break;
         }
+        case "l":
         case "ArrowRight": {
           e.preventDefault();
           if (!selectedNodeId) break;
@@ -74,6 +77,7 @@ export function useKeyboard() {
           }
           break;
         }
+        case "h":
         case "ArrowLeft": {
           e.preventDefault();
           if (!selectedNodeId) break;

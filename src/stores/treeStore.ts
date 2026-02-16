@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { TreeData } from "../lib/types";
 import { ipc } from "../lib/ipc";
+import { useUIStore } from "./uiStore";
 
 interface TreeStore {
   tree: TreeData | null;
@@ -12,6 +13,13 @@ interface TreeStore {
   addSibling: (nodeId: string, contextId: string) => Promise<void>;
   deleteNode: (nodeId: string, contextId: string) => Promise<void>;
   updateNodeTitle: (nodeId: string, title: string) => Promise<void>;
+}
+
+function patchTitle(tree: TreeData, nodeId: string, title: string): TreeData {
+  if (tree.node.id === nodeId) {
+    return { ...tree, node: { ...tree.node, title } };
+  }
+  return { ...tree, children: tree.children.map(c => patchTitle(c, nodeId, title)) };
 }
 
 function findParent(tree: TreeData, targetId: string): TreeData | null {
@@ -29,7 +37,10 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
 
   loadTree: async (contextId: string) => {
     const tree = await ipc.getTree(contextId);
-    set({ tree });
+    const { selectedNodeId } = get();
+    // Auto-select root if nothing selected
+    const autoSelect = !selectedNodeId && tree ? tree.node.id : selectedNodeId;
+    set({ tree, selectedNodeId: autoSelect });
   },
 
   selectNode: (id) => set({ selectedNodeId: id }),
@@ -38,6 +49,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     const node = await ipc.createNode(contextId, parentId, "text", "");
     await get().loadTree(contextId);
     set({ selectedNodeId: node.id });
+    useUIStore.getState().setEditingNode(node.id);
   },
 
   addSibling: async (nodeId, contextId) => {
@@ -48,6 +60,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     const node = await ipc.createNode(contextId, parent.node.id, "text", "");
     await get().loadTree(contextId);
     set({ selectedNodeId: node.id });
+    useUIStore.getState().setEditingNode(node.id);
   },
 
   deleteNode: async (nodeId, contextId) => {
@@ -60,5 +73,10 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
 
   updateNodeTitle: async (nodeId, title) => {
     await ipc.updateNode(nodeId, { title });
+    // Update local tree state to reflect the change immediately
+    const { tree } = get();
+    if (tree) {
+      set({ tree: patchTitle(tree, nodeId, title) });
+    }
   },
 }));

@@ -19,13 +19,14 @@ export function QuickSwitcher() {
   const [search, setSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (quickSwitcherOpen) {
       loadContexts();
       setSearch("");
       setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      setTimeout(() => panelRef.current?.focus(), 50);
     }
   }, [quickSwitcherOpen, loadContexts]);
 
@@ -57,27 +58,77 @@ export function QuickSwitcher() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        setSelectedIndex((i) => Math.min(i + 1, allItems.length - 1));
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        setSelectedIndex((i) => Math.max(i - 1, 0));
-        break;
-      case "Enter":
-        e.preventDefault();
-        if (allItems[selectedIndex]) {
-          handleSelect(allItems[selectedIndex]);
-        } else {
-          handleCreate();
-        }
-        break;
-      case "Escape":
-        e.preventDefault();
-        closeQuickSwitcher();
-        break;
+    const isInSearch = document.activeElement === inputRef.current;
+
+    // Move down: j / ↓ / Ctrl+j / Ctrl+n
+    if (
+      e.key === "ArrowDown" ||
+      (e.ctrlKey && (e.key === "j" || e.key === "n")) ||
+      (!isInSearch && e.key === "j")
+    ) {
+      e.preventDefault();
+      if (isInSearch) {
+        inputRef.current?.blur();
+        panelRef.current?.focus();
+      }
+      setSelectedIndex((i) => Math.min(i + 1, allItems.length - 1));
+      return;
+    }
+
+    // Move up: k / ↑ / Ctrl+k / Ctrl+p
+    if (
+      e.key === "ArrowUp" ||
+      (e.ctrlKey && (e.key === "k" || e.key === "p")) ||
+      (!isInSearch && e.key === "k")
+    ) {
+      e.preventDefault();
+      if (!isInSearch && selectedIndex === 0) {
+        inputRef.current?.focus();
+        return;
+      }
+      if (isInSearch) return;
+      setSelectedIndex((i) => Math.max(i - 1, 0));
+      return;
+    }
+
+    // Enter — select or create
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (e.nativeEvent.isComposing) return;
+      if (allItems[selectedIndex]) {
+        handleSelect(allItems[selectedIndex]);
+      } else {
+        handleCreate();
+      }
+      return;
+    }
+
+    // Escape — clear search or close
+    if (e.key === "Escape") {
+      e.preventDefault();
+      if (isInSearch && search) {
+        setSearch("");
+        inputRef.current?.blur();
+        panelRef.current?.focus();
+        return;
+      }
+      closeQuickSwitcher();
+      return;
+    }
+
+    // "/" — vim search key
+    if (!isInSearch && e.key === "/") {
+      e.preventDefault();
+      inputRef.current?.focus();
+      return;
+    }
+
+    // Any printable char when not in search → jump to search and type
+    if (!isInSearch && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      setSearch(e.key);
+      inputRef.current?.focus();
+      return;
     }
   };
 
@@ -88,7 +139,9 @@ export function QuickSwitcher() {
     >
       <div className="absolute inset-0 bg-black/50" />
       <div
-        className="relative w-[480px] bg-bg-elevated rounded-2xl overflow-hidden flex flex-col max-h-[520px]"
+        ref={panelRef}
+        tabIndex={-1}
+        className="relative w-[480px] bg-bg-elevated rounded-2xl overflow-hidden flex flex-col max-h-[520px] outline-none"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
