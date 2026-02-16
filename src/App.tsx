@@ -4,6 +4,7 @@ import { TreeCanvas } from "./components/TreeCanvas";
 import { ContentPanel } from "./components/ContentPanel";
 import { QuickSwitcher } from "./components/QuickSwitcher";
 import { NodeTypePopover } from "./components/NodeTypePopover";
+import { NodeSearch } from "./components/NodeSearch";
 import { useContextStore } from "./stores/contextStore";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useUIStore } from "./stores/uiStore";
@@ -33,6 +34,7 @@ export default function App() {
       </main>
       <QuickSwitcher />
       <NodeTypePopover />
+      <NodeSearch />
     </div>
   );
 }

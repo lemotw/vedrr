@@ -6,6 +6,7 @@ interface UIStore {
   typePopoverNodeId: string | null;
   contentPanelFocused: boolean;
   markdownEditorNodeId: string | null;
+  nodeSearchOpen: boolean;
 
   toggleQuickSwitcher: () => void;
   openQuickSwitcher: () => void;
@@ -16,6 +17,8 @@ interface UIStore {
   setContentPanelFocused: (v: boolean) => void;
   openMarkdownEditor: (nodeId: string) => void;
   closeMarkdownEditor: () => void;
+  openNodeSearch: () => void;
+  closeNodeSearch: () => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -24,6 +27,7 @@ export const useUIStore = create<UIStore>((set) => ({
   typePopoverNodeId: null,
   contentPanelFocused: false,
   markdownEditorNodeId: null,
+  nodeSearchOpen: false,
 
   toggleQuickSwitcher: () => set((s) => ({ quickSwitcherOpen: !s.quickSwitcherOpen })),
   openQuickSwitcher: () => set({ quickSwitcherOpen: true }),
@@ -34,4 +38,6 @@ export const useUIStore = create<UIStore>((set) => ({
   setContentPanelFocused: (v) => set({ contentPanelFocused: v }),
   openMarkdownEditor: (nodeId) => set({ markdownEditorNodeId: nodeId }),
   closeMarkdownEditor: () => set({ markdownEditorNodeId: null, contentPanelFocused: false }),
+  openNodeSearch: () => set({ nodeSearchOpen: true }),
+  closeNodeSearch: () => set({ nodeSearchOpen: false }),
 }));

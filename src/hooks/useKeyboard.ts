@@ -30,7 +30,7 @@ function getSiblings(tree: TreeData, id: string): TreeData[] {
 }
 
 export function useKeyboard() {
-  const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover, contentPanelFocused, markdownEditorNodeId, openMarkdownEditor, closeMarkdownEditor } = useUIStore();
+  const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover, contentPanelFocused, markdownEditorNodeId, openMarkdownEditor, closeMarkdownEditor, nodeSearchOpen, openNodeSearch } = useUIStore();
   const { tree, selectedNodeId, copiedNodeId, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile, reorderNode } = useTreeStore();
   const { currentContextId } = useContextStore();
 
@@ -40,6 +40,13 @@ export function useKeyboard() {
       if (e.metaKey && e.key === "k" && !e.shiftKey) {
         e.preventDefault();
         openQuickSwitcher();
+        return;
+      }
+
+      // ⌘F — Node Search (always active)
+      if (e.metaKey && e.key === "f" && !e.shiftKey) {
+        e.preventDefault();
+        openNodeSearch();
         return;
       }
 
@@ -66,8 +73,8 @@ export function useKeyboard() {
         return;
       }
 
-      // Don't handle tree keys when switcher is open, editing, content panel focused, or type popover open
-      if (quickSwitcherOpen || editingNodeId || typePopoverNodeId || contentPanelFocused) return;
+      // Don't handle tree keys when switcher/search is open, editing, content panel focused, or type popover open
+      if (quickSwitcherOpen || nodeSearchOpen || editingNodeId || typePopoverNodeId || contentPanelFocused) return;
       if (!tree || !currentContextId) return;
 
       // Alt+j/↓ Alt+k/↑ — reorder node among siblings
@@ -168,7 +175,7 @@ export function useKeyboard() {
     }
 
     function handlePaste(e: ClipboardEvent) {
-      if (quickSwitcherOpen || editingNodeId || typePopoverNodeId || contentPanelFocused) return;
+      if (quickSwitcherOpen || nodeSearchOpen || editingNodeId || typePopoverNodeId || contentPanelFocused) return;
       if (!tree || !currentContextId || !selectedNodeId) return;
       const items = e.clipboardData?.items;
 
@@ -216,6 +223,6 @@ export function useKeyboard() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("paste", handlePaste);
     };
-  }, [tree, selectedNodeId, copiedNodeId, currentContextId, quickSwitcherOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId,
-      openQuickSwitcher, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, openMarkdownEditor, closeMarkdownEditor]);
+  }, [tree, selectedNodeId, copiedNodeId, currentContextId, quickSwitcherOpen, nodeSearchOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId,
+      openQuickSwitcher, openNodeSearch, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, openMarkdownEditor, closeMarkdownEditor]);
 }
