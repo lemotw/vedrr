@@ -29,11 +29,13 @@ function AddButton({
   );
 }
 
-function TreeBranch({ data, isRoot }: { data: TreeData; isRoot?: boolean }) {
-  const { selectedNodeId, selectNode, addChild, addSibling } = useTreeStore();
+function TreeBranch({ data, isRoot, ancestorCut }: { data: TreeData; isRoot?: boolean; ancestorCut?: boolean }) {
+  const { selectedNodeId, selectNode, addChild, addSibling, copiedNodeId, isCut } = useTreeStore();
   const { currentContextId } = useContextStore();
   const hasChildren = data.children.length > 0;
   const isSelected = selectedNodeId === data.node.id;
+  const isCutHere = isCut && copiedNodeId === data.node.id;
+  const inCutSubtree = ancestorCut || isCutHere;
 
   return (
     <div className="flex items-start">
@@ -43,6 +45,7 @@ function TreeBranch({ data, isRoot }: { data: TreeData; isRoot?: boolean }) {
           node={data.node}
           isRoot={isRoot}
           isSelected={isSelected}
+          isCutNode={inCutSubtree}
           onClick={() => selectNode(data.node.id)}
         />
         {/* Add child button — visible on hover or when selected */}
@@ -93,7 +96,7 @@ function TreeBranch({ data, isRoot }: { data: TreeData; isRoot?: boolean }) {
                   />
                 </div>
                 <div style={{ paddingTop: isFirst ? 0 : 8 }}>
-                  <TreeBranch data={child} />
+                  <TreeBranch data={child} ancestorCut={inCutSubtree} />
                 </div>
               </div>
             );

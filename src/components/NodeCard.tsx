@@ -10,10 +10,11 @@ interface Props {
   node: TreeNode;
   isRoot?: boolean;
   isSelected?: boolean;
+  isCutNode?: boolean;
   onClick: () => void;
 }
 
-export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
+export function NodeCard({ node, isRoot, isSelected, isCutNode, onClick }: Props) {
   const { letter, color } = NODE_TYPE_CONFIG[node.node_type as NodeType];
   const { updateNodeTitle, openOrAttachFile, pickAndImportImage } = useTreeStore();
   const { editingNodeId, setEditingNode, openTypePopover, openContextMenu } = useUIStore();
@@ -51,7 +52,7 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
     return (
       <div
         ref={cardRef}
-        className={`cursor-pointer px-1 py-0.5 rounded ${isSelected ? "ring-1 ring-accent-primary" : ""}`}
+        className={`cursor-pointer px-1 py-0.5 rounded ${isSelected ? "ring-1 ring-accent-primary" : ""} ${isCutNode ? "opacity-40" : ""}`}
         onClick={onClick}
         onDoubleClick={() => setEditingNode(node.id)}
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
@@ -112,7 +113,8 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
       <div
         ref={cardRef}
         className={`flex items-center gap-2 rounded-md bg-bg-card cursor-pointer overflow-hidden
-          ${isSelected ? "ring-1 ring-accent-primary" : "hover:ring-1 hover:ring-white/10"}`}
+          ${isSelected ? "ring-1 ring-accent-primary" : "hover:ring-1 hover:ring-white/10"}
+          ${isCutNode ? "opacity-40" : ""}`}
         onClick={onClick}
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
         onDoubleClick={() => {

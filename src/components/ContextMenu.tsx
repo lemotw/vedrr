@@ -17,7 +17,7 @@ type MenuEntry = MenuItem | "separator";
 
 export function ContextMenu() {
   const { contextMenuNodeId, contextMenuPosition, closeContextMenu, setEditingNode, openTypePopover, openMarkdownEditor } = useUIStore();
-  const { tree, copiedNodeId, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, reorderNode } = useTreeStore();
+  const { tree, copiedNodeId, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, reorderNode } = useTreeStore();
   const { currentContextId } = useContextStore();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -84,6 +84,16 @@ export function ContextMenu() {
       disabled: isRoot,
     },
     {
+      label: "Cut",
+      shortcut: "⌘X",
+      icon: "✂",
+      action: () => exec(() => {
+        cutNode(contextMenuNodeId);
+        navigator.clipboard.writeText("mindflow:node:" + contextMenuNodeId);
+      }),
+      disabled: isRoot,
+    },
+    {
       label: "Paste",
       shortcut: "⌘V",
       icon: "⎘",
@@ -119,7 +129,7 @@ export function ContextMenu() {
   // Filter out disabled-for-root items that make no sense
   const filtered = items.filter((item) => {
     if (item === "separator") return true;
-    if (isRoot && (item.label === "Add Sibling" || item.label === "Copy" || item.label === "Move Up" || item.label === "Move Down" || item.label === "Delete")) return false;
+    if (isRoot && (item.label === "Add Sibling" || item.label === "Copy" || item.label === "Cut" || item.label === "Move Up" || item.label === "Move Down" || item.label === "Delete")) return false;
     return true;
   });
 

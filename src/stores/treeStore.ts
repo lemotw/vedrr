@@ -30,11 +30,13 @@ interface TreeStore {
   tree: TreeData | null;
   selectedNodeId: string | null;
   copiedNodeId: string | null;
+  isCut: boolean;
   undoStack: UndoEntry[];
 
   loadTree: (contextId: string) => Promise<void>;
   selectNode: (id: string | null) => void;
   copyNode: (nodeId: string | null) => void;
+  cutNode: (nodeId: string) => void;
   pasteNodeUnder: (targetParentId: string, contextId: string) => Promise<void>;
   addChild: (parentId: string, contextId: string) => Promise<void>;
   addSibling: (nodeId: string, contextId: string) => Promise<void>;
@@ -80,10 +82,15 @@ function pushUndo(stack: UndoEntry[], entry: UndoEntry): UndoEntry[] {
   return next.length > MAX_UNDO ? next.slice(next.length - MAX_UNDO) : next;
 }
 
+function clearCut(get: () => TreeStore, set: (s: Partial<TreeStore>) => void) {
+  if (get().isCut) set({ copiedNodeId: null, isCut: false });
+}
+
 export const useTreeStore = create<TreeStore>((set, get) => ({
   tree: null,
   selectedNodeId: null,
   copiedNodeId: null,
+  isCut: false,
   undoStack: [],
 
   loadTree: async (contextId: string) => {
@@ -101,19 +108,34 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   copyNode: (nodeId: string | null) => {
-    set({ copiedNodeId: nodeId });
+    set({ copiedNodeId: nodeId, isCut: false });
+  },
+
+  cutNode: (nodeId: string) => {
+    set({ copiedNodeId: nodeId, isCut: true });
   },
 
   pasteNodeUnder: async (targetParentId, contextId) => {
-    const { copiedNodeId, selectedNodeId, undoStack } = get();
+    const { copiedNodeId, isCut, tree, selectedNodeId, undoStack } = get();
     if (!copiedNodeId) return;
     const newId = await ipc.cloneSubtree(copiedNodeId, targetParentId, contextId);
-    set({ undoStack: pushUndo(undoStack, { type: "add", nodeId: newId, contextId, prevSelectedId: selectedNodeId }) });
+    let newStack = pushUndo(undoStack, { type: "add", nodeId: newId, contextId, prevSelectedId: selectedNodeId });
+    if (isCut && tree) {
+      const target = findNode(tree, copiedNodeId);
+      if (target) {
+        const nodes = flattenNodes(target);
+        newStack = pushUndo(newStack, { type: "delete", nodes, contextId, prevSelectedId: selectedNodeId });
+      }
+      await ipc.deleteNode(copiedNodeId);
+      set({ copiedNodeId: null, isCut: false });
+    }
+    set({ undoStack: newStack });
     await get().loadTree(contextId);
     set({ selectedNodeId: newId });
   },
 
   addChild: async (parentId, contextId) => {
+    clearCut(get, set);
     const { selectedNodeId, undoStack } = get();
     const node = await ipc.createNode(contextId, parentId, NodeTypes.TEXT, "");
     set({ undoStack: pushUndo(undoStack, { type: "add", nodeId: node.id, contextId, prevSelectedId: selectedNodeId }) });
@@ -123,6 +145,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   addSibling: async (nodeId, contextId) => {
+    clearCut(get, set);
     const { tree, selectedNodeId, undoStack } = get();
     if (!tree) return;
     const parent = findParent(tree, nodeId);
@@ -135,6 +158,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   deleteNode: async (nodeId, contextId) => {
+    clearCut(get, set);
     const { tree, selectedNodeId, undoStack } = get();
     if (!tree || tree.node.id === nodeId) return;
     const target = findNode(tree, nodeId);
@@ -155,6 +179,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   updateNodeTitle: async (nodeId, title) => {
+    clearCut(get, set);
     const { tree, undoStack } = get();
     if (!tree) return;
     const target = findNode(tree, nodeId);
@@ -171,6 +196,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   updateNodeContent: async (nodeId, content) => {
+    clearCut(get, set);
     const { tree, undoStack } = get();
     if (!tree) return;
     const target = findNode(tree, nodeId);
@@ -182,6 +208,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   updateNodeType: async (nodeId, nodeType) => {
+    clearCut(get, set);
     const { tree, undoStack } = get();
     if (!tree) return;
     const target = findNode(tree, nodeId);
@@ -193,6 +220,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   pasteAsNode: async (parentId, contextId, data) => {
+    clearCut(get, set);
     const { selectedNodeId, undoStack } = get();
     if (data.kind === PasteKind.IMAGE) {
       const node = await ipc.createNode(contextId, parentId, NodeTypes.IMAGE, `Image ${new Date().toLocaleTimeString()}`);
@@ -263,6 +291,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   reorderNode: async (nodeId, direction, contextId) => {
+    clearCut(get, set);
     const { tree, undoStack } = get();
     if (!tree) return;
     const parent = findParent(tree, nodeId);
@@ -285,6 +314,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   undo: async () => {
+    clearCut(get, set);
     const { undoStack } = get();
     if (undoStack.length === 0) return;
     const entry = undoStack[undoStack.length - 1];

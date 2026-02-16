@@ -45,7 +45,7 @@ function getNodesAtDepth(tree: TreeData, targetDepth: number, currentDepth: numb
 
 export function useKeyboard() {
   const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover, contentPanelFocused, markdownEditorNodeId, openMarkdownEditor, closeMarkdownEditor, nodeSearchOpen, openNodeSearch, contextMenuNodeId, closeContextMenu } = useUIStore();
-  const { tree, selectedNodeId, copiedNodeId, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile, reorderNode, undo } = useTreeStore();
+  const { tree, selectedNodeId, copiedNodeId, isCut, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile, reorderNode, undo } = useTreeStore();
   const { currentContextId } = useContextStore();
 
   useEffect(() => {
@@ -80,6 +80,15 @@ export function useKeyboard() {
         return;
       }
 
+      // ⌘X — Cut node (when not editing): copy + mark as cut
+      if (e.metaKey && e.key === "x" && !editingNodeId && !contentPanelFocused && !quickSwitcherOpen
+          && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
+        e.preventDefault();
+        cutNode(selectedNodeId);
+        navigator.clipboard.writeText("mindflow:node:" + selectedNodeId);
+        return;
+      }
+
       // Escape closes context menu
       if (e.key === "Escape" && contextMenuNodeId) {
         e.preventDefault();
@@ -94,7 +103,7 @@ export function useKeyboard() {
         return;
       }
 
-      // Escape clears copied node
+      // Escape clears copied/cut node
       if (e.key === "Escape" && copiedNodeId) {
         e.preventDefault();
         copyNode(null);
@@ -255,6 +264,6 @@ export function useKeyboard() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("paste", handlePaste);
     };
-  }, [tree, selectedNodeId, copiedNodeId, currentContextId, quickSwitcherOpen, nodeSearchOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId, contextMenuNodeId,
-      openQuickSwitcher, openNodeSearch, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, undo, openMarkdownEditor, closeMarkdownEditor, closeContextMenu]);
+  }, [tree, selectedNodeId, copiedNodeId, isCut, currentContextId, quickSwitcherOpen, nodeSearchOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId, contextMenuNodeId,
+      openQuickSwitcher, openNodeSearch, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, undo, openMarkdownEditor, closeMarkdownEditor, closeContextMenu]);
 }
