@@ -14,6 +14,7 @@ interface ContextStore {
   switchContext: (id: string) => Promise<void>;
   renameContext: (id: string, name: string) => Promise<void>;
   archiveContext: (id: string) => Promise<void>;
+  activateContext: (id: string) => Promise<void>;
   deleteContext: (id: string) => Promise<void>;
 }
 
@@ -55,6 +56,11 @@ export const useContextStore = create<ContextStore>((set, get) => ({
     } else {
       await get().loadContexts();
     }
+  },
+
+  activateContext: async (id: string) => {
+    await ipc.activateContext(id);
+    await get().loadContexts();
   },
 
   deleteContext: async (id: string) => {

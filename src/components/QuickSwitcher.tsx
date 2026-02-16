@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useUIStore } from "../stores/uiStore";
 import { useContextStore } from "../stores/contextStore";
+import { ask } from "@tauri-apps/plugin-dialog";
 import type { ContextSummary } from "../lib/types";
 import { ContextStates } from "../lib/constants";
 
@@ -16,7 +17,7 @@ function timeAgo(dateStr: string): string {
 
 export function QuickSwitcher() {
   const { quickSwitcherOpen, closeQuickSwitcher } = useUIStore();
-  const { contexts, loadContexts, switchContext, createContext, currentContextId } = useContextStore();
+  const { contexts, loadContexts, switchContext, createContext, archiveContext, activateContext, deleteContext, currentContextId } = useContextStore();
   const [search, setSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -56,6 +57,27 @@ export function QuickSwitcher() {
     const name = search.trim() || "New Context";
     await createContext(name);
     closeQuickSwitcher();
+  };
+
+  const handleArchive = async (e: React.MouseEvent, ctx: ContextSummary) => {
+    e.stopPropagation();
+    await archiveContext(ctx.id);
+  };
+
+  const handleActivate = async (e: React.MouseEvent, ctx: ContextSummary) => {
+    e.stopPropagation();
+    await activateContext(ctx.id);
+  };
+
+  const handleDelete = async (e: React.MouseEvent, ctx: ContextSummary) => {
+    e.stopPropagation();
+    const confirmed = await ask(
+      `確定要永久刪除「${ctx.name}」？此操作無法復原。`,
+      { title: "刪除確認", kind: "warning" },
+    );
+    if (confirmed) {
+      await deleteContext(ctx.id);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -171,24 +193,35 @@ export function QuickSwitcher() {
               </div>
               {active.map((ctx) => {
                 const idx = allItems.indexOf(ctx);
+                const isCurrent = ctx.id === currentContextId;
                 return (
                   <div
                     key={ctx.id}
-                    className={`flex items-center justify-between px-4 py-2.5 cursor-pointer
+                    className={`group/row flex items-center px-4 py-2.5 cursor-pointer
                       ${idx === selectedIndex ? "bg-white/5" : ""}
-                      ${ctx.id === currentContextId ? "bg-accent-primary/8" : ""}`}
+                      ${isCurrent ? "bg-accent-primary/8" : ""}`}
                     onClick={() => handleSelect(ctx)}
                     onMouseEnter={() => setSelectedIndex(idx)}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] ${ctx.id === currentContextId ? "text-accent-primary" : "text-text-secondary"}`}>
-                        {ctx.id === currentContextId ? "▸" : "●"}
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className={`text-[10px] shrink-0 ${isCurrent ? "text-accent-primary" : "text-text-secondary"}`}>
+                        {isCurrent ? "▸" : "●"}
                       </span>
-                      <span className="text-[13px] text-text-primary font-mono">{ctx.name}</span>
+                      <span className="text-[13px] text-text-primary font-mono truncate">{ctx.name}</span>
                     </div>
-                    <span className="text-[10px] text-text-secondary font-mono">
-                      {timeAgo(ctx.last_accessed_at)}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <span className="text-[10px] text-text-secondary font-mono">
+                        {ctx.node_count}n · {timeAgo(ctx.last_accessed_at)}
+                      </span>
+                      <button
+                        className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
+                          text-text-secondary hover:text-text-primary hover:bg-white/10 transition-all cursor-pointer"
+                        onClick={(e) => handleArchive(e, ctx)}
+                        title="Archive"
+                      >
+                        📦
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -208,18 +241,36 @@ export function QuickSwitcher() {
                 return (
                   <div
                     key={ctx.id}
-                    className={`flex items-center justify-between px-4 py-2.5 cursor-pointer
+                    className={`group/row flex items-center px-4 py-2.5 cursor-pointer
                       ${idx === selectedIndex ? "bg-white/5" : ""}`}
                     onClick={() => handleSelect(ctx)}
                     onMouseEnter={() => setSelectedIndex(idx)}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-text-secondary">○</span>
-                      <span className="text-[13px] text-text-primary font-mono">{ctx.name}</span>
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-[10px] text-text-secondary shrink-0">○</span>
+                      <span className="text-[13px] text-text-secondary font-mono truncate">{ctx.name}</span>
                     </div>
-                    <span className="text-[10px] text-text-secondary font-mono">
-                      {timeAgo(ctx.last_accessed_at)}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <span className="text-[10px] text-text-secondary font-mono">
+                        {ctx.node_count}n · {timeAgo(ctx.last_accessed_at)}
+                      </span>
+                      <button
+                        className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
+                          text-text-secondary hover:text-text-primary hover:bg-white/10 transition-all cursor-pointer"
+                        onClick={(e) => handleActivate(e, ctx)}
+                        title="Activate"
+                      >
+                        ↩
+                      </button>
+                      <button
+                        className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
+                          text-text-secondary hover:text-[#FF4444] hover:bg-white/10 transition-all cursor-pointer"
+                        onClick={(e) => handleDelete(e, ctx)}
+                        title="Delete"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 );
               })}
