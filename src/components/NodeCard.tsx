@@ -16,7 +16,7 @@ interface Props {
 export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
   const { letter, color } = NODE_TYPE_CONFIG[node.node_type as NodeType];
   const { updateNodeTitle, openOrAttachFile, pickAndImportImage } = useTreeStore();
-  const { editingNodeId, setEditingNode, openTypePopover } = useUIStore();
+  const { editingNodeId, setEditingNode, openTypePopover, openContextMenu } = useUIStore();
   const isEditing = editingNodeId === node.id;
   const cardRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -54,6 +54,7 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
         className={`cursor-pointer px-1 py-0.5 rounded ${isSelected ? "ring-1 ring-accent-primary" : ""}`}
         onClick={onClick}
         onDoubleClick={() => setEditingNode(node.id)}
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
       >
         {isEditing ? (
           <input
@@ -113,6 +114,7 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
         className={`flex items-center gap-2 rounded-md bg-bg-card cursor-pointer overflow-hidden
           ${isSelected ? "ring-1 ring-accent-primary" : "hover:ring-1 hover:ring-white/10"}`}
         onClick={onClick}
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
         onDoubleClick={() => {
           if (node.node_type === NodeTypes.MARKDOWN) {
             useUIStore.getState().openMarkdownEditor(node.id);

@@ -44,7 +44,7 @@ function getNodesAtDepth(tree: TreeData, targetDepth: number, currentDepth: numb
 }
 
 export function useKeyboard() {
-  const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover, contentPanelFocused, markdownEditorNodeId, openMarkdownEditor, closeMarkdownEditor, nodeSearchOpen, openNodeSearch } = useUIStore();
+  const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover, contentPanelFocused, markdownEditorNodeId, openMarkdownEditor, closeMarkdownEditor, nodeSearchOpen, openNodeSearch, contextMenuNodeId, closeContextMenu } = useUIStore();
   const { tree, selectedNodeId, copiedNodeId, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile, reorderNode, undo } = useTreeStore();
   const { currentContextId } = useContextStore();
 
@@ -80,6 +80,13 @@ export function useKeyboard() {
         return;
       }
 
+      // Escape closes context menu
+      if (e.key === "Escape" && contextMenuNodeId) {
+        e.preventDefault();
+        closeContextMenu();
+        return;
+      }
+
       // Escape closes markdown editor (before other guards so it works while editing)
       if (e.key === "Escape" && markdownEditorNodeId) {
         e.preventDefault();
@@ -94,8 +101,8 @@ export function useKeyboard() {
         return;
       }
 
-      // Don't handle tree keys when switcher/search is open, editing, content panel focused, or type popover open
-      if (quickSwitcherOpen || nodeSearchOpen || editingNodeId || typePopoverNodeId || contentPanelFocused) return;
+      // Don't handle tree keys when switcher/search is open, editing, content panel focused, type popover or context menu open
+      if (quickSwitcherOpen || nodeSearchOpen || editingNodeId || typePopoverNodeId || contentPanelFocused || contextMenuNodeId) return;
       if (!tree || !currentContextId) return;
 
       // Alt+j/↓ Alt+k/↑ — reorder node among siblings
@@ -200,7 +207,7 @@ export function useKeyboard() {
     }
 
     function handlePaste(e: ClipboardEvent) {
-      if (quickSwitcherOpen || nodeSearchOpen || editingNodeId || typePopoverNodeId || contentPanelFocused) return;
+      if (quickSwitcherOpen || nodeSearchOpen || editingNodeId || typePopoverNodeId || contentPanelFocused || contextMenuNodeId) return;
       if (!tree || !currentContextId || !selectedNodeId) return;
       const items = e.clipboardData?.items;
 
@@ -248,6 +255,6 @@ export function useKeyboard() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("paste", handlePaste);
     };
-  }, [tree, selectedNodeId, copiedNodeId, currentContextId, quickSwitcherOpen, nodeSearchOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId,
-      openQuickSwitcher, openNodeSearch, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, undo, openMarkdownEditor, closeMarkdownEditor]);
+  }, [tree, selectedNodeId, copiedNodeId, currentContextId, quickSwitcherOpen, nodeSearchOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId, contextMenuNodeId,
+      openQuickSwitcher, openNodeSearch, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, undo, openMarkdownEditor, closeMarkdownEditor, closeContextMenu]);
 }
