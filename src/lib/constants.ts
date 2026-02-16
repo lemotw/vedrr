@@ -34,6 +34,7 @@ export const IpcCmd = {
   READ_FILE_BYTES: "read_file_bytes",
   SAVE_CLIPBOARD_IMAGE: "save_clipboard_image",
   IMPORT_IMAGE: "import_image",
+  CLONE_SUBTREE: "clone_subtree",
 } as const;
 
 // ── Paste Data Kinds ────────────────────────────────────────

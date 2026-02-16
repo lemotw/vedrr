@@ -9,9 +9,12 @@ import { useContextStore } from "./contextStore";
 interface TreeStore {
   tree: TreeData | null;
   selectedNodeId: string | null;
+  copiedNodeId: string | null;
 
   loadTree: (contextId: string) => Promise<void>;
   selectNode: (id: string | null) => void;
+  copyNode: (nodeId: string | null) => void;
+  pasteNodeUnder: (targetParentId: string, contextId: string) => Promise<void>;
   addChild: (parentId: string, contextId: string) => Promise<void>;
   addSibling: (nodeId: string, contextId: string) => Promise<void>;
   deleteNode: (nodeId: string, contextId: string) => Promise<void>;
@@ -21,6 +24,7 @@ interface TreeStore {
   pasteAsNode: (parentId: string, contextId: string, data: { kind: typeof PasteKind.IMAGE; blob: File; ext: string } | { kind: typeof PasteKind.TEXT; text: string }) => Promise<void>;
   openOrAttachFile: (nodeId: string) => Promise<void>;
   pickAndImportImage: (nodeId: string) => Promise<void>;
+  reorderNode: (nodeId: string, direction: "up" | "down", contextId: string) => Promise<void>;
 }
 
 function patchNode(tree: TreeData, nodeId: string, patch: Partial<TreeData["node"]>): TreeData {
@@ -51,6 +55,7 @@ function findParent(tree: TreeData, targetId: string): TreeData | null {
 export const useTreeStore = create<TreeStore>((set, get) => ({
   tree: null,
   selectedNodeId: null,
+  copiedNodeId: null,
 
   loadTree: async (contextId: string) => {
     const tree = await ipc.getTree(contextId);
@@ -64,6 +69,18 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     set({ selectedNodeId: id });
     const { markdownEditorNodeId, closeMarkdownEditor } = useUIStore.getState();
     if (markdownEditorNodeId && markdownEditorNodeId !== id) closeMarkdownEditor();
+  },
+
+  copyNode: (nodeId: string | null) => {
+    set({ copiedNodeId: nodeId });
+  },
+
+  pasteNodeUnder: async (targetParentId, contextId) => {
+    const { copiedNodeId } = get();
+    if (!copiedNodeId) return;
+    const newId = await ipc.cloneSubtree(copiedNodeId, targetParentId, contextId);
+    await get().loadTree(contextId);
+    set({ selectedNodeId: newId });
   },
 
   addChild: async (parentId, contextId) => {
@@ -196,5 +213,23 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     } else {
       set({ tree: patchNode(get().tree!, nodeId, { file_path: savedPath }) });
     }
+  },
+
+  reorderNode: async (nodeId, direction, contextId) => {
+    const { tree } = get();
+    if (!tree) return;
+    const parent = findParent(tree, nodeId);
+    if (!parent) return; // root node can't be reordered
+    const siblings = parent.children;
+    const idx = siblings.findIndex(s => s.node.id === nodeId);
+    if (idx < 0) return;
+    if (direction === "up" && idx > 0) {
+      await ipc.moveNode(nodeId, parent.node.id, siblings[idx - 1].node.position);
+    } else if (direction === "down" && idx < siblings.length - 1) {
+      await ipc.moveNode(nodeId, parent.node.id, siblings[idx + 1].node.position + 1);
+    } else {
+      return;
+    }
+    await get().loadTree(contextId);
   },
 }));

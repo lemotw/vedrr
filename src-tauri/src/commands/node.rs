@@ -19,11 +19,17 @@ fn row_to_node(row: &rusqlite::Row) -> rusqlite::Result<TreeNode> {
     })
 }
 
+const MAX_TREE_DEPTH: u32 = 50;
+
 fn build_tree(
     db: &rusqlite::Connection,
     context_id: &str,
     parent_id: Option<&str>,
+    depth: u32,
 ) -> Result<Vec<TreeData>, MindFlowError> {
+    if depth > MAX_TREE_DEPTH {
+        return Ok(Vec::new());
+    }
     let mut stmt = db.prepare(
         "SELECT id, context_id, parent_id, position, node_type, title, content, file_path, created_at, updated_at
          FROM tree_nodes WHERE context_id = ?1 AND parent_id IS ?2
@@ -36,7 +42,7 @@ fn build_tree(
     let mut result = Vec::new();
     for node in nodes {
         let node_id = node.id.clone();
-        let children = build_tree(db, context_id, Some(&node_id))?;
+        let children = build_tree(db, context_id, Some(&node_id), depth + 1)?;
         result.push(TreeData { node, children });
     }
     Ok(result)
@@ -69,7 +75,7 @@ pub fn get_tree(
         row_to_node,
     )?;
 
-    let children = build_tree(&db, &context_id, Some(&root_id))?;
+    let children = build_tree(&db, &context_id, Some(&root_id), 1)?;
     Ok(Some(TreeData {
         node: root,
         children,
@@ -201,4 +207,84 @@ pub fn move_node(
         rusqlite::params![new_parent_id, position, id],
     )?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn clone_subtree(
+    state: State<'_, AppState>,
+    source_id: String,
+    target_parent_id: String,
+    context_id: String,
+) -> Result<String, MindFlowError> {
+    let db = state.db.lock().unwrap();
+
+    // Prevent cloning a node under itself or its descendants
+    fn is_descendant(db: &rusqlite::Connection, node_id: &str, ancestor_id: &str) -> bool {
+        if node_id == ancestor_id { return true; }
+        let parent: Option<String> = db.query_row(
+            "SELECT parent_id FROM tree_nodes WHERE id = ?1",
+            [node_id],
+            |row| row.get(0),
+        ).unwrap_or(None);
+        match parent {
+            Some(pid) => is_descendant(db, &pid, ancestor_id),
+            None => false,
+        }
+    }
+    if is_descendant(&db, &target_parent_id, &source_id) {
+        return Err(MindFlowError::Other("Cannot paste a node under itself or its descendants".into()));
+    }
+
+    fn clone_recursive(
+        db: &rusqlite::Connection,
+        source_id: &str,
+        new_parent_id: &str,
+        context_id: &str,
+    ) -> Result<String, MindFlowError> {
+        let src = db.query_row(
+            "SELECT node_type, title, content, file_path FROM tree_nodes WHERE id = ?1",
+            [source_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            },
+        )?;
+
+        let new_id = uuid::Uuid::new_v4().to_string();
+        let max_pos: i32 = db
+            .query_row(
+                "SELECT COALESCE(MAX(position), -1) FROM tree_nodes WHERE context_id = ?1 AND parent_id = ?2",
+                rusqlite::params![context_id, new_parent_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(-1);
+
+        db.execute(
+            "INSERT INTO tree_nodes (id, context_id, parent_id, position, node_type, title, content, file_path)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            rusqlite::params![new_id, context_id, new_parent_id, max_pos + 1, src.0, src.1, src.2, src.3],
+        )?;
+
+        // Clone children
+        let children: Vec<String> = {
+            let mut stmt = db.prepare(
+                "SELECT id FROM tree_nodes WHERE parent_id = ?1 ORDER BY position",
+            )?;
+            let rows = stmt.query_map([source_id], |row| row.get(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            rows
+        };
+        for child_id in children {
+            clone_recursive(db, &child_id, &new_id, context_id)?;
+        }
+
+        Ok(new_id)
+    }
+
+    let new_root_id = clone_recursive(&db, &source_id, &target_parent_id, &context_id)?;
+    Ok(new_root_id)
 }

@@ -56,6 +56,9 @@ export const ipc = {
   pickFile: () =>
     openDialog({ multiple: false, directory: false }),
 
+  cloneSubtree: (sourceId: string, targetParentId: string, contextId: string) =>
+    invoke<string>(IpcCmd.CLONE_SUBTREE, { sourceId, targetParentId, contextId }),
+
   pickImage: () =>
     openDialog({
       multiple: false,

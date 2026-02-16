@@ -31,7 +31,7 @@ function getSiblings(tree: TreeData, id: string): TreeData[] {
 
 export function useKeyboard() {
   const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover, contentPanelFocused, markdownEditorNodeId, openMarkdownEditor, closeMarkdownEditor } = useUIStore();
-  const { tree, selectedNodeId, selectNode, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile } = useTreeStore();
+  const { tree, selectedNodeId, copiedNodeId, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile, reorderNode } = useTreeStore();
   const { currentContextId } = useContextStore();
 
   useEffect(() => {
@@ -43,6 +43,15 @@ export function useKeyboard() {
         return;
       }
 
+      // ⌘C — Copy node (when not editing): write marker to clipboard
+      if (e.metaKey && e.key === "c" && !editingNodeId && !contentPanelFocused && !quickSwitcherOpen
+          && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
+        e.preventDefault();
+        copyNode(selectedNodeId);
+        navigator.clipboard.writeText("mindflow:node:" + selectedNodeId);
+        return;
+      }
+
       // Escape closes markdown editor (before other guards so it works while editing)
       if (e.key === "Escape" && markdownEditorNodeId) {
         e.preventDefault();
@@ -50,9 +59,30 @@ export function useKeyboard() {
         return;
       }
 
+      // Escape clears copied node
+      if (e.key === "Escape" && copiedNodeId) {
+        e.preventDefault();
+        copyNode(null);
+        return;
+      }
+
       // Don't handle tree keys when switcher is open, editing, content panel focused, or type popover open
       if (quickSwitcherOpen || editingNodeId || typePopoverNodeId || contentPanelFocused) return;
       if (!tree || !currentContextId) return;
+
+      // Alt+j/↓ Alt+k/↑ — reorder node among siblings
+      if (e.altKey && selectedNodeId && selectedNodeId !== tree.node.id) {
+        if (e.code === "KeyJ" || e.key === "ArrowDown") {
+          e.preventDefault();
+          reorderNode(selectedNodeId, "down", currentContextId);
+          return;
+        }
+        if (e.code === "KeyK" || e.key === "ArrowUp") {
+          e.preventDefault();
+          reorderNode(selectedNodeId, "up", currentContextId);
+          return;
+        }
+      }
 
       switch (e.key) {
         // j/↓ k/↑ — breadth: move between siblings
@@ -138,33 +168,44 @@ export function useKeyboard() {
     }
 
     function handlePaste(e: ClipboardEvent) {
-      if (quickSwitcherOpen || editingNodeId || typePopoverNodeId) return;
+      if (quickSwitcherOpen || editingNodeId || typePopoverNodeId || contentPanelFocused) return;
       if (!tree || !currentContextId || !selectedNodeId) return;
       const items = e.clipboardData?.items;
-      if (!items || items.length === 0) return;
 
-      // Extract blob/text synchronously before clipboard data expires
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.type.startsWith("image/")) {
-          const blob = item.getAsFile();
-          if (!blob) continue;
-          e.preventDefault();
-          const ext = item.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
-          pasteAsNode(selectedNodeId, currentContextId, { kind: PasteKind.IMAGE, blob, ext });
-          return;
+      // 1. Clipboard has image → paste as image node
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.type.startsWith("image/")) {
+            const blob = item.getAsFile();
+            if (!blob) continue;
+            e.preventDefault();
+            const ext = item.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
+            pasteAsNode(selectedNodeId, currentContextId, { kind: PasteKind.IMAGE, blob, ext });
+            return;
+          }
         }
       }
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.type === "text/plain") {
-          e.preventDefault();
-          item.getAsString((text) => {
-            if (text.trim()) {
-              pasteAsNode(selectedNodeId!, currentContextId!, { kind: PasteKind.TEXT, text });
-            }
-          });
-          return;
+
+      // 2. Clipboard has text → check if it's a node marker or regular text
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.type === "text/plain") {
+            e.preventDefault();
+            item.getAsString((text) => {
+              if (text.startsWith("mindflow:node:")) {
+                // Internal node copy → clone subtree
+                const sourceId = text.replace("mindflow:node:", "");
+                if (sourceId) {
+                  pasteNodeUnder(selectedNodeId!, currentContextId!);
+                }
+              } else if (text.trim()) {
+                pasteAsNode(selectedNodeId!, currentContextId!, { kind: PasteKind.TEXT, text });
+              }
+            });
+            return;
+          }
         }
       }
     }
@@ -175,6 +216,6 @@ export function useKeyboard() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("paste", handlePaste);
     };
-  }, [tree, selectedNodeId, currentContextId, quickSwitcherOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId,
-      openQuickSwitcher, selectNode, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, openMarkdownEditor, closeMarkdownEditor]);
+  }, [tree, selectedNodeId, copiedNodeId, currentContextId, quickSwitcherOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId,
+      openQuickSwitcher, selectNode, copyNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, openMarkdownEditor, closeMarkdownEditor]);
 }
