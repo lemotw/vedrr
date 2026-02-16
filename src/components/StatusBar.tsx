@@ -1,12 +1,13 @@
 import { useContextStore } from "../stores/contextStore";
 import { useUIStore } from "../stores/uiStore";
+import { ContextStates } from "../lib/constants";
 
 export function StatusBar() {
   const { contexts, currentContextId } = useContextStore();
   const { openQuickSwitcher } = useUIStore();
 
   const current = contexts.find((c) => c.id === currentContextId);
-  const activeCount = contexts.filter((c) => c.state === "active").length;
+  const activeCount = contexts.filter((c) => c.state === ContextStates.ACTIVE).length;
 
   return (
     <div className="flex items-center justify-between h-11 px-5 bg-bg-card shrink-0">

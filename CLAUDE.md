@@ -55,8 +55,9 @@ src/
 │   ├── treeStore.ts            # Tree + node CRUD state + paste logic
 │   └── uiStore.ts              # UI flags (switcher, editing, popover)
 └── lib/
+    ├── constants.ts            # Centralized enums: NodeTypes, ContextStates, IpcCmd, PasteKind, imageMime()
     ├── types.ts                # TS types + NODE_TYPE_CONFIG
-    └── ipc.ts                  # Tauri invoke wrappers (14 calls)
+    └── ipc.ts                  # Tauri invoke wrappers (16 calls)
 
 src-tauri/src/
 ├── main.rs                     # Tauri entry, AppState { db: Mutex<Connection> }
@@ -66,7 +67,7 @@ src-tauri/src/
 └── commands/
     ├── context.rs              # create/list/switch/archive/activate/rename/delete
     ├── node.rs                 # get_tree/create_node/update_node/delete_node/move_node
-    └── file_ops.rs             # read_file_bytes / save_clipboard_image
+    └── file_ops.rs             # read_file_bytes / save_clipboard_image / import_image
 ```
 
 ## DB Schema
@@ -106,12 +107,27 @@ tree_nodes (id, context_id → contexts, parent_id → self, position, node_type
 | 1-4 | Quick switch type (in popover) |
 | ⌘K | Quick Switcher |
 | Ctrl+V | Paste as node (image auto-detect) |
-| Esc | Close lightbox / cancel edit |
+| Esc | Close lightbox / cancel edit / close markdown editor |
+| o | Open/attach file (FILE node) / pick image (IMAGE node) |
 
 ## File Storage
 
 - DB: `~/MindFlow/data/mindflow.db`
 - Images: `~/MindFlow/files/{context_id}/{node_id_prefix}.{ext}`
+
+## Constants & Enums
+
+All string enums are centralized in `src/lib/constants.ts`:
+
+| Constant | Values | Usage |
+|----------|--------|-------|
+| `NodeTypes` | TEXT, MARKDOWN, IMAGE, FILE | Node type checks, create calls |
+| `ContextStates` | ACTIVE, ARCHIVED, VAULT | Context filtering |
+| `IpcCmd` | 16 Tauri invoke command names | `ipc.ts` invoke calls |
+| `PasteKind` | IMAGE, TEXT | Paste handler dispatch |
+| `imageMime(ext)` | Maps ext → MIME string | Image blob creation |
+
+**Rule**: Never use raw strings for these values. Always import from `constants.ts`.
 
 ---
 
@@ -138,3 +154,8 @@ tree_nodes (id, context_id → contexts, parent_id → self, position, node_type
 
 - j/k = sibling navigation (breadth-first), h/l = parent/child (depth). NOT DFS flatten order.
 - Root node title changes sync to context name (bidirectional via `rename_context` backend).
+
+### State Management
+
+- **Markdown editor**: Explicit open/close via `uiStore.openMarkdownEditor(nodeId)` / `closeMarkdownEditor()`. Auto-closes when `treeStore.selectNode` switches to a different node.
+- **Image import**: `import_image` Rust command copies file into `~/MindFlow/files/` so originals can be deleted safely. Frontend `pickImage()` restricts to image extensions via `tauri-plugin-dialog` filters.

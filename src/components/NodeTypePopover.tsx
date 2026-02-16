@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { NodeType } from "../lib/types";
 import { NODE_TYPE_CONFIG } from "../lib/types";
+import { NODE_TYPE_LIST } from "../lib/constants";
 import { useTreeStore } from "../stores/treeStore";
 import { useUIStore } from "../stores/uiStore";
-
-const NODE_TYPES: NodeType[] = ["text", "markdown", "image", "file"];
 
 function findNodeType(tree: import("../lib/types").TreeData, nodeId: string): NodeType | null {
   if (tree.node.id === nodeId) return tree.node.node_type;
@@ -27,7 +26,7 @@ export function NodeTypePopover() {
 
   useEffect(() => {
     if (typePopoverNodeId && currentType) {
-      setSelectedIndex(NODE_TYPES.indexOf(currentType));
+      setSelectedIndex(NODE_TYPE_LIST.indexOf(currentType));
       setTimeout(() => panelRef.current?.focus(), 30);
     }
   }, [typePopoverNodeId, currentType]);
@@ -48,7 +47,7 @@ export function NodeTypePopover() {
     const num = parseInt(e.key);
     if (num >= 1 && num <= 4) {
       e.preventDefault();
-      handleSelect(NODE_TYPES[num - 1]);
+      handleSelect(NODE_TYPE_LIST[num - 1]);
       return;
     }
 
@@ -56,7 +55,7 @@ export function NodeTypePopover() {
       case "j":
       case "ArrowDown":
         e.preventDefault();
-        setSelectedIndex((i) => Math.min(i + 1, NODE_TYPES.length - 1));
+        setSelectedIndex((i) => Math.min(i + 1, NODE_TYPE_LIST.length - 1));
         break;
       case "k":
       case "ArrowUp":
@@ -65,7 +64,7 @@ export function NodeTypePopover() {
         break;
       case "Enter":
         e.preventDefault();
-        handleSelect(NODE_TYPES[selectedIndex]);
+        handleSelect(NODE_TYPE_LIST[selectedIndex]);
         break;
       case "Escape":
       case "t":
@@ -95,7 +94,7 @@ export function NodeTypePopover() {
           </span>
         </div>
         <div className="py-1">
-          {NODE_TYPES.map((type, i) => {
+          {NODE_TYPE_LIST.map((type, i) => {
             const { letter, color } = NODE_TYPE_CONFIG[type];
             const isCurrent = type === currentType;
             const isHighlighted = i === selectedIndex;

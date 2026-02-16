@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { ContextSummary } from "../lib/types";
 import { ipc } from "../lib/ipc";
+import { ContextStates } from "../lib/constants";
 
 interface ContextStore {
   contexts: ContextSummary[];
@@ -47,7 +48,7 @@ export const useContextStore = create<ContextStore>((set, get) => ({
     const { currentContextId } = get();
     if (currentContextId === id) {
       const contexts = await ipc.listContexts();
-      const next = contexts.find(c => c.state === "active" && c.id !== id);
+      const next = contexts.find(c => c.state === ContextStates.ACTIVE && c.id !== id);
       set({ currentContextId: next?.id ?? null, contexts });
     } else {
       await get().loadContexts();

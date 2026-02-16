@@ -39,9 +39,11 @@ export interface TreeData {
   children: TreeData[];
 }
 
+import { NodeTypes } from "./constants";
+
 export const NODE_TYPE_CONFIG: Record<NodeType, { letter: string; color: string }> = {
-  text:     { letter: "T", color: "var(--color-node-text)" },
-  markdown: { letter: "M", color: "var(--color-node-markdown)" },
-  image:    { letter: "I", color: "var(--color-node-image)" },
-  file:     { letter: "F", color: "var(--color-node-file)" },
+  [NodeTypes.TEXT]:     { letter: "T", color: "var(--color-node-text)" },
+  [NodeTypes.MARKDOWN]: { letter: "M", color: "var(--color-node-markdown)" },
+  [NodeTypes.IMAGE]:    { letter: "I", color: "var(--color-node-image)" },
+  [NodeTypes.FILE]:     { letter: "F", color: "var(--color-node-file)" },
 };

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { TreeData, NodeType } from "../lib/types";
 import { ipc } from "../lib/ipc";
+import { NodeTypes, PasteKind } from "../lib/constants";
 import { useUIStore } from "./uiStore";
 import { useContextStore } from "./contextStore";
 
@@ -15,8 +16,10 @@ interface TreeStore {
   deleteNode: (nodeId: string, contextId: string) => Promise<void>;
   updateNodeTitle: (nodeId: string, title: string) => Promise<void>;
   updateNodeType: (nodeId: string, nodeType: NodeType) => Promise<void>;
-  pasteAsNode: (parentId: string, contextId: string, data: { kind: "image"; blob: File; ext: string } | { kind: "text"; text: string }) => Promise<void>;
+  updateNodeContent: (nodeId: string, content: string) => Promise<void>;
+  pasteAsNode: (parentId: string, contextId: string, data: { kind: typeof PasteKind.IMAGE; blob: File; ext: string } | { kind: typeof PasteKind.TEXT; text: string }) => Promise<void>;
   openOrAttachFile: (nodeId: string) => Promise<void>;
+  pickAndImportImage: (nodeId: string) => Promise<void>;
 }
 
 function patchNode(tree: TreeData, nodeId: string, patch: Partial<TreeData["node"]>): TreeData {
@@ -56,10 +59,14 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     set({ tree, selectedNodeId: autoSelect });
   },
 
-  selectNode: (id) => set({ selectedNodeId: id }),
+  selectNode: (id) => {
+    set({ selectedNodeId: id });
+    const { markdownEditorNodeId, closeMarkdownEditor } = useUIStore.getState();
+    if (markdownEditorNodeId && markdownEditorNodeId !== id) closeMarkdownEditor();
+  },
 
   addChild: async (parentId, contextId) => {
-    const node = await ipc.createNode(contextId, parentId, "text", "");
+    const node = await ipc.createNode(contextId, parentId, NodeTypes.TEXT, "");
     await get().loadTree(contextId);
     set({ selectedNodeId: node.id });
     useUIStore.getState().setEditingNode(node.id);
@@ -70,7 +77,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     if (!tree) return;
     const parent = findParent(tree, nodeId);
     if (!parent) return;
-    const node = await ipc.createNode(contextId, parent.node.id, "text", "");
+    const node = await ipc.createNode(contextId, parent.node.id, NodeTypes.TEXT, "");
     await get().loadTree(contextId);
     set({ selectedNodeId: node.id });
     useUIStore.getState().setEditingNode(node.id);
@@ -96,6 +103,14 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     }
   },
 
+  updateNodeContent: async (nodeId, content) => {
+    await ipc.updateNode(nodeId, { content });
+    const { tree } = get();
+    if (tree) {
+      set({ tree: patchNode(tree, nodeId, { content }) });
+    }
+  },
+
   updateNodeType: async (nodeId, nodeType) => {
     await ipc.updateNode(nodeId, { nodeType });
     const { tree } = get();
@@ -105,8 +120,8 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   pasteAsNode: async (parentId, contextId, data) => {
-    if (data.kind === "image") {
-      const node = await ipc.createNode(contextId, parentId, "image", `Image ${new Date().toLocaleTimeString()}`);
+    if (data.kind === PasteKind.IMAGE) {
+      const node = await ipc.createNode(contextId, parentId, NodeTypes.IMAGE, `Image ${new Date().toLocaleTimeString()}`);
       const buffer = await data.blob.arrayBuffer();
       const bytes = Array.from(new Uint8Array(buffer));
       const savedPath = await ipc.saveClipboardImage(contextId, node.id, bytes, data.ext);
@@ -116,7 +131,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     } else {
       const title = data.text.trim().split("\n")[0].slice(0, 200);
       if (!title) return;
-      const node = await ipc.createNode(contextId, parentId, "text", title);
+      const node = await ipc.createNode(contextId, parentId, NodeTypes.TEXT, title);
       if (data.text.trim().length > title.length) {
         await ipc.updateNode(node.id, { content: data.text.trim() });
       }
@@ -133,7 +148,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     if (!target) return;
     const { node } = target;
     const type = node.node_type;
-    if (type !== "file" && type !== "markdown") return;
+    if (type !== NodeTypes.FILE && type !== NodeTypes.MARKDOWN) return;
 
     if (node.file_path) {
       // Reveal in Finder
@@ -149,6 +164,28 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
         await ipc.updateNode(nodeId, { title: fileName });
       }
       set({ tree: patchNode(tree, nodeId, { file_path: filePath, title: node.title || fileName }) });
+    }
+  },
+
+  pickAndImportImage: async (nodeId) => {
+    const { tree } = get();
+    if (!tree) return;
+    const target = findNode(tree, nodeId);
+    if (!target || target.node.node_type !== NodeTypes.IMAGE) return;
+
+    const filePath = await ipc.pickImage();
+    if (!filePath) return;
+
+    const contextId = target.node.context_id;
+    const savedPath = await ipc.importImage(contextId, nodeId, filePath);
+    await ipc.updateNode(nodeId, { filePath: savedPath });
+
+    const fileName = filePath.split("/").pop()?.replace(/\.[^.]+$/, "") || "Image";
+    if (!target.node.title || target.node.title.startsWith("Image ")) {
+      await ipc.updateNode(nodeId, { title: fileName });
+      set({ tree: patchNode(get().tree!, nodeId, { file_path: savedPath, title: fileName }) });
+    } else {
+      set({ tree: patchNode(get().tree!, nodeId, { file_path: savedPath }) });
     }
   },
 }));

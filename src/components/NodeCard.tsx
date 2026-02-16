@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import type { TreeNode, NodeType } from "../lib/types";
 import { NODE_TYPE_CONFIG } from "../lib/types";
+import { NodeTypes, imageMime } from "../lib/constants";
 import { useTreeStore } from "../stores/treeStore";
 import { useUIStore } from "../stores/uiStore";
 import { ipc } from "../lib/ipc";
@@ -14,7 +15,7 @@ interface Props {
 
 export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
   const { letter, color } = NODE_TYPE_CONFIG[node.node_type as NodeType];
-  const { updateNodeTitle, openOrAttachFile } = useTreeStore();
+  const { updateNodeTitle, openOrAttachFile, pickAndImportImage } = useTreeStore();
   const { editingNodeId, setEditingNode, openTypePopover } = useUIStore();
   const isEditing = editingNodeId === node.id;
   const cardRef = useRef<HTMLDivElement>(null);
@@ -72,8 +73,8 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
     );
   }
 
-  const isFileish = node.node_type === "file" || node.node_type === "markdown";
-  const isImage = node.node_type === "image" && node.file_path;
+  const isFileish = node.node_type === NodeTypes.FILE;
+  const isImage = node.node_type === NodeTypes.IMAGE && node.file_path;
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [showLightbox, setShowLightbox] = useState(false);
 
@@ -95,10 +96,7 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
     ipc.readFileBytes(node.file_path).then((bytes) => {
       if (revoked) return;
       const ext = node.file_path!.split(".").pop() || "png";
-      const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg"
-        : ext === "gif" ? "image/gif"
-        : ext === "webp" ? "image/webp"
-        : "image/png";
+      const mime = imageMime(ext);
       const blob = new Blob([new Uint8Array(bytes)], { type: mime });
       setImageSrc(URL.createObjectURL(blob));
     }).catch(() => setImageSrc(null));
@@ -115,7 +113,13 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
         className={`flex items-center gap-2 rounded-md bg-bg-card cursor-pointer overflow-hidden
           ${isSelected ? "ring-1 ring-accent-primary" : "hover:ring-1 hover:ring-white/10"}`}
         onClick={onClick}
-        onDoubleClick={() => setEditingNode(node.id)}
+        onDoubleClick={() => {
+          if (node.node_type === NodeTypes.MARKDOWN) {
+            useUIStore.getState().openMarkdownEditor(node.id);
+          } else {
+            setEditingNode(node.id);
+          }
+        }}
       >
         {imageSrc && (
           <div
@@ -161,6 +165,16 @@ export function NodeCard({ node, isRoot, isSelected, onClick }: Props) {
               title={node.file_path ? "Reveal in Finder (O)" : "Attach file (O)"}
             >
               {node.file_path ? "open" : "attach"}
+            </button>
+          )}
+          {node.node_type === NodeTypes.IMAGE && !node.file_path && (
+            <button
+              className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 cursor-pointer
+                bg-bg-elevated text-text-secondary hover:text-text-primary hover:ring-1 hover:ring-white/20 transition-colors"
+              onClick={(e) => { e.stopPropagation(); pickAndImportImage(node.id); }}
+              title="Choose image"
+            >
+              pick
             </button>
           )}
         </div>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useUIStore } from "../stores/uiStore";
 import { useContextStore } from "../stores/contextStore";
 import type { ContextSummary } from "../lib/types";
+import { ContextStates } from "../lib/constants";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -36,8 +37,8 @@ export function QuickSwitcher() {
     return contexts.filter((c) => c.name.toLowerCase().includes(q));
   }, [contexts, search]);
 
-  const active = filtered.filter((c) => c.state === "active");
-  const archived = filtered.filter((c) => c.state === "archived");
+  const active = filtered.filter((c) => c.state === ContextStates.ACTIVE);
+  const archived = filtered.filter((c) => c.state === ContextStates.ARCHIVED);
   const allItems: ContextSummary[] = [...active, ...archived];
 
   useEffect(() => {
