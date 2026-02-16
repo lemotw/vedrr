@@ -23,10 +23,24 @@ function findParentInTree(tree: TreeData, id: string): TreeData | null {
   return null;
 }
 
-// Get siblings of the given node (returns parent's children, or [root] if root)
-function getSiblings(tree: TreeData, id: string): TreeData[] {
-  const parent = findParentInTree(tree, id);
-  return parent ? parent.children : [tree];
+// Get the depth of a node in the tree (-1 if not found)
+function getNodeDepth(tree: TreeData, id: string, depth: number = 0): number {
+  if (tree.node.id === id) return depth;
+  for (const child of tree.children) {
+    const found = getNodeDepth(child, id, depth + 1);
+    if (found >= 0) return found;
+  }
+  return -1;
+}
+
+// Collect all nodes at a given depth, in left-to-right (visual top-to-bottom) order
+function getNodesAtDepth(tree: TreeData, targetDepth: number, currentDepth: number = 0): TreeData[] {
+  if (currentDepth === targetDepth) return [tree];
+  const result: TreeData[] = [];
+  for (const child of tree.children) {
+    result.push(...getNodesAtDepth(child, targetDepth, currentDepth + 1));
+  }
+  return result;
 }
 
 export function useKeyboard() {
@@ -99,15 +113,17 @@ export function useKeyboard() {
       }
 
       switch (e.key) {
-        // j/↓ k/↑ — breadth: move between siblings
+        // j/↓ k/↑ — move between nodes at the same depth level (across subtrees)
         case "j":
         case "ArrowDown": {
           e.preventDefault();
           if (!selectedNodeId) break;
-          const siblingsDown = getSiblings(tree, selectedNodeId);
-          const idxDown = siblingsDown.findIndex(s => s.node.id === selectedNodeId);
-          if (idxDown < siblingsDown.length - 1) {
-            selectNode(siblingsDown[idxDown + 1].node.id);
+          const depthDown = getNodeDepth(tree, selectedNodeId);
+          if (depthDown < 0) break;
+          const layerDown = getNodesAtDepth(tree, depthDown);
+          const idxDown = layerDown.findIndex(s => s.node.id === selectedNodeId);
+          if (idxDown < layerDown.length - 1) {
+            selectNode(layerDown[idxDown + 1].node.id);
           }
           break;
         }
@@ -115,10 +131,12 @@ export function useKeyboard() {
         case "ArrowUp": {
           e.preventDefault();
           if (!selectedNodeId) break;
-          const siblingsUp = getSiblings(tree, selectedNodeId);
-          const idxUp = siblingsUp.findIndex(s => s.node.id === selectedNodeId);
+          const depthUp = getNodeDepth(tree, selectedNodeId);
+          if (depthUp < 0) break;
+          const layerUp = getNodesAtDepth(tree, depthUp);
+          const idxUp = layerUp.findIndex(s => s.node.id === selectedNodeId);
           if (idxUp > 0) {
-            selectNode(siblingsUp[idxUp - 1].node.id);
+            selectNode(layerUp[idxUp - 1].node.id);
           }
           break;
         }
