@@ -107,6 +107,22 @@ pub fn activate_context(state: State<'_, AppState>, id: String) -> Result<(), Mi
 }
 
 #[tauri::command]
+pub fn rename_context(state: State<'_, AppState>, id: String, name: String) -> Result<(), MindFlowError> {
+    let db = state.db.lock().unwrap();
+    // Update context name
+    db.execute(
+        "UPDATE contexts SET name = ?1, updated_at = datetime('now') WHERE id = ?2",
+        rusqlite::params![name, id],
+    )?;
+    // Sync root node title
+    db.execute(
+        "UPDATE tree_nodes SET title = ?1, updated_at = datetime('now') WHERE id = (SELECT root_node_id FROM contexts WHERE id = ?2)",
+        rusqlite::params![name, id],
+    )?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn delete_context(state: State<'_, AppState>, id: String) -> Result<(), MindFlowError> {
     let db = state.db.lock().unwrap();
     db.execute("DELETE FROM contexts WHERE id = ?1", [&id])?;

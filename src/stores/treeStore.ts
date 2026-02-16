@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { TreeData, NodeType } from "../lib/types";
 import { ipc } from "../lib/ipc";
 import { useUIStore } from "./uiStore";
+import { useContextStore } from "./contextStore";
 
 interface TreeStore {
   tree: TreeData | null;
@@ -14,6 +15,7 @@ interface TreeStore {
   deleteNode: (nodeId: string, contextId: string) => Promise<void>;
   updateNodeTitle: (nodeId: string, title: string) => Promise<void>;
   updateNodeType: (nodeId: string, nodeType: NodeType) => Promise<void>;
+  pasteAsNode: (parentId: string, contextId: string, data: { kind: "image"; blob: File; ext: string } | { kind: "text"; text: string }) => Promise<void>;
 }
 
 function patchNode(tree: TreeData, nodeId: string, patch: Partial<TreeData["node"]>): TreeData {
@@ -77,6 +79,10 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     const { tree } = get();
     if (tree) {
       set({ tree: patchNode(tree, nodeId, { title }) });
+      // If editing root node, sync context name
+      if (tree.node.id === nodeId) {
+        useContextStore.getState().loadContexts();
+      }
     }
   },
 
@@ -85,6 +91,28 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     const { tree } = get();
     if (tree) {
       set({ tree: patchNode(tree, nodeId, { node_type: nodeType }) });
+    }
+  },
+
+  pasteAsNode: async (parentId, contextId, data) => {
+    if (data.kind === "image") {
+      const node = await ipc.createNode(contextId, parentId, "image", `Image ${new Date().toLocaleTimeString()}`);
+      const buffer = await data.blob.arrayBuffer();
+      const bytes = Array.from(new Uint8Array(buffer));
+      const savedPath = await ipc.saveClipboardImage(contextId, node.id, bytes, data.ext);
+      await ipc.updateNode(node.id, { filePath: savedPath });
+      await get().loadTree(contextId);
+      set({ selectedNodeId: node.id });
+    } else {
+      const title = data.text.trim().split("\n")[0].slice(0, 200);
+      if (!title) return;
+      const node = await ipc.createNode(contextId, parentId, "text", title);
+      if (data.text.trim().length > title.length) {
+        await ipc.updateNode(node.id, { content: data.text.trim() });
+      }
+      await get().loadTree(contextId);
+      set({ selectedNodeId: node.id });
+      useUIStore.getState().setEditingNode(node.id);
     }
   },
 }));

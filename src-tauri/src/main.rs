@@ -29,12 +29,15 @@ fn main() {
             commands::context::switch_context,
             commands::context::archive_context,
             commands::context::activate_context,
+            commands::context::rename_context,
             commands::context::delete_context,
             commands::node::get_tree,
             commands::node::create_node,
             commands::node::update_node,
             commands::node::delete_node,
             commands::node::move_node,
+            commands::file_ops::read_file_bytes,
+            commands::file_ops::save_clipboard_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

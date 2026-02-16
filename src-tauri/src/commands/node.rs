@@ -124,11 +124,17 @@ pub fn update_node(
     title: Option<String>,
     content: Option<String>,
     node_type: Option<String>,
+    file_path: Option<String>,
 ) -> Result<(), MindFlowError> {
     let db = state.db.lock().unwrap();
     if let Some(t) = title {
         db.execute(
             "UPDATE tree_nodes SET title = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![t, id],
+        )?;
+        // If this is a root node, sync context name
+        db.execute(
+            "UPDATE contexts SET name = ?1, updated_at = datetime('now') WHERE root_node_id = ?2",
             rusqlite::params![t, id],
         )?;
     }
@@ -142,6 +148,12 @@ pub fn update_node(
         db.execute(
             "UPDATE tree_nodes SET node_type = ?1, updated_at = datetime('now') WHERE id = ?2",
             rusqlite::params![nt, id],
+        )?;
+    }
+    if let Some(fp) = file_path {
+        db.execute(
+            "UPDATE tree_nodes SET file_path = ?1, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![fp, id],
         )?;
     }
     Ok(())

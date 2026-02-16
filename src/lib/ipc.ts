@@ -17,6 +17,9 @@ export const ipc = {
   activateContext: (id: string) =>
     invoke<void>("activate_context", { id }),
 
+  renameContext: (id: string, name: string) =>
+    invoke<void>("rename_context", { id, name }),
+
   deleteContext: (id: string) =>
     invoke<void>("delete_context", { id }),
 
@@ -26,8 +29,14 @@ export const ipc = {
   createNode: (contextId: string, parentId: string, nodeType: string, title: string) =>
     invoke<TreeNode>("create_node", { contextId, parentId, nodeType, title }),
 
-  updateNode: (id: string, updates: { title?: string; content?: string; nodeType?: string }) =>
+  updateNode: (id: string, updates: { title?: string; content?: string; nodeType?: string; filePath?: string }) =>
     invoke<void>("update_node", { id, ...updates }),
+
+  readFileBytes: (filePath: string) =>
+    invoke<number[]>("read_file_bytes", { filePath }),
+
+  saveClipboardImage: (contextId: string, nodeId: string, data: number[], extension: string) =>
+    invoke<string>("save_clipboard_image", { contextId, nodeId, data, extension }),
 
   deleteNode: (id: string) =>
     invoke<void>("delete_node", { id }),
