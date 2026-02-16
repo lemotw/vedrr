@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { TreeData, NodeType } from "../lib/types";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { ipc } from "../lib/ipc";
 import { NodeTypes, PasteKind } from "../lib/constants";
 import { useUIStore } from "./uiStore";
@@ -86,6 +87,14 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   deleteNode: async (nodeId, contextId) => {
     const { tree } = get();
     if (!tree || tree.node.id === nodeId) return;
+    const target = findNode(tree, nodeId);
+    if (target && target.children.length > 0) {
+      const confirmed = await ask(
+        `「${target.node.title || "Untitled"}」有 ${target.children.length} 個子節點，確定要刪除？`,
+        { title: "刪除確認", kind: "info" },
+      );
+      if (!confirmed) return;
+    }
     await ipc.deleteNode(nodeId);
     await get().loadTree(contextId);
     set({ selectedNodeId: null });
