@@ -1,6 +1,6 @@
 # Mind Flow — 待實作功能清單
 
-> 最後更新：2025-02-16
+> 最後更新：2026-02-17
 > 參考：PRD v1.0、目前 codebase 狀態
 
 ---
@@ -26,6 +26,16 @@
 - **Markdown 編輯器**（Tiptap split-panel：左側 tree、右側 editor、auto-save 到 `content` 欄位，雙擊開啟、Esc 關閉、切換節點自動關閉）
 - **Image 節點選圖匯入**（`pick` 按鈕 + 系統檔案選擇器限圖片格式 + 複製到 app 儲存區 `~/MindFlow/files/`）
 - **File 節點 attach/open**（無 file_path 時 attach 選擇檔案、有 file_path 時 Reveal in Finder）
+- **刪除確認**（有子節點時彈出確認 dialog）
+- **節點排序**（Alt+↑/↓ 同級節點移動）
+- **複製/貼上子樹**（⌘C/⌘V + clipboard marker 防外部文字覆蓋）
+- **搜尋**（⌘F 搜尋當前 tree 標題，高亮匹配 + 上下跳轉）
+- **復原**（⌘Z undo，支援 add/delete/title/type/content/reorder）
+- **同深度 j/k 導航**（跨子樹同層級移動）
+- **右鍵 Context Menu**（Edit、Change Type、Add Child/Sibling、Copy/Cut/Paste、Move Up/Down、Delete）
+- **剪下**（⌘X cut node，灰顯子樹，貼上後刪除原節點，非貼上操作自動取消）
+- **QuickSwitcher 狀態管理**（Active/Archived 分區、node count、archive 📦、activate ↩、delete ✕）
+- **拖放排序**（@dnd-kit：同級 reorder、跨父級 reparent、root drop zone、DragOverlay 預覽、Alt+h/l 鍵盤 reparent）
 
 ---
 
@@ -40,7 +50,7 @@
 | ~~3~~ | ~~選中節點自動捲動~~ | ~~已完成~~ | ~~S~~ | ✅ |
 | ~~4~~ | ~~節點收合/展開~~ | ~~不需要~~ | ~~M~~ | 取消 |
 | ~~5~~ | ~~Context 重新命名~~ | ~~已完成~~ | ~~S~~ | ✅ |
-| 6 | 刪除確認 | 刪除有子節點的 node 時應提示警告（或支援 undo）。 | S | 待實作 |
+| ~~6~~ | ~~刪除確認~~ | ~~已完成（子節點時 dialog 確認）~~ | ~~S~~ | ✅ |
 
 ---
 
@@ -48,12 +58,12 @@
 
 | # | 功能 | 說明 | 工時 | 狀態 |
 |---|------|------|------|------|
-| 7 | 右鍵 Context Menu | Node 上的統一選單：開啟、重新命名、變更類型、複製、上移/下移、刪除。 | M | 待實作 |
-| 8 | 節點排序（鍵盤） | Alt+↑ / Alt+↓ 在同級節點中移動位置。後端 `move_node` 已實作。 | S | 待實作 |
+| ~~7~~ | ~~右鍵 Context Menu~~ | ~~已完成（完整選單含 Edit/Type/Add/Copy/Cut/Paste/Move/Delete）~~ | ~~M~~ | ✅ |
+| ~~8~~ | ~~節點排序（鍵盤）~~ | ~~已完成（Alt+↑/↓）~~ | ~~S~~ | ✅ |
 | ~~9~~ | ~~Image 節點縮圖~~ | ~~已完成（thumbnail + lightbox + paste + pick import）~~ | ~~M~~ | ✅ |
 | ~~10~~ | ~~File 節點開啟~~ | ~~已完成（attach file + Reveal in Finder）~~ | ~~S~~ | ✅ |
-| 11 | 搜尋 | ⌘F 或 `/` 搜尋目前 tree 的標題。未來：跨 context 搜尋。 | M | 待實作 |
-| 12 | 復原/重做 | 至少支援復原最後一個破壞性操作（刪除 node）。用 Zustand middleware 或 command pattern。 | M | 待實作 |
+| ~~11~~ | ~~搜尋~~ | ~~已完成（⌘F 搜尋標題 + 上下跳轉 + 高亮）~~ | ~~M~~ | ✅ |
+| ~~12~~ | ~~復原/重做~~ | ~~已完成（⌘Z undo，支援 add/delete/title/type/content/reorder）~~ | ~~M~~ | ✅ |
 
 ---
 
@@ -63,11 +73,11 @@
 
 | # | 功能 | 說明 | 工時 | 狀態 |
 |---|------|------|------|------|
-| 13 | Context Manager 面板 | 完整 ⌘⇧K 面板，含 Active/Archived/Vault 分區、tag 篩選、統計數據。 | L | 待實作 |
+| 13 | Context Manager 面板 | 完整 ⌘⇧K 面板，含 Active/Archived/Vault 分區、tag 篩選、Common Knowledge、統計。**設計稿：`design/design.pen` 中 "Context Manager v2" (node `4f2aI`)** | L | 待實作 |
 | 14 | Tag 系統 | Context 上建立/編輯 tag，在 Context Manager 中用 tag 篩選。 | M | 待實作 |
 | 15 | 共用知識圖譜 | 跨 context 的共享 knowledge tree，用 d3-force 或 @xyflow/react 做 graph view。 | XL | 待實作 |
 | 16 | Insights 統計欄 | 每日/每週統計：建立的 node 數、活躍 context 數、使用時間。 | M | 待實作 |
-| 17 | 拖放排序 | 滑鼠拖動 node 重新排列/變更層級。交互模型複雜。 | L | 待實作 |
+| ~~17~~ | ~~拖放排序~~ | ~~已完成（@dnd-kit：同級 reorder + 跨父級 reparent + root drop zone + Alt+h/l 鍵盤 reparent + DragOverlay 預覽 + 橘色高亮）~~ | ~~L~~ | ✅ |
 | 18 | 效能優化（虛擬渲染） | 50+ 可見 node 的場景。虛擬渲染 + canvas 連接線。 | L | 待實作 |
 | 19 | 過場動畫 | 展開/收合、新增/刪除 node 的平滑動畫。 | M | 待實作 |
 | 20 | 跨平台 | Windows 支援，未來 iOS/iPad。 | XL | 待實作 |
@@ -83,10 +93,13 @@
 
 ---
 
+## 已知 Bug
+
+- **archiveContext 切換不完整**：歸檔當前 context 時只設了 `currentContextId`，未呼叫 `switchContext`，導致 tree 不更新。需改為 `switchContext(next.id)`。
+
 ## 建議下一輪 Sprint
 
-挑 3-5 項最有感的：
-
-1. **#8** 節點排序（S）— 鍵盤用戶需要，後端已完成
-2. **#6** 刪除確認（S）— 防止誤刪
-3. **#11** 搜尋（M）— 節點多時必備
+1. **archiveContext bug** — 快速修復（S）
+2. **#13** Context Manager 面板（L）— 設計稿已完成，可直接實作
+3. **#14** Tag 系統（M）— Context Manager 的依賴
+4. **#19** 過場動畫（M）— 新增/刪除/拖放動畫提升體感

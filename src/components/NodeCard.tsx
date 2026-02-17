@@ -11,10 +11,13 @@ interface Props {
   isRoot?: boolean;
   isSelected?: boolean;
   isCutNode?: boolean;
+  isDropTarget?: boolean;
   onClick: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dragHandleListeners?: Record<string, any>;
 }
 
-export function NodeCard({ node, isRoot, isSelected, isCutNode, onClick }: Props) {
+export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, onClick, dragHandleListeners }: Props) {
   const { letter, color } = NODE_TYPE_CONFIG[node.node_type as NodeType];
   const { updateNodeTitle, openOrAttachFile, pickAndImportImage } = useTreeStore();
   const { editingNodeId, setEditingNode, openTypePopover, openContextMenu } = useUIStore();
@@ -52,7 +55,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, onClick }: Props
     return (
       <div
         ref={cardRef}
-        className={`cursor-pointer px-1 py-0.5 rounded ${isSelected ? "ring-1 ring-accent-primary" : ""} ${isCutNode ? "opacity-40" : ""}`}
+        className={`cursor-pointer px-1 py-0.5 rounded ${isDropTarget ? "ring-2 ring-accent-primary bg-accent-primary/10" : isSelected ? "ring-1 ring-accent-primary" : ""} ${isCutNode ? "opacity-40" : ""}`}
         onClick={onClick}
         onDoubleClick={() => setEditingNode(node.id)}
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
@@ -113,7 +116,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, onClick }: Props
       <div
         ref={cardRef}
         className={`flex items-center gap-2 rounded-md bg-bg-card cursor-pointer overflow-hidden
-          ${isSelected ? "ring-1 ring-accent-primary" : "hover:ring-1 hover:ring-white/10"}
+          ${isDropTarget ? "ring-2 ring-accent-primary bg-accent-primary/10" : isSelected ? "ring-1 ring-accent-primary" : "hover:ring-1 hover:ring-white/10"}
           ${isCutNode ? "opacity-40" : ""}`}
         onClick={onClick}
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
@@ -124,6 +127,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, onClick }: Props
             setEditingNode(node.id);
           }
         }}
+        {...dragHandleListeners}
       >
         {imageSrc && (
           <div

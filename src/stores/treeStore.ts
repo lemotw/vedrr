@@ -15,7 +15,8 @@ type UndoEntry =
   | { type: "title"; nodeId: string; old: string }
   | { type: "type"; nodeId: string; old: NodeType }
   | { type: "content"; nodeId: string; old: string | null }
-  | { type: "reorder"; contextId: string; nodeId: string; parentId: string; oldPosition: number };
+  | { type: "reorder"; contextId: string; nodeId: string; parentId: string; oldPosition: number }
+  | { type: "move"; nodeId: string; contextId: string; oldParentId: string; oldPosition: number; prevSelectedId: string | null };
 
 // ── Helpers ────────────────────────────────────────────────
 function flattenNodes(td: TreeData): TreeNode[] {
@@ -48,6 +49,7 @@ interface TreeStore {
   openOrAttachFile: (nodeId: string) => Promise<void>;
   pickAndImportImage: (nodeId: string) => Promise<void>;
   reorderNode: (nodeId: string, direction: "up" | "down", contextId: string) => Promise<void>;
+  dragMoveNode: (nodeId: string, newParentId: string, position: number, contextId: string) => Promise<void>;
   undo: () => Promise<void>;
   clearUndo: () => void;
 }
@@ -59,7 +61,7 @@ function patchNode(tree: TreeData, nodeId: string, patch: Partial<TreeData["node
   return { ...tree, children: tree.children.map(c => patchNode(c, nodeId, patch)) };
 }
 
-function findNode(tree: TreeData, id: string): TreeData | null {
+export function findNode(tree: TreeData, id: string): TreeData | null {
   if (tree.node.id === id) return tree;
   for (const child of tree.children) {
     const found = findNode(child, id);
@@ -68,7 +70,7 @@ function findNode(tree: TreeData, id: string): TreeData | null {
   return null;
 }
 
-function findParent(tree: TreeData, targetId: string): TreeData | null {
+export function findParent(tree: TreeData, targetId: string): TreeData | null {
   for (const child of tree.children) {
     if (child.node.id === targetId) return tree;
     const found = findParent(child, targetId);
@@ -313,6 +315,26 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     await get().loadTree(contextId);
   },
 
+  dragMoveNode: async (nodeId, newParentId, position, contextId) => {
+    clearCut(get, set);
+    const { tree, undoStack, selectedNodeId } = get();
+    if (!tree) return;
+    const node = findNode(tree, nodeId);
+    if (!node || !node.node.parent_id) return; // Don't move root
+    // Prevent cycle: don't move node under its own descendant
+    if (findNode(node, newParentId)) return;
+    set({
+      undoStack: pushUndo(undoStack, {
+        type: "move", nodeId, contextId,
+        oldParentId: node.node.parent_id,
+        oldPosition: node.node.position,
+        prevSelectedId: selectedNodeId,
+      }),
+    });
+    await ipc.moveNode(nodeId, newParentId, position);
+    await get().loadTree(contextId);
+  },
+
   undo: async () => {
     clearCut(get, set);
     const { undoStack } = get();
@@ -359,6 +381,12 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       case "reorder": {
         await ipc.moveNode(entry.nodeId, entry.parentId, entry.oldPosition);
         await get().loadTree(entry.contextId);
+        break;
+      }
+      case "move": {
+        await ipc.moveNode(entry.nodeId, entry.oldParentId, entry.oldPosition);
+        await get().loadTree(entry.contextId);
+        set({ selectedNodeId: entry.prevSelectedId });
         break;
       }
     }

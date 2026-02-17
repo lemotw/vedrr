@@ -45,7 +45,7 @@ function getNodesAtDepth(tree: TreeData, targetDepth: number, currentDepth: numb
 
 export function useKeyboard() {
   const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover, contentPanelFocused, markdownEditorNodeId, openMarkdownEditor, closeMarkdownEditor, nodeSearchOpen, openNodeSearch, contextMenuNodeId, closeContextMenu } = useUIStore();
-  const { tree, selectedNodeId, copiedNodeId, isCut, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile, reorderNode, undo } = useTreeStore();
+  const { tree, selectedNodeId, copiedNodeId, isCut, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile, reorderNode, dragMoveNode, undo } = useTreeStore();
   const { currentContextId } = useContextStore();
 
   useEffect(() => {
@@ -115,6 +115,8 @@ export function useKeyboard() {
       if (!tree || !currentContextId) return;
 
       // Alt+j/↓ Alt+k/↑ — reorder node among siblings
+      // Alt+l/→ — reparent into previous sibling (become its last child)
+      // Alt+h/← — reparent to grandparent (become sibling of parent)
       if (e.altKey && selectedNodeId && selectedNodeId !== tree.node.id) {
         if (e.code === "KeyJ" || e.key === "ArrowDown") {
           e.preventDefault();
@@ -124,6 +126,31 @@ export function useKeyboard() {
         if (e.code === "KeyK" || e.key === "ArrowUp") {
           e.preventDefault();
           reorderNode(selectedNodeId, "up", currentContextId);
+          return;
+        }
+        if (e.code === "KeyL" || e.key === "ArrowRight") {
+          e.preventDefault();
+          // Move into previous sibling as last child
+          const parent = findParentInTree(tree, selectedNodeId);
+          if (!parent) return;
+          const siblings = parent.children;
+          const idx = siblings.findIndex(s => s.node.id === selectedNodeId);
+          if (idx <= 0) return; // no previous sibling
+          const prevSibling = siblings[idx - 1];
+          const lastPos = prevSibling.children.length > 0
+            ? prevSibling.children[prevSibling.children.length - 1].node.position + 1
+            : 0;
+          dragMoveNode(selectedNodeId, prevSibling.node.id, lastPos, currentContextId);
+          return;
+        }
+        if (e.code === "KeyH" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          // Move up to grandparent (become sibling of parent)
+          const parent = findParentInTree(tree, selectedNodeId);
+          if (!parent || parent.node.id === tree.node.id) return; // parent is root, can't go higher
+          const grandparent = findParentInTree(tree, parent.node.id);
+          if (!grandparent) return;
+          dragMoveNode(selectedNodeId, grandparent.node.id, parent.node.position + 1, currentContextId);
           return;
         }
       }
@@ -265,5 +292,5 @@ export function useKeyboard() {
       window.removeEventListener("paste", handlePaste);
     };
   }, [tree, selectedNodeId, copiedNodeId, isCut, currentContextId, quickSwitcherOpen, nodeSearchOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId, contextMenuNodeId,
-      openQuickSwitcher, openNodeSearch, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, undo, openMarkdownEditor, closeMarkdownEditor, closeContextMenu]);
+      openQuickSwitcher, openNodeSearch, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, dragMoveNode, undo, openMarkdownEditor, closeMarkdownEditor, closeContextMenu]);
 }
