@@ -114,6 +114,13 @@ export function QuickSwitcher() {
       return;
     }
 
+    // ⌘N — create new context
+    if (e.metaKey && e.key === "n") {
+      e.preventDefault();
+      handleCreate();
+      return;
+    }
+
     // Enter — select or create
     if (e.key === "Enter") {
       e.preventDefault();
@@ -288,9 +295,10 @@ export function QuickSwitcher() {
         <div className="flex items-center justify-between px-4 h-12 bg-bg-card">
           <button
             onClick={handleCreate}
-            className="px-3 py-1.5 text-[12px] font-bold text-white bg-accent-primary rounded-md font-mono cursor-pointer"
+            className="px-3 py-1.5 text-[12px] font-bold text-white bg-accent-primary rounded-md font-mono cursor-pointer flex items-center gap-2"
           >
             + New
+            <span className="text-[10px] opacity-70">⌘N</span>
           </button>
         </div>
       </div>
