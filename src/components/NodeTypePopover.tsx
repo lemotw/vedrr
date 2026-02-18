@@ -15,27 +15,31 @@ function findNodeType(tree: import("../lib/types").TreeData, nodeId: string): No
 }
 
 export function NodeTypePopover() {
-  const { typePopoverNodeId, closeTypePopover } = useUIStore();
+  const { typePopoverNodeId } = useUIStore();
+  if (!typePopoverNodeId) return null;
+  return <NodeTypePopoverInner key={typePopoverNodeId} nodeId={typePopoverNodeId} />;
+}
+
+function NodeTypePopoverInner({ nodeId }: { nodeId: string }) {
+  const { closeTypePopover } = useUIStore();
   const { tree, updateNodeType } = useTreeStore();
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const currentType = typePopoverNodeId && tree
-    ? findNodeType(tree, typePopoverNodeId)
-    : null;
+  const currentType = tree ? findNodeType(tree, nodeId) : null;
+
+  const [selectedIndex, setSelectedIndex] = useState(
+    () => (currentType ? NODE_TYPE_LIST.indexOf(currentType) : 0),
+  );
 
   useEffect(() => {
-    if (typePopoverNodeId && currentType) {
-      setSelectedIndex(NODE_TYPE_LIST.indexOf(currentType));
-      setTimeout(() => panelRef.current?.focus(), 30);
-    }
-  }, [typePopoverNodeId, currentType]);
+    setTimeout(() => panelRef.current?.focus(), 30);
+  }, []);
 
-  if (!typePopoverNodeId || !currentType) return null;
+  if (!currentType) return null;
 
   const handleSelect = (type: NodeType) => {
     if (type !== currentType) {
-      updateNodeType(typePopoverNodeId, type);
+      updateNodeType(nodeId, type);
     }
     closeTypePopover();
   };
@@ -102,7 +106,7 @@ export function NodeTypePopover() {
               <div
                 key={type}
                 className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors
-                  ${isHighlighted ? "bg-white/5" : ""}
+                  ${isHighlighted ? "bg-[var(--color-hover)]" : ""}
                   ${isCurrent ? "bg-accent-primary/10" : ""}`}
                 onClick={() => handleSelect(type)}
                 onMouseEnter={() => setSelectedIndex(i)}
@@ -122,7 +126,7 @@ export function NodeTypePopover() {
             );
           })}
         </div>
-        <div className="flex items-center gap-3 px-3 py-2 border-t border-[#444]">
+        <div className="flex items-center gap-3 px-3 py-2 border-t border-border">
           <span className="text-[9px] text-text-secondary font-mono">
             <kbd className="bg-bg-card px-1 py-0.5 rounded text-[8px]">1-4</kbd> switch
           </span>

@@ -15,7 +15,7 @@ function findNode(tree: TreeData, id: string): TreeData | null {
 }
 
 export function ContentPanel() {
-  const { tree, selectedNodeId, updateNodeContent, updateNodeTitle } = useTreeStore();
+  const { tree, updateNodeContent, updateNodeTitle } = useTreeStore();
   const { markdownEditorNodeId } = useUIStore();
 
   const targetId = markdownEditorNodeId;
@@ -40,9 +40,9 @@ export function ContentPanel() {
   if (!showPanel || !node) return null;
 
   return (
-    <div className="w-[480px] shrink-0 border-l border-white/5 bg-bg-page flex flex-col h-full">
+    <div className="w-[480px] shrink-0 border-l border-border bg-bg-page flex flex-col h-full">
       {/* Header with editable title */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 shrink-0">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-border shrink-0">
         <span className="text-[10px] font-mono font-bold text-node-markdown shrink-0">M</span>
         <PanelTitle
           key={node.id}

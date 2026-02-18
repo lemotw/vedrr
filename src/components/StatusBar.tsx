@@ -4,7 +4,7 @@ import { ContextStates } from "../lib/constants";
 
 export function StatusBar() {
   const { contexts, currentContextId } = useContextStore();
-  const { openQuickSwitcher } = useUIStore();
+  const { openQuickSwitcher, toggleThemeSwitcher } = useUIStore();
 
   const current = contexts.find((c) => c.id === currentContextId);
   const activeCount = contexts.filter((c) => c.state === ContextStates.ACTIVE).length;
@@ -19,12 +19,21 @@ export function StatusBar() {
           {activeCount} active
         </span>
       </div>
-      <button
-        onClick={openQuickSwitcher}
-        className="px-2 py-1 text-xs text-text-secondary bg-bg-elevated rounded cursor-pointer hover:bg-bg-card"
-      >
-        ⌘K
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={toggleThemeSwitcher}
+          className="px-2 py-1 text-xs text-text-secondary bg-bg-elevated rounded cursor-pointer hover:text-text-primary transition-colors"
+          title="Theme"
+        >
+          ◐
+        </button>
+        <button
+          onClick={openQuickSwitcher}
+          className="px-2 py-1 text-xs text-text-secondary bg-bg-elevated rounded cursor-pointer hover:bg-bg-card"
+        >
+          ⌘K
+        </button>
+      </div>
     </div>
   );
 }

@@ -38,6 +38,74 @@ export const IpcCmd = {
   RESTORE_NODES: "restore_nodes",
 } as const;
 
+// ── Themes ─────────────────────────────────────────────────
+export const Themes = {
+  OBSIDIAN: "obsidian",
+  MIDNIGHT: "midnight",
+  FOREST: "forest",
+  AMETHYST: "amethyst",
+  MOCHA: "mocha",
+  SLATE: "slate",
+  PAPER: "paper",
+  DAYLIGHT: "daylight",
+  CUSTOM: "custom",
+} as const;
+
+export type ThemeId = (typeof Themes)[keyof typeof Themes];
+
+export const THEME_META: Record<ThemeId, { name: string; accent: string }> = {
+  obsidian:  { name: "Obsidian",  accent: "#FF6B35" },
+  midnight:  { name: "Midnight",  accent: "#4FC3F7" },
+  forest:    { name: "Forest",    accent: "#4ADE80" },
+  amethyst:  { name: "Amethyst",  accent: "#A78BFA" },
+  mocha:     { name: "Mocha",     accent: "#F0A050" },
+  slate:     { name: "Slate",     accent: "#00D4AA" },
+  paper:     { name: "Paper",     accent: "#D4634B" },
+  daylight:  { name: "Daylight",  accent: "#2563EB" },
+  custom:    { name: "Custom",    accent: "#888888" },
+};
+
+export interface CustomThemeColors {
+  bgPage: string;
+  bgCard: string;
+  bgElevated: string;
+  accentPrimary: string;
+  textPrimary: string;
+  textSecondary: string;
+  border: string;
+}
+
+export const DEFAULT_CUSTOM_COLORS: CustomThemeColors = {
+  bgPage: "#1A1A1A",
+  bgCard: "#212121",
+  bgElevated: "#2D2D2D",
+  accentPrimary: "#FF6B35",
+  textPrimary: "#FFFFFF",
+  textSecondary: "#777777",
+  border: "#3D3D3D",
+};
+
+// Map CustomThemeColors keys to CSS variable names
+export const CUSTOM_COLOR_CSS_MAP: Record<keyof CustomThemeColors, string> = {
+  bgPage: "--color-bg-page",
+  bgCard: "--color-bg-card",
+  bgElevated: "--color-bg-elevated",
+  accentPrimary: "--color-accent-primary",
+  textPrimary: "--color-text-primary",
+  textSecondary: "--color-text-secondary",
+  border: "--color-border",
+};
+
+export const CUSTOM_COLOR_LABELS: Record<keyof CustomThemeColors, string> = {
+  bgPage: "Background",
+  bgCard: "Card",
+  bgElevated: "Elevated",
+  accentPrimary: "Accent",
+  textPrimary: "Text",
+  textSecondary: "Text 2nd",
+  border: "Border",
+};
+
 // ── Paste Data Kinds ────────────────────────────────────────
 export const PasteKind = {
   IMAGE: "image" as const,

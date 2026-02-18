@@ -6,6 +6,7 @@ import { QuickSwitcher } from "./components/QuickSwitcher";
 import { NodeTypePopover } from "./components/NodeTypePopover";
 import { NodeSearch } from "./components/NodeSearch";
 import { ContextMenu } from "./components/ContextMenu";
+import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { useContextStore } from "./stores/contextStore";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useUIStore } from "./stores/uiStore";
@@ -17,6 +18,9 @@ export default function App() {
   useKeyboard();
 
   useEffect(() => {
+    // Apply saved theme on startup
+    const { currentTheme, setTheme } = useUIStore.getState();
+    setTheme(currentTheme);
     loadContexts().then(() => {
       const active = useContextStore.getState().contexts.find(c => c.state === ContextStates.ACTIVE);
       if (active) switchContext(active.id);
@@ -37,6 +41,7 @@ export default function App() {
       <NodeTypePopover />
       <NodeSearch />
       <ContextMenu />
+      <ThemeSwitcher />
     </div>
   );
 }

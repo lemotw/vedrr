@@ -81,7 +81,7 @@ export function MarkdownEditor({ content, onSave }: Props) {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-1 px-3 py-2 border-b border-white/5 shrink-0 flex-wrap">
+      <div className="flex items-center gap-1 px-3 py-2 border-b border-border shrink-0 flex-wrap">
         <ToolBtn
           active={editor.isActive("heading", { level: 1 })}
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
@@ -170,7 +170,7 @@ function ToolBtn({
   return (
     <button
       className={`px-1.5 py-0.5 rounded text-[11px] font-mono cursor-pointer transition-colors
-        ${active ? "bg-accent-primary/20 text-accent-primary" : "text-text-secondary hover:text-text-primary hover:bg-white/5"}
+        ${active ? "bg-accent-primary/20 text-accent-primary" : "text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)]"}
         ${bold ? "font-bold" : ""} ${italic ? "italic" : ""} ${strike ? "line-through" : ""}`}
       onMouseDown={(e) => {
         e.preventDefault(); // prevent editor blur
@@ -183,5 +183,5 @@ function ToolBtn({
 }
 
 function Sep() {
-  return <div className="w-px h-4 bg-white/10 mx-0.5" />;
+  return <div className="w-px h-4 bg-border mx-0.5" />;
 }

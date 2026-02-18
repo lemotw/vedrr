@@ -117,7 +117,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, on
       <div
         ref={cardRef}
         className={`flex items-center gap-2 rounded-md bg-bg-card cursor-pointer overflow-hidden
-          ${isDropTarget ? "ring-2 ring-accent-primary bg-accent-primary/10" : isSelected ? "ring-1 ring-accent-primary" : "hover:ring-1 hover:ring-white/10"}
+          ${isDropTarget ? "ring-2 ring-accent-primary bg-accent-primary/10" : isSelected ? "ring-1 ring-accent-primary" : "hover:ring-1 hover:ring-border"}
           ${isCutNode ? "opacity-40" : ""}`}
         onClick={onClick}
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
@@ -144,7 +144,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, on
         )}
         <div className="flex items-center gap-2 px-3 py-2 whitespace-nowrap">
           <div
-            className="flex items-center justify-center w-5 h-5 rounded bg-bg-elevated shrink-0 cursor-pointer hover:ring-1 hover:ring-white/20"
+            className="flex items-center justify-center w-5 h-5 rounded bg-bg-elevated shrink-0 cursor-pointer hover:ring-1 hover:ring-border"
             onClick={(e) => { e.stopPropagation(); openTypePopover(node.id); }}
             title="Change type (T)"
           >
@@ -169,7 +169,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, on
           {isFileish && (
             <button
               className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 cursor-pointer
-                bg-bg-elevated text-text-secondary hover:text-text-primary hover:ring-1 hover:ring-white/20 transition-colors"
+                bg-bg-elevated text-text-secondary hover:text-text-primary hover:ring-1 hover:ring-border transition-colors"
               onClick={(e) => { e.stopPropagation(); openOrAttachFile(node.id); }}
               title={node.file_path ? "Reveal in Finder (O)" : "Attach file (O)"}
             >
@@ -179,7 +179,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, on
           {node.node_type === NodeTypes.IMAGE && !node.file_path && (
             <button
               className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 cursor-pointer
-                bg-bg-elevated text-text-secondary hover:text-text-primary hover:ring-1 hover:ring-white/20 transition-colors"
+                bg-bg-elevated text-text-secondary hover:text-text-primary hover:ring-1 hover:ring-border transition-colors"
               onClick={(e) => { e.stopPropagation(); pickAndImportImage(node.id); }}
               title="Choose image"
             >
@@ -191,7 +191,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, on
 
       {showLightbox && imageSrc && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)]"
           onClick={() => setShowLightbox(false)}
         >
           <img

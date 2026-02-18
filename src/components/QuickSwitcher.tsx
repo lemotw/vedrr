@@ -167,7 +167,7 @@ export function QuickSwitcher() {
       className="fixed inset-0 flex items-start justify-center pt-[20vh] z-50"
       onClick={closeQuickSwitcher}
     >
-      <div className="absolute inset-0 bg-black/50" />
+      <div className="absolute inset-0 bg-[var(--color-overlay)]" />
       <div
         ref={panelRef}
         tabIndex={-1}
@@ -205,7 +205,7 @@ export function QuickSwitcher() {
                   <div
                     key={ctx.id}
                     className={`group/row flex items-center px-4 py-2.5 cursor-pointer
-                      ${idx === selectedIndex ? "bg-white/5" : ""}
+                      ${idx === selectedIndex ? "bg-[var(--color-hover)]" : ""}
                       ${isCurrent ? "bg-accent-primary/8" : ""}`}
                     onClick={() => handleSelect(ctx)}
                     onMouseEnter={() => setSelectedIndex(idx)}
@@ -222,7 +222,7 @@ export function QuickSwitcher() {
                       </span>
                       <button
                         className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
-                          text-text-secondary hover:text-text-primary hover:bg-white/10 transition-all cursor-pointer"
+                          text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)] transition-all cursor-pointer"
                         onClick={(e) => handleArchive(e, ctx)}
                         title="Archive"
                       >
@@ -237,7 +237,7 @@ export function QuickSwitcher() {
 
           {archived.length > 0 && (
             <>
-              {active.length > 0 && <div className="h-px bg-[#444] mx-0" />}
+              {active.length > 0 && <div className="h-px bg-border mx-0" />}
               <div className="px-4 pt-3 pb-1.5">
                 <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
                   ARCHIVED
@@ -249,7 +249,7 @@ export function QuickSwitcher() {
                   <div
                     key={ctx.id}
                     className={`group/row flex items-center px-4 py-2.5 cursor-pointer
-                      ${idx === selectedIndex ? "bg-white/5" : ""}`}
+                      ${idx === selectedIndex ? "bg-[var(--color-hover)]" : ""}`}
                     onClick={() => handleSelect(ctx)}
                     onMouseEnter={() => setSelectedIndex(idx)}
                   >
@@ -263,7 +263,7 @@ export function QuickSwitcher() {
                       </span>
                       <button
                         className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
-                          text-text-secondary hover:text-text-primary hover:bg-white/10 transition-all cursor-pointer"
+                          text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)] transition-all cursor-pointer"
                         onClick={(e) => handleActivate(e, ctx)}
                         title="Activate"
                       >
@@ -271,7 +271,7 @@ export function QuickSwitcher() {
                       </button>
                       <button
                         className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
-                          text-text-secondary hover:text-[#FF4444] hover:bg-white/10 transition-all cursor-pointer"
+                          text-text-secondary hover:text-[#FF4444] hover:bg-[var(--color-hover)] transition-all cursor-pointer"
                         onClick={(e) => handleDelete(e, ctx)}
                         title="Delete"
                       >

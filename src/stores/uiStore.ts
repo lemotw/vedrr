@@ -1,4 +1,37 @@
 import { create } from "zustand";
+import { Themes, DEFAULT_CUSTOM_COLORS, CUSTOM_COLOR_CSS_MAP } from "../lib/constants";
+import type { ThemeId, CustomThemeColors } from "../lib/constants";
+
+function loadCustomColors(): CustomThemeColors {
+  try {
+    const raw = localStorage.getItem("mindflow-custom-theme");
+    if (raw) return { ...DEFAULT_CUSTOM_COLORS, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return { ...DEFAULT_CUSTOM_COLORS };
+}
+
+function applyCustomColors(colors: CustomThemeColors) {
+  const el = document.documentElement;
+  for (const [key, cssVar] of Object.entries(CUSTOM_COLOR_CSS_MAP)) {
+    el.style.setProperty(cssVar, colors[key as keyof CustomThemeColors]);
+  }
+  // Auto-compute overlay/hover from bgPage brightness
+  const r = parseInt(colors.bgPage.slice(1, 3), 16);
+  const g = parseInt(colors.bgPage.slice(3, 5), 16);
+  const b = parseInt(colors.bgPage.slice(5, 7), 16);
+  const isDark = (r * 299 + g * 587 + b * 114) / 1000 < 128;
+  el.style.setProperty("--color-overlay", isDark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.3)");
+  el.style.setProperty("--color-hover", isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)");
+}
+
+function clearCustomColors() {
+  const el = document.documentElement;
+  for (const cssVar of Object.values(CUSTOM_COLOR_CSS_MAP)) {
+    el.style.removeProperty(cssVar);
+  }
+  el.style.removeProperty("--color-overlay");
+  el.style.removeProperty("--color-hover");
+}
 
 interface UIStore {
   quickSwitcherOpen: boolean;
@@ -10,6 +43,9 @@ interface UIStore {
   contextMenuNodeId: string | null;
   contextMenuPosition: { x: number; y: number } | null;
   collapsedNodes: Set<string>;
+  currentTheme: ThemeId;
+  themeSwitcherOpen: boolean;
+  customThemeColors: CustomThemeColors;
 
   toggleQuickSwitcher: () => void;
   openQuickSwitcher: () => void;
@@ -25,6 +61,10 @@ interface UIStore {
   openContextMenu: (nodeId: string, x: number, y: number) => void;
   closeContextMenu: () => void;
   toggleCollapse: (nodeId: string) => void;
+  setTheme: (theme: ThemeId) => void;
+  setCustomColor: (key: keyof CustomThemeColors, value: string) => void;
+  toggleThemeSwitcher: () => void;
+  closeThemeSwitcher: () => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -37,6 +77,9 @@ export const useUIStore = create<UIStore>((set) => ({
   contextMenuNodeId: null,
   contextMenuPosition: null,
   collapsedNodes: new Set<string>(),
+  currentTheme: (localStorage.getItem("mindflow-theme") as ThemeId) || Themes.MOCHA,
+  themeSwitcherOpen: false,
+  customThemeColors: loadCustomColors(),
 
   toggleQuickSwitcher: () => set((s) => ({ quickSwitcherOpen: !s.quickSwitcherOpen })),
   openQuickSwitcher: () => set({ quickSwitcherOpen: true }),
@@ -56,4 +99,24 @@ export const useUIStore = create<UIStore>((set) => ({
     if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId);
     return { collapsedNodes: next };
   }),
+  setTheme: (theme) => {
+    localStorage.setItem("mindflow-theme", theme);
+    clearCustomColors();
+    if (theme === Themes.CUSTOM) {
+      document.documentElement.setAttribute("data-theme", "custom");
+      const colors = useUIStore.getState().customThemeColors;
+      applyCustomColors(colors);
+    } else {
+      document.documentElement.setAttribute("data-theme", theme === Themes.OBSIDIAN ? "" : theme);
+    }
+    set({ currentTheme: theme });
+  },
+  setCustomColor: (key, value) => {
+    const colors = { ...useUIStore.getState().customThemeColors, [key]: value };
+    localStorage.setItem("mindflow-custom-theme", JSON.stringify(colors));
+    applyCustomColors(colors);
+    set({ customThemeColors: colors });
+  },
+  toggleThemeSwitcher: () => set((s) => ({ themeSwitcherOpen: !s.themeSwitcherOpen })),
+  closeThemeSwitcher: () => set({ themeSwitcherOpen: false }),
 }));

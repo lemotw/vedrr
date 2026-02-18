@@ -189,18 +189,18 @@ export function ContextMenu() {
           left: contextMenuPosition.x,
           top: contextMenuPosition.y,
           boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-          border: "1px solid #3D3D3D",
+          border: "1px solid var(--color-border)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {cleaned.map((item, i) =>
           item === "separator" ? (
-            <div key={`sep-${i}`} className="h-px bg-[#3D3D3D] my-1 mx-2" />
+            <div key={`sep-${i}`} className="h-px bg-border my-1 mx-2" />
           ) : (
             <button
               key={item.label}
               className={`flex items-center w-full px-3 py-1.5 text-left gap-3 transition-colors cursor-pointer
-                ${item.disabled ? "opacity-40 pointer-events-none" : "hover:bg-white/5"}
+                ${item.disabled ? "opacity-40 pointer-events-none" : "hover:bg-[var(--color-hover)]"}
                 ${item.danger ? "text-[#FF4444]" : "text-text-primary"}`}
               onClick={item.action}
               disabled={item.disabled}
