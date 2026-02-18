@@ -9,6 +9,7 @@ interface UIStore {
   nodeSearchOpen: boolean;
   contextMenuNodeId: string | null;
   contextMenuPosition: { x: number; y: number } | null;
+  collapsedNodes: Set<string>;
 
   toggleQuickSwitcher: () => void;
   openQuickSwitcher: () => void;
@@ -23,6 +24,7 @@ interface UIStore {
   closeNodeSearch: () => void;
   openContextMenu: (nodeId: string, x: number, y: number) => void;
   closeContextMenu: () => void;
+  toggleCollapse: (nodeId: string) => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -34,6 +36,7 @@ export const useUIStore = create<UIStore>((set) => ({
   nodeSearchOpen: false,
   contextMenuNodeId: null,
   contextMenuPosition: null,
+  collapsedNodes: new Set<string>(),
 
   toggleQuickSwitcher: () => set((s) => ({ quickSwitcherOpen: !s.quickSwitcherOpen })),
   openQuickSwitcher: () => set({ quickSwitcherOpen: true }),
@@ -48,4 +51,9 @@ export const useUIStore = create<UIStore>((set) => ({
   closeNodeSearch: () => set({ nodeSearchOpen: false }),
   openContextMenu: (nodeId, x, y) => set({ contextMenuNodeId: nodeId, contextMenuPosition: { x, y } }),
   closeContextMenu: () => set({ contextMenuNodeId: null, contextMenuPosition: null }),
+  toggleCollapse: (nodeId) => set((s) => {
+    const next = new Set(s.collapsedNodes);
+    if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId);
+    return { collapsedNodes: next };
+  }),
 }));

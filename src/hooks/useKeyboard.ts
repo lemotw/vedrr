@@ -34,17 +34,19 @@ function getNodeDepth(tree: TreeData, id: string, depth: number = 0): number {
 }
 
 // Collect all nodes at a given depth, in left-to-right (visual top-to-bottom) order
-function getNodesAtDepth(tree: TreeData, targetDepth: number, currentDepth: number = 0): TreeData[] {
+// Skips children of collapsed nodes (they are not visible)
+function getNodesAtDepth(tree: TreeData, targetDepth: number, collapsedNodes: Set<string>, currentDepth: number = 0): TreeData[] {
   if (currentDepth === targetDepth) return [tree];
+  if (collapsedNodes.has(tree.node.id)) return [];
   const result: TreeData[] = [];
   for (const child of tree.children) {
-    result.push(...getNodesAtDepth(child, targetDepth, currentDepth + 1));
+    result.push(...getNodesAtDepth(child, targetDepth, collapsedNodes, currentDepth + 1));
   }
   return result;
 }
 
 export function useKeyboard() {
-  const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover, contentPanelFocused, markdownEditorNodeId, openMarkdownEditor, closeMarkdownEditor, nodeSearchOpen, openNodeSearch, contextMenuNodeId, closeContextMenu } = useUIStore();
+  const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover, contentPanelFocused, markdownEditorNodeId, openMarkdownEditor, closeMarkdownEditor, nodeSearchOpen, openNodeSearch, contextMenuNodeId, closeContextMenu, collapsedNodes, toggleCollapse } = useUIStore();
   const { tree, selectedNodeId, copiedNodeId, isCut, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile, reorderNode, dragMoveNode, undo } = useTreeStore();
   const { currentContextId } = useContextStore();
 
@@ -163,7 +165,7 @@ export function useKeyboard() {
           if (!selectedNodeId) break;
           const depthDown = getNodeDepth(tree, selectedNodeId);
           if (depthDown < 0) break;
-          const layerDown = getNodesAtDepth(tree, depthDown);
+          const layerDown = getNodesAtDepth(tree, depthDown, collapsedNodes);
           const idxDown = layerDown.findIndex(s => s.node.id === selectedNodeId);
           if (idxDown < layerDown.length - 1) {
             selectNode(layerDown[idxDown + 1].node.id);
@@ -176,7 +178,7 @@ export function useKeyboard() {
           if (!selectedNodeId) break;
           const depthUp = getNodeDepth(tree, selectedNodeId);
           if (depthUp < 0) break;
-          const layerUp = getNodesAtDepth(tree, depthUp);
+          const layerUp = getNodesAtDepth(tree, depthUp, collapsedNodes);
           const idxUp = layerUp.findIndex(s => s.node.id === selectedNodeId);
           if (idxUp > 0) {
             selectNode(layerUp[idxUp - 1].node.id);
@@ -187,9 +189,22 @@ export function useKeyboard() {
         case "ArrowRight": {
           e.preventDefault();
           if (!selectedNodeId) break;
-          const node = findNodeInTree(tree, selectedNodeId);
-          if (node && node.children.length > 0) {
-            selectNode(node.children[0].node.id);
+          const nodeR = findNodeInTree(tree, selectedNodeId);
+          if (nodeR && nodeR.children.length > 0) {
+            if (collapsedNodes.has(selectedNodeId)) {
+              toggleCollapse(selectedNodeId);
+            } else {
+              selectNode(nodeR.children[0].node.id);
+            }
+          }
+          break;
+        }
+        case "z": {
+          e.preventDefault();
+          if (!selectedNodeId) break;
+          const nodeZ = findNodeInTree(tree, selectedNodeId);
+          if (nodeZ && nodeZ.children.length > 0) {
+            toggleCollapse(selectedNodeId);
           }
           break;
         }
@@ -291,6 +306,6 @@ export function useKeyboard() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("paste", handlePaste);
     };
-  }, [tree, selectedNodeId, copiedNodeId, isCut, currentContextId, quickSwitcherOpen, nodeSearchOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId, contextMenuNodeId,
-      openQuickSwitcher, openNodeSearch, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, dragMoveNode, undo, openMarkdownEditor, closeMarkdownEditor, closeContextMenu]);
+  }, [tree, selectedNodeId, copiedNodeId, isCut, currentContextId, quickSwitcherOpen, nodeSearchOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId, contextMenuNodeId, collapsedNodes,
+      openQuickSwitcher, openNodeSearch, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, dragMoveNode, undo, openMarkdownEditor, closeMarkdownEditor, closeContextMenu, toggleCollapse]);
 }

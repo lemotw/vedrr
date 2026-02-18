@@ -3,6 +3,7 @@ import { useUIStore } from "../stores/uiStore";
 import { useTreeStore } from "../stores/treeStore";
 import { useContextStore } from "../stores/contextStore";
 import { NodeTypes } from "../lib/constants";
+import type { TreeData } from "../lib/types";
 
 interface MenuItem {
   label: string;
@@ -11,13 +12,27 @@ interface MenuItem {
   action: () => void;
   danger?: boolean;
   disabled?: boolean;
+  rootOnly?: boolean;
 }
 
 type MenuEntry = MenuItem | "separator";
 
+const NBSP = "\u00A0";
+
+function treeToMarkdownList(data: TreeData, depth = 0): string {
+  const indent = (NBSP + NBSP).repeat(depth);
+  const line = `${indent}-${NBSP}${data.node.title || "(untitled)"}`;
+  const childLines = data.children.map((c) => treeToMarkdownList(c, depth + 1));
+  return [line, ...childLines].join("\n");
+}
+
+function copyTreeToClipboard(tree: TreeData) {
+  navigator.clipboard.writeText(treeToMarkdownList(tree));
+}
+
 export function ContextMenu() {
-  const { contextMenuNodeId, contextMenuPosition, closeContextMenu, setEditingNode, openTypePopover, openMarkdownEditor } = useUIStore();
-  const { tree, copiedNodeId, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, reorderNode } = useTreeStore();
+  const { contextMenuNodeId, contextMenuPosition, closeContextMenu, setEditingNode, openTypePopover, openMarkdownEditor, collapsedNodes, toggleCollapse } = useUIStore();
+  const { tree, copiedNodeId, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, reorderNode } = useTreeStore();
   const { currentContextId } = useContextStore();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -36,6 +51,8 @@ export function ContextMenu() {
   const isRoot = tree.node.id === contextMenuNodeId;
   const node = findNode(tree, contextMenuNodeId);
   const nodeType = node?.node.node_type;
+  const hasChildren = node ? node.children.length > 0 : false;
+  const isNodeCollapsed = collapsedNodes.has(contextMenuNodeId);
 
   const exec = (fn: () => void) => {
     closeContextMenu();
@@ -57,6 +74,22 @@ export function ContextMenu() {
       shortcut: "T",
       icon: "◆",
       action: () => exec(() => openTypePopover(contextMenuNodeId)),
+    },
+    {
+      label: isNodeCollapsed ? "Expand" : "Collapse",
+      shortcut: "Z",
+      icon: isNodeCollapsed ? "▸" : "▾",
+      action: () => exec(() => toggleCollapse(contextMenuNodeId)),
+      disabled: !hasChildren,
+    },
+    {
+      label: "Copy as Markdown",
+      shortcut: "",
+      icon: "📋",
+      action: () => exec(() => {
+        if (tree) copyTreeToClipboard(tree);
+      }),
+      rootOnly: true,
     },
     "separator",
     {
@@ -126,9 +159,10 @@ export function ContextMenu() {
     },
   ];
 
-  // Filter out disabled-for-root items that make no sense
+  // Filter out items based on root context
   const filtered = items.filter((item) => {
     if (item === "separator") return true;
+    if (!isRoot && item.rootOnly) return false;
     if (isRoot && (item.label === "Add Sibling" || item.label === "Copy" || item.label === "Cut" || item.label === "Move Up" || item.label === "Move Down" || item.label === "Delete")) return false;
     return true;
   });
@@ -184,7 +218,7 @@ export function ContextMenu() {
   );
 }
 
-function findNode(tree: { node: { id: string }; children: typeof tree[] }, id: string): typeof tree | null {
+function findNode(tree: TreeData, id: string): TreeData | null {
   if (tree.node.id === id) return tree;
   for (const child of tree.children) {
     const found = findNode(child, id);

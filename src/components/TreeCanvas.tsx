@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import type { TreeData } from "../lib/types";
+import { NODE_TYPE_CONFIG } from "../lib/types";
 import { useContextStore } from "../stores/contextStore";
 import { useTreeStore, findNode, findParent } from "../stores/treeStore";
+import { useUIStore } from "../stores/uiStore";
 import { DragStateContext, useDragState } from "../lib/dragContext";
 import { NodeCard } from "./NodeCard";
 import {
@@ -139,8 +141,10 @@ function TreeBranch({
   const { selectedNodeId, selectNode, addChild, addSibling, copiedNodeId, isCut } =
     useTreeStore();
   const { currentContextId } = useContextStore();
+  const { collapsedNodes, toggleCollapse } = useUIStore();
   const dragState = useDragState();
   const hasChildren = data.children.length > 0;
+  const isCollapsed = collapsedNodes.has(data.node.id);
   const isSelected = selectedNodeId === data.node.id;
   const isCutHere = isCut && copiedNodeId === data.node.id;
   const inCutSubtree = ancestorCut || isCutHere;
@@ -192,8 +196,25 @@ function TreeBranch({
         )}
       </div>
 
-      {/* Children with curved connectors */}
-      {hasChildren && (
+      {/* Collapsed: show dots */}
+      {hasChildren && isCollapsed && (
+        <button
+          className="flex items-center gap-1 px-1 self-center cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={() => toggleCollapse(data.node.id)}
+          title="Expand (z)"
+        >
+          {data.children.map((child) => (
+            <span
+              key={child.node.id}
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ backgroundColor: NODE_TYPE_CONFIG[child.node.node_type]?.color ?? "#777" }}
+            />
+          ))}
+        </button>
+      )}
+
+      {/* Expanded: children with curved connectors */}
+      {hasChildren && !isCollapsed && (
         <div className="flex flex-col">
           <SortableContext
             items={data.children.map((c) => c.node.id)}
