@@ -24,6 +24,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, on
   const isEditing = editingNodeId === node.id;
   const cardRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastEnterRef = useRef<number>(0);
   const [editValue, setEditValue] = useState(node.title);
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, on
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={commitEdit}
-            onKeyDown={(e) => { e.stopPropagation(); if (e.nativeEvent.isComposing) return; if (e.key === "Enter") { e.preventDefault(); commitEdit(); } if (e.key === "Escape") { e.preventDefault(); setEditingNode(null); } }}
+            onKeyDown={(e) => { e.stopPropagation(); if (e.nativeEvent.isComposing) return; if (e.key === "Enter") { e.preventDefault(); const now = Date.now(); if (now - lastEnterRef.current < 300) { commitEdit(); } lastEnterRef.current = now; } if (e.key === "Escape") { e.preventDefault(); setEditingNode(null); } }}
             className="bg-transparent font-heading text-[28px] font-bold text-text-primary outline-none border-b border-accent-primary"
           />
         ) : (
@@ -157,7 +158,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, on
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={commitEdit}
-              onKeyDown={(e) => { e.stopPropagation(); if (e.nativeEvent.isComposing) return; if (e.key === "Enter") { e.preventDefault(); commitEdit(); } if (e.key === "Escape") { e.preventDefault(); setEditingNode(null); } }}
+              onKeyDown={(e) => { e.stopPropagation(); if (e.nativeEvent.isComposing) return; if (e.key === "Enter") { e.preventDefault(); const now = Date.now(); if (now - lastEnterRef.current < 300) { commitEdit(); } lastEnterRef.current = now; } if (e.key === "Escape") { e.preventDefault(); setEditingNode(null); } }}
               className="bg-transparent text-[13px] text-text-primary outline-none border-b border-accent-primary min-w-[60px]"
             />
           ) : (
