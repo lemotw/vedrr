@@ -121,6 +121,10 @@
     overflow: hidden;
     user-select: none;
   }
+
+  *:focus {
+    outline: none;
+  }
 }
 
 /* Tiptap editor styles */
