@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useUIStore } from "../stores/uiStore";
 import { Themes, THEME_META, CUSTOM_COLOR_LABELS } from "../lib/constants";
 import type { ThemeId, CustomThemeColors } from "../lib/constants";
+import { cn } from "../lib/cn";
 
 const PRESET_ORDER: ThemeId[] = [
   Themes.OBSIDIAN,
@@ -73,8 +74,12 @@ export function ThemeSwitcher() {
         {/* Custom theme button */}
         <div className="border-t border-border pt-3">
           <button
-            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors text-[12px] font-mono
-              ${isCustom ? "bg-accent-primary/15 text-accent-primary" : "text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)]"}`}
+            className={cn(
+              "w-full flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors text-[12px] font-mono",
+              isCustom
+                ? "bg-accent-primary/15 text-accent-primary"
+                : "text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)]",
+            )}
             onClick={() => {
               if (!isCustom) setTheme(Themes.CUSTOM);
               setShowEditor(!showEditor);

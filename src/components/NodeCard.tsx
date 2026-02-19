@@ -5,6 +5,7 @@ import { NodeTypes, imageMime } from "../lib/constants";
 import { useTreeStore } from "../stores/treeStore";
 import { useUIStore } from "../stores/uiStore";
 import { ipc } from "../lib/ipc";
+import { cn } from "../lib/cn";
 
 interface Props {
   node: TreeNode;
@@ -56,7 +57,12 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, on
     return (
       <div
         ref={cardRef}
-        className={`cursor-pointer px-1 py-0.5 rounded ${isDropTarget ? "ring-2 ring-accent-primary bg-accent-primary/10" : isSelected ? "ring-1 ring-accent-primary" : ""} ${isCutNode ? "opacity-40" : ""}`}
+        className={cn(
+          "cursor-pointer px-1 py-0.5 rounded",
+          isDropTarget && "ring-2 ring-accent-primary bg-accent-primary/10",
+          !isDropTarget && isSelected && "ring-1 ring-accent-primary",
+          isCutNode && "opacity-40",
+        )}
         onClick={onClick}
         onDoubleClick={() => setEditingNode(node.id)}
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
@@ -116,9 +122,13 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, on
     <>
       <div
         ref={cardRef}
-        className={`flex items-center gap-2 rounded-md bg-bg-card cursor-pointer overflow-hidden
-          ${isDropTarget ? "ring-2 ring-accent-primary bg-accent-primary/10" : isSelected ? "ring-1 ring-accent-primary" : "hover:ring-1 hover:ring-border"}
-          ${isCutNode ? "opacity-40" : ""}`}
+        className={cn(
+          "flex items-center gap-2 rounded-md bg-bg-card cursor-pointer overflow-hidden",
+          isDropTarget && "ring-2 ring-accent-primary bg-accent-primary/10",
+          !isDropTarget && isSelected && "ring-1 ring-accent-primary",
+          !isDropTarget && !isSelected && "hover:ring-1 hover:ring-border",
+          isCutNode && "opacity-40",
+        )}
         onClick={onClick}
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
         onDoubleClick={() => {

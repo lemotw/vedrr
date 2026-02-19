@@ -3,6 +3,7 @@ import { useUIStore } from "../stores/uiStore";
 import { useTreeStore } from "../stores/treeStore";
 import type { TreeData, TreeNode } from "../lib/types";
 import { NODE_TYPE_CONFIG } from "../lib/types";
+import { cn } from "../lib/cn";
 
 interface FlatNode {
   node: TreeNode;
@@ -120,7 +121,10 @@ export function NodeSearch() {
             return (
               <div
                 key={item.node.id}
-                className={`flex flex-col gap-1 px-4 py-2 cursor-pointer ${idx === selectedIdx ? "bg-accent-primary/10" : "hover:bg-bg-card/50"}`}
+                className={cn(
+                  "flex flex-col gap-1 px-4 py-2 cursor-pointer",
+                  idx === selectedIdx ? "bg-accent-primary/10" : "hover:bg-bg-card/50",
+                )}
                 onClick={() => handleSelect(item.node.id)}
                 onMouseEnter={() => setSelectedIdx(idx)}
               >
@@ -131,7 +135,7 @@ export function NodeSearch() {
                   >
                     {cfg?.letter}
                   </span>
-                  <span className={`font-mono text-[13px] text-text-primary ${idx === selectedIdx ? "font-semibold" : ""}`}>
+                  <span className={cn("font-mono text-[13px] text-text-primary", idx === selectedIdx && "font-semibold")}>
                     {item.node.title || "Untitled"}
                   </span>
                 </div>

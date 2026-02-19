@@ -4,6 +4,7 @@ import { useContextStore } from "../stores/contextStore";
 import { ask } from "@tauri-apps/plugin-dialog";
 import type { ContextSummary } from "../lib/types";
 import { ContextStates } from "../lib/constants";
+import { cn } from "../lib/cn";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -204,14 +205,16 @@ export function QuickSwitcher() {
                 return (
                   <div
                     key={ctx.id}
-                    className={`group/row flex items-center px-4 py-2.5 cursor-pointer
-                      ${idx === selectedIndex ? "bg-[var(--color-hover)]" : ""}
-                      ${isCurrent ? "bg-accent-primary/8" : ""}`}
+                    className={cn(
+                      "group/row flex items-center px-4 py-2.5 cursor-pointer",
+                      idx === selectedIndex && "bg-[var(--color-hover)]",
+                      isCurrent && "bg-accent-primary/8",
+                    )}
                     onClick={() => handleSelect(ctx)}
                     onMouseEnter={() => setSelectedIndex(idx)}
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className={`text-[10px] shrink-0 ${isCurrent ? "text-accent-primary" : "text-text-secondary"}`}>
+                      <span className={cn("text-[10px] shrink-0", isCurrent ? "text-accent-primary" : "text-text-secondary")}>
                         {isCurrent ? "▸" : "●"}
                       </span>
                       <span className="text-[13px] text-text-primary font-mono truncate">{ctx.name}</span>
@@ -248,8 +251,10 @@ export function QuickSwitcher() {
                 return (
                   <div
                     key={ctx.id}
-                    className={`group/row flex items-center px-4 py-2.5 cursor-pointer
-                      ${idx === selectedIndex ? "bg-[var(--color-hover)]" : ""}`}
+                    className={cn(
+                      "group/row flex items-center px-4 py-2.5 cursor-pointer",
+                      idx === selectedIndex && "bg-[var(--color-hover)]",
+                    )}
                     onClick={() => handleSelect(ctx)}
                     onMouseEnter={() => setSelectedIndex(idx)}
                   >

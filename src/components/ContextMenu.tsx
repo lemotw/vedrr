@@ -4,6 +4,7 @@ import { useTreeStore } from "../stores/treeStore";
 import { useContextStore } from "../stores/contextStore";
 import { NodeTypes } from "../lib/constants";
 import type { TreeData } from "../lib/types";
+import { cn } from "../lib/cn";
 
 interface MenuItem {
   label: string;
@@ -199,15 +200,17 @@ export function ContextMenu() {
           ) : (
             <button
               key={item.label}
-              className={`flex items-center w-full px-3 py-1.5 text-left gap-3 transition-colors cursor-pointer
-                ${item.disabled ? "opacity-40 pointer-events-none" : "hover:bg-[var(--color-hover)]"}
-                ${item.danger ? "text-[#FF4444]" : "text-text-primary"}`}
+              className={cn(
+                "flex items-center w-full px-3 py-1.5 text-left gap-3 transition-colors cursor-pointer",
+                item.disabled ? "opacity-40 pointer-events-none" : "hover:bg-[var(--color-hover)]",
+                item.danger ? "text-[#FF4444]" : "text-text-primary",
+              )}
               onClick={item.action}
               disabled={item.disabled}
             >
               <span className="w-4 text-center text-[12px] shrink-0 font-mono">{item.icon}</span>
               <span className="flex-1 text-[12px] font-mono font-medium">{item.label}</span>
-              <span className={`text-[11px] font-mono ${item.danger ? "text-[#FF444488]" : "text-text-secondary"}`}>
+              <span className={cn("text-[11px] font-mono", item.danger ? "text-[#FF444488]" : "text-text-secondary")}>
                 {item.shortcut}
               </span>
             </button>

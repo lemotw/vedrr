@@ -3,6 +3,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useUIStore } from "../stores/uiStore";
+import { cn } from "../lib/cn";
 
 interface Props {
   content: string;
@@ -169,9 +170,15 @@ function ToolBtn({
 }) {
   return (
     <button
-      className={`px-1.5 py-0.5 rounded text-[11px] font-mono cursor-pointer transition-colors
-        ${active ? "bg-accent-primary/20 text-accent-primary" : "text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)]"}
-        ${bold ? "font-bold" : ""} ${italic ? "italic" : ""} ${strike ? "line-through" : ""}`}
+      className={cn(
+        "px-1.5 py-0.5 rounded text-[11px] font-mono cursor-pointer transition-colors",
+        active
+          ? "bg-accent-primary/20 text-accent-primary"
+          : "text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)]",
+        bold && "font-bold",
+        italic && "italic",
+        strike && "line-through",
+      )}
       onMouseDown={(e) => {
         e.preventDefault(); // prevent editor blur
         onClick();

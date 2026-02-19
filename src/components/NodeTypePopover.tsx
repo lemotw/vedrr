@@ -4,6 +4,7 @@ import { NODE_TYPE_CONFIG } from "../lib/types";
 import { NODE_TYPE_LIST } from "../lib/constants";
 import { useTreeStore } from "../stores/treeStore";
 import { useUIStore } from "../stores/uiStore";
+import { cn } from "../lib/cn";
 
 function findNodeType(tree: import("../lib/types").TreeData, nodeId: string): NodeType | null {
   if (tree.node.id === nodeId) return tree.node.node_type;
@@ -105,9 +106,11 @@ function NodeTypePopoverInner({ nodeId }: { nodeId: string }) {
             return (
               <div
                 key={type}
-                className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors
-                  ${isHighlighted ? "bg-[var(--color-hover)]" : ""}
-                  ${isCurrent ? "bg-accent-primary/10" : ""}`}
+                className={cn(
+                "flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors",
+                isHighlighted && "bg-[var(--color-hover)]",
+                isCurrent && "bg-accent-primary/10",
+              )}
                 onClick={() => handleSelect(type)}
                 onMouseEnter={() => setSelectedIndex(i)}
               >
@@ -119,7 +122,7 @@ function NodeTypePopoverInner({ nodeId }: { nodeId: string }) {
                     {letter}
                   </span>
                 </div>
-                <span className={`text-[12px] font-mono ${isCurrent ? "text-accent-primary font-bold" : "text-text-primary"}`}>
+                <span className={cn("text-[12px] font-mono", isCurrent ? "text-accent-primary font-bold" : "text-text-primary")}>
                   {type.charAt(0).toUpperCase() + type.slice(1)}
                 </span>
               </div>
