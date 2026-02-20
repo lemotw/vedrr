@@ -36,6 +36,10 @@ export const IpcCmd = {
   IMPORT_IMAGE: "import_image",
   CLONE_SUBTREE: "clone_subtree",
   RESTORE_NODES: "restore_nodes",
+  LIST_AI_PROFILES: "list_ai_profiles",
+  CREATE_AI_PROFILE: "create_ai_profile",
+  DELETE_AI_PROFILE: "delete_ai_profile",
+  COMPACT_NODE: "compact_node",
 } as const;
 
 // ── Themes ─────────────────────────────────────────────────

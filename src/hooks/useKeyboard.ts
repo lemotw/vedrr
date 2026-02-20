@@ -5,6 +5,8 @@ import { useContextStore } from "../stores/contextStore";
 import type { TreeData } from "../lib/types";
 import { NodeTypes, PasteKind } from "../lib/constants";
 import { isModKey } from "../lib/platform";
+import { ipc } from "../lib/ipc";
+import { computeDiff } from "../lib/compactDiff";
 
 function findNodeInTree(tree: TreeData, id: string): TreeData | null {
   if (tree.node.id === id) return tree;
@@ -53,6 +55,9 @@ export function useKeyboard() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Block ALL keys when modal overlays are open
+      if (useUIStore.getState().aiSettingsOpen) return;
+
       // Mod+K — Quick Switcher (always active)
       if (isModKey(e) && e.key === "k" && !e.shiftKey) {
         e.preventDefault();
@@ -248,6 +253,33 @@ export function useKeyboard() {
           if (selectedNodeId) openTypePopover(selectedNodeId);
           break;
         }
+        case "c": {
+          if (isModKey(e)) break; // Mod+C is handled above
+          e.preventDefault();
+          if (!selectedNodeId || !currentContextId) break;
+          const profileId = localStorage.getItem("mindflow-active-ai-profile");
+          if (!profileId) {
+            useUIStore.getState().setCompactError("No AI profile selected. Open AI Settings to create and select one.");
+            break;
+          }
+          const { setCompactLoading, setCompactResult, setCompactError } = useUIStore.getState();
+          console.log("[compact] triggered via keyboard, nodeId:", selectedNodeId, "profileId:", profileId);
+          setCompactLoading(true);
+          setCompactError(null);
+          ipc.compactNode(selectedNodeId, profileId)
+            .then((result) => {
+              console.log("[compact] IPC result:", JSON.stringify(result).slice(0, 500));
+              const diff = computeDiff(result.original, result.proposed);
+              console.log("[compact] diff ops:", diff.length, diff);
+              setCompactResult(result, diff);
+            })
+            .catch((err) => {
+              console.error("[compact] IPC error:", err);
+              setCompactError(String(err));
+            })
+            .finally(() => setCompactLoading(false));
+          break;
+        }
         case "Backspace":
         case "Delete": {
           if (!selectedNodeId || selectedNodeId === tree.node.id) break;
@@ -259,6 +291,7 @@ export function useKeyboard() {
     }
 
     function handlePaste(e: ClipboardEvent) {
+      if (useUIStore.getState().aiSettingsOpen) return;
       if (quickSwitcherOpen || nodeSearchOpen || editingNodeId || typePopoverNodeId || contentPanelFocused || contextMenuNodeId) return;
       if (!tree || !currentContextId || !selectedNodeId) return;
       const items = e.clipboardData?.items;

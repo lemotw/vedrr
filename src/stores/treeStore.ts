@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { TreeData, TreeNode, NodeType } from "../lib/types";
+import type { TreeData, TreeNode, NodeType, CompactResult, ProposedNode } from "../lib/types";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { ipc } from "../lib/ipc";
 import { NodeTypes, PasteKind } from "../lib/constants";
@@ -50,6 +50,7 @@ interface TreeStore {
   pickAndImportImage: (nodeId: string) => Promise<void>;
   reorderNode: (nodeId: string, direction: "up" | "down", contextId: string) => Promise<void>;
   dragMoveNode: (nodeId: string, newParentId: string, position: number, contextId: string) => Promise<void>;
+  applyCompact: (result: CompactResult) => Promise<void>;
   undo: () => Promise<void>;
   clearUndo: () => void;
 }
@@ -333,6 +334,38 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     });
     await ipc.moveNode(nodeId, newParentId, position);
     await get().loadTree(contextId);
+  },
+
+  applyCompact: async (result: CompactResult) => {
+    const { tree, undoStack, selectedNodeId } = get();
+    if (!tree) return;
+    const rootId = result.original.node.id;
+    const contextId = result.original.node.context_id;
+
+    // Snapshot all original children for undo
+    const rootNode = findNode(tree, rootId);
+    if (!rootNode) return;
+    const allNodes = flattenNodes(rootNode).filter(n => n.id !== rootId);
+    set({ undoStack: pushUndo(undoStack, { type: "delete", nodes: allNodes, contextId, prevSelectedId: selectedNodeId }) });
+
+    // Delete all existing children of root
+    for (const child of rootNode.children) {
+      await ipc.deleteNode(child.node.id);
+    }
+
+    // Rebuild from proposed tree
+    async function createChildren(proposed: ProposedNode[], parentId: string) {
+      for (const p of proposed) {
+        const nodeType = (["text", "markdown", "image", "file"].includes(p.node_type) ? p.node_type : "text") as string;
+        const node = await ipc.createNode(contextId, parentId, nodeType, p.title);
+        if (p.children.length > 0) {
+          await createChildren(p.children, node.id);
+        }
+      }
+    }
+    await createChildren(result.proposed, rootId);
+    await get().loadTree(contextId);
+    set({ selectedNodeId: rootId });
   },
 
   undo: async () => {

@@ -42,6 +42,10 @@ fn main() {
             commands::file_ops::read_file_bytes,
             commands::file_ops::save_clipboard_image,
             commands::file_ops::import_image,
+            commands::ai::list_ai_profiles,
+            commands::ai::create_ai_profile,
+            commands::ai::delete_ai_profile,
+            commands::ai::compact_node,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -4,6 +4,8 @@ import { useTreeStore } from "../stores/treeStore";
 import { useContextStore } from "../stores/contextStore";
 import { NodeTypes } from "../lib/constants";
 import type { TreeData } from "../lib/types";
+import { ipc } from "../lib/ipc";
+import { computeDiff } from "../lib/compactDiff";
 import { cn } from "../lib/cn";
 import { modSymbol } from "../lib/platform";
 
@@ -149,6 +151,34 @@ export function ContextMenu() {
       icon: "↓",
       action: () => exec(() => reorderNode(contextMenuNodeId, "down", currentContextId)),
       disabled: isRoot,
+    },
+    {
+      label: "AI Compact",
+      shortcut: "C",
+      icon: "⚡",
+      action: () => exec(async () => {
+        const profileId = localStorage.getItem("mindflow-active-ai-profile");
+        if (!profileId) {
+          useUIStore.getState().setCompactError("No AI profile selected. Open AI Settings to create and select one.");
+          return;
+        }
+        const { setCompactLoading, setCompactResult, setCompactError } = useUIStore.getState();
+        console.log("[compact] triggered via context menu, nodeId:", contextMenuNodeId, "profileId:", profileId);
+        setCompactLoading(true);
+        setCompactError(null);
+        try {
+          const result = await ipc.compactNode(contextMenuNodeId, profileId);
+          console.log("[compact] IPC result:", JSON.stringify(result).slice(0, 500));
+          const diff = computeDiff(result.original, result.proposed);
+          console.log("[compact] diff ops:", diff.length, diff);
+          setCompactResult(result, diff);
+        } catch (e) {
+          console.error("[compact] IPC error:", e);
+          setCompactError(String(e));
+        } finally {
+          setCompactLoading(false);
+        }
+      }),
     },
     "separator",
     {

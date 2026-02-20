@@ -5,7 +5,7 @@ import { modSymbol } from "../lib/platform";
 
 export function StatusBar() {
   const { contexts, currentContextId } = useContextStore();
-  const { openQuickSwitcher, toggleThemeSwitcher } = useUIStore();
+  const { openQuickSwitcher, toggleThemeSwitcher, openAiSettings } = useUIStore();
 
   const current = contexts.find((c) => c.id === currentContextId);
   const activeCount = contexts.filter((c) => c.state === ContextStates.ACTIVE).length;
@@ -21,6 +21,13 @@ export function StatusBar() {
         </span>
       </div>
       <div className="flex items-center gap-2">
+        <button
+          onClick={openAiSettings}
+          className="px-2 py-1 text-xs text-text-secondary bg-bg-elevated rounded cursor-pointer hover:text-text-primary transition-colors"
+          title="AI Settings"
+        >
+          AI
+        </button>
         <button
           onClick={toggleThemeSwitcher}
           className="px-2 py-1 text-xs text-text-secondary bg-bg-elevated rounded cursor-pointer hover:text-text-primary transition-colors"

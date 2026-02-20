@@ -41,3 +41,28 @@ pub struct TreeData {
     pub node: TreeNode,
     pub children: Vec<TreeData>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiProfile {
+    pub id: String,
+    pub name: String,
+    pub provider: String,
+    pub model: String,
+    pub has_api_key: bool,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProposedNode {
+    pub source_id: Option<String>,
+    pub title: String,
+    pub node_type: String,
+    #[serde(default)]
+    pub children: Vec<ProposedNode>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CompactResult {
+    pub original: TreeData,
+    pub proposed: Vec<ProposedNode>,
+}

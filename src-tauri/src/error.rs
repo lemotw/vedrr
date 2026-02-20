@@ -10,6 +10,8 @@ pub enum MindFlowError {
     Database(#[from] rusqlite::Error),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("HTTP error: {0}")]
+    Http(#[from] reqwest::Error),
     #[error("{0}")]
     Other(String),
 }

@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { Themes, DEFAULT_CUSTOM_COLORS, CUSTOM_COLOR_CSS_MAP } from "../lib/constants";
 import type { ThemeId, CustomThemeColors } from "../lib/constants";
+import type { CompactResult } from "../lib/types";
+import type { DiffOp } from "../lib/compactDiff";
 
 function loadCustomColors(): CustomThemeColors {
   try {
@@ -46,6 +48,11 @@ interface UIStore {
   currentTheme: ThemeId;
   themeSwitcherOpen: boolean;
   customThemeColors: CustomThemeColors;
+  aiSettingsOpen: boolean;
+  compactLoading: boolean;
+  compactResult: CompactResult | null;
+  compactDiff: DiffOp[] | null;
+  compactError: string | null;
 
   toggleQuickSwitcher: () => void;
   openQuickSwitcher: () => void;
@@ -65,6 +72,12 @@ interface UIStore {
   setCustomColor: (key: keyof CustomThemeColors, value: string) => void;
   toggleThemeSwitcher: () => void;
   closeThemeSwitcher: () => void;
+  openAiSettings: () => void;
+  closeAiSettings: () => void;
+  setCompactLoading: (v: boolean) => void;
+  setCompactResult: (result: CompactResult | null, diff: DiffOp[] | null) => void;
+  setCompactError: (error: string | null) => void;
+  closeCompactPreview: () => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -80,6 +93,11 @@ export const useUIStore = create<UIStore>((set) => ({
   currentTheme: (localStorage.getItem("mindflow-theme") as ThemeId) || Themes.MOCHA,
   themeSwitcherOpen: false,
   customThemeColors: loadCustomColors(),
+  aiSettingsOpen: false,
+  compactLoading: false,
+  compactResult: null,
+  compactDiff: null,
+  compactError: null,
 
   toggleQuickSwitcher: () => set((s) => ({ quickSwitcherOpen: !s.quickSwitcherOpen })),
   openQuickSwitcher: () => set({ quickSwitcherOpen: true }),
@@ -119,4 +137,10 @@ export const useUIStore = create<UIStore>((set) => ({
   },
   toggleThemeSwitcher: () => set((s) => ({ themeSwitcherOpen: !s.themeSwitcherOpen })),
   closeThemeSwitcher: () => set({ themeSwitcherOpen: false }),
+  openAiSettings: () => set({ aiSettingsOpen: true }),
+  closeAiSettings: () => set({ aiSettingsOpen: false }),
+  setCompactLoading: (v) => set({ compactLoading: v }),
+  setCompactResult: (result, diff) => set({ compactResult: result, compactDiff: diff, compactError: null }),
+  setCompactError: (error) => set({ compactError: error }),
+  closeCompactPreview: () => set({ compactResult: null, compactDiff: null, compactError: null }),
 }));

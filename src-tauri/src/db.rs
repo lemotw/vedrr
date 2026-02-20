@@ -43,6 +43,19 @@ pub fn init_db(conn: &Connection) -> Result<(), MindFlowError> {
 
         CREATE INDEX IF NOT EXISTS idx_nodes_context ON tree_nodes(context_id);
         CREATE INDEX IF NOT EXISTS idx_nodes_parent ON tree_nodes(parent_id);
+
+        CREATE TABLE IF NOT EXISTS ai_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS ai_profiles (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            model TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
     ",
     )?;
     Ok(())

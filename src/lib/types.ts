@@ -39,6 +39,27 @@ export interface TreeData {
   children: TreeData[];
 }
 
+export interface ProposedNode {
+  source_id: string | null;
+  title: string;
+  node_type: string;
+  children: ProposedNode[];
+}
+
+export interface CompactResult {
+  original: TreeData;
+  proposed: ProposedNode[];
+}
+
+export interface AiProfile {
+  id: string;
+  name: string;
+  provider: string;
+  model: string;
+  has_api_key: boolean;
+  created_at: string;
+}
+
 import { NodeTypes } from "./constants";
 
 export const NODE_TYPE_CONFIG: Record<NodeType, { letter: string; color: string }> = {

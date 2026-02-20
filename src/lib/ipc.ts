@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Context, ContextSummary, TreeData, TreeNode } from "./types";
+import type { Context, ContextSummary, TreeData, TreeNode, CompactResult, AiProfile } from "./types";
 import { IpcCmd } from "./constants";
 
 export const ipc = {
@@ -68,4 +68,16 @@ export const ipc = {
       directory: false,
       filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }],
     }),
+
+  listAiProfiles: () =>
+    invoke<AiProfile[]>(IpcCmd.LIST_AI_PROFILES),
+
+  createAiProfile: (name: string, provider: string, model: string, apiKey: string) =>
+    invoke<AiProfile>(IpcCmd.CREATE_AI_PROFILE, { name, provider, model, apiKey }),
+
+  deleteAiProfile: (id: string) =>
+    invoke<void>(IpcCmd.DELETE_AI_PROFILE, { id }),
+
+  compactNode: (nodeId: string, profileId: string) =>
+    invoke<CompactResult>(IpcCmd.COMPACT_NODE, { nodeId, profileId }),
 };
