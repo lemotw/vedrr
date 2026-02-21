@@ -4,6 +4,7 @@ import { useTreeStore } from "../stores/treeStore";
 import { useContextStore } from "../stores/contextStore";
 import type { TreeData } from "../lib/types";
 import { NodeTypes, PasteKind } from "../lib/constants";
+import { isModKey } from "../lib/platform";
 
 function findNodeInTree(tree: TreeData, id: string): TreeData | null {
   if (tree.node.id === id) return tree;
@@ -52,29 +53,29 @@ export function useKeyboard() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // ⌘K — Quick Switcher (always active)
-      if (e.metaKey && e.key === "k" && !e.shiftKey) {
+      // Mod+K — Quick Switcher (always active)
+      if (isModKey(e) && e.key === "k" && !e.shiftKey) {
         e.preventDefault();
         openQuickSwitcher();
         return;
       }
 
-      // ⌘F — Node Search (always active)
-      if (e.metaKey && e.key === "f" && !e.shiftKey) {
+      // Mod+F — Node Search (always active)
+      if (isModKey(e) && e.key === "f" && !e.shiftKey) {
         e.preventDefault();
         openNodeSearch();
         return;
       }
 
-      // ⌘Z — Undo (always active, unless editing text)
-      if (e.metaKey && e.key === "z" && !e.shiftKey && !editingNodeId && !contentPanelFocused) {
+      // Mod+Z — Undo (always active, unless editing text)
+      if (isModKey(e) && e.key === "z" && !e.shiftKey && !editingNodeId && !contentPanelFocused) {
         e.preventDefault();
         undo();
         return;
       }
 
-      // ⌘C — Copy node (when not editing): write marker to clipboard
-      if (e.metaKey && e.key === "c" && !editingNodeId && !contentPanelFocused && !quickSwitcherOpen
+      // Mod+C — Copy node (when not editing): write marker to clipboard
+      if (isModKey(e) && e.key === "c" && !editingNodeId && !contentPanelFocused && !quickSwitcherOpen
           && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
         e.preventDefault();
         copyNode(selectedNodeId);
@@ -82,8 +83,8 @@ export function useKeyboard() {
         return;
       }
 
-      // ⌘X — Cut node (when not editing): copy + mark as cut
-      if (e.metaKey && e.key === "x" && !editingNodeId && !contentPanelFocused && !quickSwitcherOpen
+      // Mod+X — Cut node (when not editing): copy + mark as cut
+      if (isModKey(e) && e.key === "x" && !editingNodeId && !contentPanelFocused && !quickSwitcherOpen
           && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
         e.preventDefault();
         cutNode(selectedNodeId);

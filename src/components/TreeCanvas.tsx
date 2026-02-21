@@ -26,6 +26,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { modSymbol } from "../lib/platform";
 
 // Use pointerWithin first (precise), fall back to rectIntersection (wider reach)
 const combinedCollision: CollisionDetection = (args) => {
@@ -368,7 +369,7 @@ export function TreeCanvas() {
   if (!currentContextId) {
     return (
       <div className="flex items-center justify-center h-full text-text-secondary text-sm">
-        Press ⌘K to create or switch context
+        Press {modSymbol}K to create or switch context
       </div>
     );
   }

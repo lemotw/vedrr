@@ -5,6 +5,7 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import type { ContextSummary } from "../lib/types";
 import { ContextStates } from "../lib/constants";
 import { cn } from "../lib/cn";
+import { isModKey, modSymbol } from "../lib/platform";
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -115,8 +116,8 @@ export function QuickSwitcher() {
       return;
     }
 
-    // ⌘N — create new context
-    if (e.metaKey && e.key === "n") {
+    // Mod+N — create new context
+    if (isModKey(e) && e.key === "n") {
       e.preventDefault();
       handleCreate();
       return;
@@ -186,7 +187,7 @@ export function QuickSwitcher() {
             className="flex-1 bg-transparent text-[13px] text-text-primary placeholder:text-text-secondary outline-none font-mono"
           />
           <span className="text-[10px] text-text-secondary bg-bg-elevated px-2 py-1 rounded">
-            ⌘K
+            {modSymbol}K
           </span>
         </div>
 
@@ -303,7 +304,7 @@ export function QuickSwitcher() {
             className="px-3 py-1.5 text-[12px] font-bold text-white bg-accent-primary rounded-md font-mono cursor-pointer flex items-center gap-2"
           >
             + New
-            <span className="text-[10px] opacity-70">⌘N</span>
+            <span className="text-[10px] opacity-70">{modSymbol}N</span>
           </button>
         </div>
       </div>

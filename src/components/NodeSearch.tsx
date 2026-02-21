@@ -4,6 +4,7 @@ import { useTreeStore } from "../stores/treeStore";
 import type { TreeData, TreeNode } from "../lib/types";
 import { NODE_TYPE_CONFIG } from "../lib/types";
 import { cn } from "../lib/cn";
+import { modSymbol } from "../lib/platform";
 
 interface FlatNode {
   node: TreeNode;
@@ -108,7 +109,7 @@ export function NodeSearch() {
             onChange={e => { setQuery(e.target.value); setSelectedIdx(0); }}
             onKeyDown={handleKeyDown}
           />
-          <kbd className="text-text-secondary font-mono text-[11px] bg-bg-elevated rounded px-2 py-1">⌘F</kbd>
+          <kbd className="text-text-secondary font-mono text-[11px] bg-bg-elevated rounded px-2 py-1">{modSymbol}F</kbd>
         </div>
 
         {/* Results */}

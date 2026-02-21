@@ -262,7 +262,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       const filePath = await ipc.pickFile();
       if (!filePath) return;
       await ipc.updateNode(nodeId, { filePath });
-      const fileName = filePath.split("/").pop() || filePath;
+      const fileName = filePath.split(/[/\\]/).pop() || filePath;
       if (!node.title || node.title === "Untitled") {
         await ipc.updateNode(nodeId, { title: fileName });
       }
@@ -283,7 +283,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     const savedPath = await ipc.importImage(contextId, nodeId, filePath);
     await ipc.updateNode(nodeId, { filePath: savedPath });
 
-    const fileName = filePath.split("/").pop()?.replace(/\.[^.]+$/, "") || "Image";
+    const fileName = filePath.split(/[/\\]/).pop()?.replace(/\.[^.]+$/, "") || "Image";
     if (!target.node.title || target.node.title.startsWith("Image ")) {
       await ipc.updateNode(nodeId, { title: fileName });
       set({ tree: patchNode(get().tree!, nodeId, { file_path: savedPath, title: fileName }) });

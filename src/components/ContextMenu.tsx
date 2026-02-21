@@ -5,6 +5,7 @@ import { useContextStore } from "../stores/contextStore";
 import { NodeTypes } from "../lib/constants";
 import type { TreeData } from "../lib/types";
 import { cn } from "../lib/cn";
+import { modSymbol } from "../lib/platform";
 
 interface MenuItem {
   label: string;
@@ -109,7 +110,7 @@ export function ContextMenu() {
     "separator",
     {
       label: "Copy",
-      shortcut: "⌘C",
+      shortcut: `${modSymbol}C`,
       icon: "⧉",
       action: () => exec(() => {
         copyNode(contextMenuNodeId);
@@ -119,7 +120,7 @@ export function ContextMenu() {
     },
     {
       label: "Cut",
-      shortcut: "⌘X",
+      shortcut: `${modSymbol}X`,
       icon: "✂",
       action: () => exec(() => {
         cutNode(contextMenuNodeId);
@@ -129,7 +130,7 @@ export function ContextMenu() {
     },
     {
       label: "Paste",
-      shortcut: "⌘V",
+      shortcut: `${modSymbol}V`,
       icon: "⎘",
       action: () => exec(() => pasteNodeUnder(contextMenuNodeId, currentContextId)),
       disabled: !copiedNodeId,

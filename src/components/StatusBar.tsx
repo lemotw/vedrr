@@ -1,6 +1,7 @@
 import { useContextStore } from "../stores/contextStore";
 import { useUIStore } from "../stores/uiStore";
 import { ContextStates } from "../lib/constants";
+import { modSymbol } from "../lib/platform";
 
 export function StatusBar() {
   const { contexts, currentContextId } = useContextStore();
@@ -31,7 +32,7 @@ export function StatusBar() {
           onClick={openQuickSwitcher}
           className="px-2 py-1 text-xs text-text-secondary bg-bg-elevated rounded cursor-pointer hover:bg-bg-card"
         >
-          ⌘K
+          {modSymbol}K
         </button>
       </div>
     </div>
