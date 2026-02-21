@@ -237,6 +237,7 @@ fn build_prompt(ancestor_path: &[String], subtree: &TreeData) -> String {
 - 移動節點到更合適的位置
 - image/file 類型節點建議保留（有綁定檔案路徑）
 
+重要：只回傳根節點的 children（不要包含根節點本身）。
 只回傳 JSON，不要任何其他文字：
 {{
   "nodes": [
@@ -251,7 +252,8 @@ fn build_prompt(ancestor_path: &[String], subtree: &TreeData) -> String {
 
 source_id 規則：
 - 保留或修改的原始節點 → 填原始 id
-- 全新節點 → 填 null"#
+- 全新節點 → 填 null
+- 不要包含根節點本身，nodes 陣列只放根節點的直接子節點"#
     )
 }
 

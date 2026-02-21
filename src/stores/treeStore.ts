@@ -385,7 +385,22 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       await ipc.deleteNode(child.node.id);
     }
 
-    // 4. Rebuild from proposed tree + collect highlights
+    // 4. Unwrap root if AI included it in proposed (LLM sometimes wraps root)
+    let proposedChildren = result.proposed;
+    if (
+      proposedChildren.length === 1 &&
+      proposedChildren[0].source_id === rootId
+    ) {
+      // AI returned the root node itself — unwrap to its children
+      const wrappedRoot = proposedChildren[0];
+      // Update root title if AI changed it
+      if (wrappedRoot.title && wrappedRoot.title !== rootNode.node.title) {
+        await ipc.updateNode(rootId, { title: wrappedRoot.title });
+      }
+      proposedChildren = wrappedRoot.children;
+    }
+
+    // 5. Rebuild from proposed tree + collect highlights
     const highlights = new Map<string, CompactHighlightInfo>();
     let addedCount = 0;
     let editedCount = 0;
@@ -427,11 +442,11 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
         }
       }
     }
-    await createChildren(result.proposed, rootId, rootId);
+    await createChildren(proposedChildren, rootId, rootId);
     await get().loadTree(contextId);
     set({ selectedNodeId: rootId });
 
-    // 5. Compute deleted nodes
+    // 6. Compute deleted nodes
     const usedSourceIds = new Set<string>();
     function collectSourceIds(nodes: ProposedNode[]) {
       for (const n of nodes) {
@@ -439,7 +454,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
         collectSourceIds(n.children);
       }
     }
-    collectSourceIds(result.proposed);
+    collectSourceIds(proposedChildren);
 
     const deletedNames: string[] = [];
     for (const [id, info] of origMap) {
