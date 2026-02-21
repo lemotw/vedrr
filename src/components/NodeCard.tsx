@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import type { TreeNode, NodeType } from "../lib/types";
+import type { TreeNode, NodeType, CompactHighlightInfo } from "../lib/types";
 import { NODE_TYPE_CONFIG } from "../lib/types";
 import { NodeTypes, imageMime } from "../lib/constants";
 import { useTreeStore } from "../stores/treeStore";
@@ -7,18 +7,27 @@ import { useUIStore } from "../stores/uiStore";
 import { ipc } from "../lib/ipc";
 import { cn } from "../lib/cn";
 
+const HIGHLIGHT_COLORS: Record<string, { border: string; bg: string; text: string }> = {
+  added:           { border: "#2DD4BF99", bg: "#1E3A36", text: "#2DD4BF" },
+  edited:          { border: "#FBBF2499", bg: "#2D2A1F", text: "#FBBF24" },
+  moved:           { border: "#4FC3F799", bg: "#1E2535", text: "#4FC3F7" },
+  "edited+moved":  { border: "#FBBF2499", bg: "#2D2A1F", text: "#FBBF24" },
+};
+
 interface Props {
   node: TreeNode;
   isRoot?: boolean;
   isSelected?: boolean;
   isCutNode?: boolean;
   isDropTarget?: boolean;
+  compactHighlight?: CompactHighlightInfo | null;
+  compactFading?: boolean;
   onClick: () => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dragHandleListeners?: Record<string, any>;
 }
 
-export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, onClick, dragHandleListeners }: Props) {
+export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, compactHighlight, compactFading, onClick, dragHandleListeners }: Props) {
   const { letter, color } = NODE_TYPE_CONFIG[node.node_type as NodeType];
   const { updateNodeTitle, openOrAttachFile, pickAndImportImage } = useTreeStore();
   const { editingNodeId, setEditingNode, openTypePopover, openContextMenu } = useUIStore();
@@ -118,17 +127,24 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, on
     };
   }, [isImage, node.file_path]);
 
+  const hl = compactHighlight && !compactFading ? HIGHLIGHT_COLORS[compactHighlight.type] : null;
+
   return (
     <>
       <div
         ref={cardRef}
         className={cn(
           "flex items-center gap-2 rounded-md bg-bg-card cursor-pointer overflow-hidden",
+          "transition-[background-color,border-color] duration-700",
           isDropTarget && "ring-2 ring-accent-primary bg-accent-primary/10",
           !isDropTarget && isSelected && "ring-1 ring-accent-primary",
           !isDropTarget && !isSelected && "hover:ring-1 hover:ring-border",
           isCutNode && "opacity-40",
         )}
+        style={hl ? {
+          backgroundColor: hl.bg,
+          borderLeft: `3px solid ${hl.border}`,
+        } : undefined}
         onClick={onClick}
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
         onDoubleClick={() => {
@@ -172,9 +188,21 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, on
               className="bg-transparent text-[13px] text-text-primary outline-none border-b border-accent-primary min-w-[60px]"
             />
           ) : (
-            <span className="text-[13px] text-text-primary">
-              {node.title || "Untitled"}
-            </span>
+            <div className="flex flex-col">
+              <span className="text-[13px] text-text-primary">
+                {node.title || "Untitled"}
+              </span>
+              {compactHighlight?.oldTitle && (
+                <span className="text-[10px]" style={{ color: HIGHLIGHT_COLORS[compactHighlight.type]?.text }}>
+                  ← {compactHighlight.oldTitle}
+                </span>
+              )}
+              {compactHighlight?.fromParent && (
+                <span className="text-[10px]" style={{ color: HIGHLIGHT_COLORS[compactHighlight.type]?.text }}>
+                  ↗ from: {compactHighlight.fromParent}
+                </span>
+              )}
+            </div>
           )}
           {isFileish && (
             <button

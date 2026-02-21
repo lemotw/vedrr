@@ -110,6 +110,14 @@ export const CUSTOM_COLOR_LABELS: Record<keyof CustomThemeColors, string> = {
   border: "Border",
 };
 
+// ── Compact States ──────────────────────────────────────────
+export const CompactStates = {
+  IDLE: "idle",
+  LOADING: "loading",
+  APPLIED: "applied",
+} as const;
+export type CompactState = (typeof CompactStates)[keyof typeof CompactStates];
+
 // ── Paste Data Kinds ────────────────────────────────────────
 export const PasteKind = {
   IMAGE: "image" as const,

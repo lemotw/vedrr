@@ -8,16 +8,16 @@ import { NodeSearch } from "./components/NodeSearch";
 import { ContextMenu } from "./components/ContextMenu";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { AISettings } from "./components/AISettings";
-import { CompactPreview } from "./components/CompactPreview";
+import { CompactBanner } from "./components/CompactBanner";
 import { useContextStore } from "./stores/contextStore";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useUIStore } from "./stores/uiStore";
-import { ContextStates } from "./lib/constants";
+import { ContextStates, CompactStates } from "./lib/constants";
 
 export default function App() {
   const { loadContexts, switchContext } = useContextStore();
   const { openQuickSwitcher } = useUIStore();
-  const compactLoading = useUIStore((s) => s.compactLoading);
+  const compactState = useUIStore((s) => s.compactState);
   const compactError = useUIStore((s) => s.compactError);
   useKeyboard();
 
@@ -35,6 +35,7 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen w-screen bg-bg-page">
       <StatusBar />
+      <CompactBanner />
       <main className="flex-1 overflow-hidden flex">
         <div className="flex-1 overflow-hidden">
           <TreeCanvas />
@@ -47,13 +48,12 @@ export default function App() {
       <ContextMenu />
       <ThemeSwitcher />
       <AISettings />
-      <CompactPreview />
-      {compactLoading && (
+      {compactState === CompactStates.LOADING && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
           <div className="rounded-xl border border-border bg-bg-elevated px-8 py-6 shadow-2xl">
             <div className="flex items-center gap-3">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent-primary border-t-transparent" />
-              <span className="font-mono text-sm text-text-primary">AI Compact...</span>
+              <span className="font-mono text-sm text-text-primary">AI 正在重組你的筆記...</span>
             </div>
           </div>
         </div>

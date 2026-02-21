@@ -3,10 +3,9 @@ import { useUIStore } from "../stores/uiStore";
 import { useTreeStore } from "../stores/treeStore";
 import { useContextStore } from "../stores/contextStore";
 import type { TreeData } from "../lib/types";
-import { NodeTypes, PasteKind } from "../lib/constants";
+import { NodeTypes, PasteKind, CompactStates } from "../lib/constants";
 import { isModKey } from "../lib/platform";
 import { ipc } from "../lib/ipc";
-import { computeDiff } from "../lib/compactDiff";
 
 function findNodeInTree(tree: TreeData, id: string): TreeData | null {
   if (tree.node.id === id) return tree;
@@ -97,6 +96,14 @@ export function useKeyboard() {
         return;
       }
 
+      // Escape/Enter dismisses compact banner in APPLIED state
+      if ((e.key === "Escape" || e.key === "Enter") && !editingNodeId && useUIStore.getState().compactState === CompactStates.APPLIED) {
+        e.preventDefault();
+        useUIStore.getState().dismissCompactBanner();
+        useUIStore.getState().startCompactFade(3000);
+        return;
+      }
+
       // Escape closes context menu
       if (e.key === "Escape" && contextMenuNodeId) {
         e.preventDefault();
@@ -163,11 +170,19 @@ export function useKeyboard() {
         }
       }
 
+      // Helper: trigger highlight fade on navigation
+      const fadeHighlightsOnNav = () => {
+        if (useUIStore.getState().compactHighlights) {
+          useUIStore.getState().startCompactFade(0);
+        }
+      };
+
       switch (e.key) {
         // j/↓ k/↑ — move between nodes at the same depth level (across subtrees)
         case "j":
         case "ArrowDown": {
           e.preventDefault();
+          fadeHighlightsOnNav();
           if (!selectedNodeId) break;
           const depthDown = getNodeDepth(tree, selectedNodeId);
           if (depthDown < 0) break;
@@ -181,6 +196,7 @@ export function useKeyboard() {
         case "k":
         case "ArrowUp": {
           e.preventDefault();
+          fadeHighlightsOnNav();
           if (!selectedNodeId) break;
           const depthUp = getNodeDepth(tree, selectedNodeId);
           if (depthUp < 0) break;
@@ -194,6 +210,7 @@ export function useKeyboard() {
         case "l":
         case "ArrowRight": {
           e.preventDefault();
+          fadeHighlightsOnNav();
           if (!selectedNodeId) break;
           const nodeR = findNodeInTree(tree, selectedNodeId);
           if (nodeR && nodeR.children.length > 0) {
@@ -217,9 +234,18 @@ export function useKeyboard() {
         case "h":
         case "ArrowLeft": {
           e.preventDefault();
+          fadeHighlightsOnNav();
           if (!selectedNodeId) break;
           const parent = findParentInTree(tree, selectedNodeId);
           if (parent) selectNode(parent.node.id);
+          break;
+        }
+        case "u": {
+          if (useUIStore.getState().compactState === CompactStates.APPLIED) {
+            e.preventDefault();
+            useUIStore.getState().clearCompactHighlights();
+            useTreeStore.getState().undoCompact();
+          }
           break;
         }
         case "Enter": {
@@ -257,27 +283,28 @@ export function useKeyboard() {
           if (isModKey(e)) break; // Mod+C is handled above
           e.preventDefault();
           if (!selectedNodeId || !currentContextId) break;
+          if (useUIStore.getState().compactState !== CompactStates.IDLE) break;
           const profileId = localStorage.getItem("mindflow-active-ai-profile");
           if (!profileId) {
             useUIStore.getState().setCompactError("No AI profile selected. Open AI Settings to create and select one.");
             break;
           }
-          const { setCompactLoading, setCompactResult, setCompactError } = useUIStore.getState();
-          console.log("[compact] triggered via keyboard, nodeId:", selectedNodeId, "profileId:", profileId);
-          setCompactLoading(true);
-          setCompactError(null);
+          useUIStore.getState().setCompactState(CompactStates.LOADING);
           ipc.compactNode(selectedNodeId, profileId)
-            .then((result) => {
-              console.log("[compact] IPC result:", JSON.stringify(result).slice(0, 500));
-              const diff = computeDiff(result.original, result.proposed);
-              console.log("[compact] diff ops:", diff.length, diff);
-              setCompactResult(result, diff);
+            .then(async (result) => {
+              const { applyCompact } = useTreeStore.getState();
+              const { highlights, summary } = await applyCompact(result);
+              const totalChanges = summary.added + summary.edited + summary.moved + summary.deleted;
+              if (totalChanges === 0) {
+                useUIStore.getState().setCompactState(CompactStates.IDLE);
+              } else {
+                useUIStore.getState().setCompactApplied(summary, highlights);
+              }
             })
             .catch((err) => {
-              console.error("[compact] IPC error:", err);
-              setCompactError(String(err));
-            })
-            .finally(() => setCompactLoading(false));
+              console.error("[compact] error:", err);
+              useUIStore.getState().setCompactError(String(err));
+            });
           break;
         }
         case "Backspace":

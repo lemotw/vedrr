@@ -2,10 +2,9 @@ import { useRef, useEffect } from "react";
 import { useUIStore } from "../stores/uiStore";
 import { useTreeStore } from "../stores/treeStore";
 import { useContextStore } from "../stores/contextStore";
-import { NodeTypes } from "../lib/constants";
+import { NodeTypes, CompactStates } from "../lib/constants";
 import type { TreeData } from "../lib/types";
 import { ipc } from "../lib/ipc";
-import { computeDiff } from "../lib/compactDiff";
 import { cn } from "../lib/cn";
 import { modSymbol } from "../lib/platform";
 
@@ -157,26 +156,26 @@ export function ContextMenu() {
       shortcut: "C",
       icon: "⚡",
       action: () => exec(async () => {
+        if (useUIStore.getState().compactState !== CompactStates.IDLE) return;
         const profileId = localStorage.getItem("mindflow-active-ai-profile");
         if (!profileId) {
           useUIStore.getState().setCompactError("No AI profile selected. Open AI Settings to create and select one.");
           return;
         }
-        const { setCompactLoading, setCompactResult, setCompactError } = useUIStore.getState();
-        console.log("[compact] triggered via context menu, nodeId:", contextMenuNodeId, "profileId:", profileId);
-        setCompactLoading(true);
-        setCompactError(null);
+        useUIStore.getState().setCompactState(CompactStates.LOADING);
         try {
           const result = await ipc.compactNode(contextMenuNodeId, profileId);
-          console.log("[compact] IPC result:", JSON.stringify(result).slice(0, 500));
-          const diff = computeDiff(result.original, result.proposed);
-          console.log("[compact] diff ops:", diff.length, diff);
-          setCompactResult(result, diff);
+          const { applyCompact } = useTreeStore.getState();
+          const { highlights, summary } = await applyCompact(result);
+          const totalChanges = summary.added + summary.edited + summary.moved + summary.deleted;
+          if (totalChanges === 0) {
+            useUIStore.getState().setCompactState(CompactStates.IDLE);
+          } else {
+            useUIStore.getState().setCompactApplied(summary, highlights);
+          }
         } catch (e) {
-          console.error("[compact] IPC error:", e);
-          setCompactError(String(e));
-        } finally {
-          setCompactLoading(false);
+          console.error("[compact] error:", e);
+          useUIStore.getState().setCompactError(String(e));
         }
       }),
     },

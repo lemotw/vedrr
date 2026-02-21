@@ -143,6 +143,8 @@ function TreeBranch({
     useTreeStore();
   const { currentContextId } = useContextStore();
   const { collapsedNodes, toggleCollapse } = useUIStore();
+  const compactHighlights = useUIStore((s) => s.compactHighlights);
+  const compactFading = useUIStore((s) => s.compactFading);
   const dragState = useDragState();
   const hasChildren = data.children.length > 0;
   const isCollapsed = collapsedNodes.has(data.node.id);
@@ -157,6 +159,8 @@ function TreeBranch({
     dragState.activeId !== data.node.id &&
     dragState.reparentIntent;
 
+  const highlight = compactHighlights?.get(data.node.id) ?? null;
+
   const nodeCard = (
     <NodeCard
       node={data.node}
@@ -164,6 +168,8 @@ function TreeBranch({
       isSelected={isSelected}
       isCutNode={inCutSubtree}
       isDropTarget={isReparentTarget}
+      compactHighlight={highlight}
+      compactFading={compactFading}
       onClick={() => selectNode(data.node.id)}
       dragHandleListeners={!isRoot ? dragHandleListeners : undefined}
     />

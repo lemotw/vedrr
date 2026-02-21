@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { TreeData, TreeNode, NodeType, CompactResult, ProposedNode } from "../lib/types";
+import type { TreeData, TreeNode, NodeType, CompactResult, ProposedNode, CompactHighlightInfo, CompactSummary } from "../lib/types";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { ipc } from "../lib/ipc";
 import { NodeTypes, PasteKind } from "../lib/constants";
@@ -16,7 +16,8 @@ type UndoEntry =
   | { type: "type"; nodeId: string; old: NodeType }
   | { type: "content"; nodeId: string; old: string | null }
   | { type: "reorder"; contextId: string; nodeId: string; parentId: string; oldPosition: number }
-  | { type: "move"; nodeId: string; contextId: string; oldParentId: string; oldPosition: number; prevSelectedId: string | null };
+  | { type: "move"; nodeId: string; contextId: string; oldParentId: string; oldPosition: number; prevSelectedId: string | null }
+  | { type: "compact"; contextId: string; rootId: string; originalNodes: TreeNode[]; prevSelectedId: string | null };
 
 // ── Helpers ────────────────────────────────────────────────
 function flattenNodes(td: TreeData): TreeNode[] {
@@ -50,7 +51,8 @@ interface TreeStore {
   pickAndImportImage: (nodeId: string) => Promise<void>;
   reorderNode: (nodeId: string, direction: "up" | "down", contextId: string) => Promise<void>;
   dragMoveNode: (nodeId: string, newParentId: string, position: number, contextId: string) => Promise<void>;
-  applyCompact: (result: CompactResult) => Promise<void>;
+  applyCompact: (result: CompactResult) => Promise<{ highlights: Map<string, CompactHighlightInfo>; summary: CompactSummary }>;
+  undoCompact: () => Promise<void>;
   undo: () => Promise<void>;
   clearUndo: () => void;
 }
@@ -87,6 +89,12 @@ function pushUndo(stack: UndoEntry[], entry: UndoEntry): UndoEntry[] {
 
 function clearCut(get: () => TreeStore, set: (s: Partial<TreeStore>) => void) {
   if (get().isCut) set({ copiedNodeId: null, isCut: false });
+}
+
+function clearHighlightsIfActive() {
+  if (useUIStore.getState().compactHighlights) {
+    useUIStore.getState().clearCompactHighlights();
+  }
 }
 
 export const useTreeStore = create<TreeStore>((set, get) => ({
@@ -139,6 +147,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
 
   addChild: async (parentId, contextId) => {
     clearCut(get, set);
+    clearHighlightsIfActive();
     const { selectedNodeId, undoStack } = get();
     const node = await ipc.createNode(contextId, parentId, NodeTypes.TEXT, "");
     set({ undoStack: pushUndo(undoStack, { type: "add", nodeId: node.id, contextId, prevSelectedId: selectedNodeId }) });
@@ -149,6 +158,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
 
   addSibling: async (nodeId, contextId) => {
     clearCut(get, set);
+    clearHighlightsIfActive();
     const { tree, selectedNodeId, undoStack } = get();
     if (!tree) return;
     const parent = findParent(tree, nodeId);
@@ -162,6 +172,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
 
   deleteNode: async (nodeId, contextId) => {
     clearCut(get, set);
+    clearHighlightsIfActive();
     const { tree, selectedNodeId, undoStack } = get();
     if (!tree || tree.node.id === nodeId) return;
     const target = findNode(tree, nodeId);
@@ -295,6 +306,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
 
   reorderNode: async (nodeId, direction, contextId) => {
     clearCut(get, set);
+    clearHighlightsIfActive();
     const { tree, undoStack } = get();
     if (!tree) return;
     const parent = findParent(tree, nodeId);
@@ -318,6 +330,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
 
   dragMoveNode: async (nodeId, newParentId, position, contextId) => {
     clearCut(get, set);
+    clearHighlightsIfActive();
     const { tree, undoStack, selectedNodeId } = get();
     if (!tree) return;
     const node = findNode(tree, nodeId);
@@ -338,34 +351,132 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
 
   applyCompact: async (result: CompactResult) => {
     const { tree, undoStack, selectedNodeId } = get();
-    if (!tree) return;
+    if (!tree) throw new Error("No tree loaded");
     const rootId = result.original.node.id;
     const contextId = result.original.node.context_id;
 
-    // Snapshot all original children for undo
     const rootNode = findNode(tree, rootId);
-    if (!rootNode) return;
-    const allNodes = flattenNodes(rootNode).filter(n => n.id !== rootId);
-    set({ undoStack: pushUndo(undoStack, { type: "delete", nodes: allNodes, contextId, prevSelectedId: selectedNodeId }) });
+    if (!rootNode) throw new Error("Root node not found");
 
-    // Delete all existing children of root
+    // 1. Build origMap: id → { title, parentId }
+    const origMap = new Map<string, { title: string; parentId: string | null }>();
+    function walkOrig(td: TreeData) {
+      origMap.set(td.node.id, { title: td.node.title, parentId: td.node.parent_id });
+      for (const c of td.children) walkOrig(c);
+    }
+    walkOrig(rootNode);
+
+    // Build parentTitleMap: id → parent title (for "from" display)
+    const parentTitleMap = new Map<string, string>();
+    function buildParentTitles(td: TreeData) {
+      for (const c of td.children) {
+        parentTitleMap.set(c.node.id, td.node.title);
+        buildParentTitles(c);
+      }
+    }
+    buildParentTitles(rootNode);
+
+    // 2. Snapshot for undo
+    const allNodes = flattenNodes(rootNode).filter(n => n.id !== rootId);
+    set({ undoStack: pushUndo(undoStack, { type: "compact", contextId, rootId, originalNodes: allNodes, prevSelectedId: selectedNodeId }) });
+
+    // 3. Delete existing children
     for (const child of rootNode.children) {
       await ipc.deleteNode(child.node.id);
     }
 
-    // Rebuild from proposed tree
-    async function createChildren(proposed: ProposedNode[], parentId: string) {
+    // 4. Rebuild from proposed tree + collect highlights
+    const highlights = new Map<string, CompactHighlightInfo>();
+    let addedCount = 0;
+    let editedCount = 0;
+    let movedCount = 0;
+
+    async function createChildren(proposed: ProposedNode[], parentId: string, parentSourceId: string | null) {
       for (const p of proposed) {
         const nodeType = (["text", "markdown", "image", "file"].includes(p.node_type) ? p.node_type : "text") as string;
         const node = await ipc.createNode(contextId, parentId, nodeType, p.title);
+
+        if (!p.source_id) {
+          highlights.set(node.id, { type: "added" });
+          addedCount++;
+        } else {
+          const orig = origMap.get(p.source_id);
+          if (orig) {
+            const titleChanged = orig.title !== p.title;
+            const parentChanged = orig.parentId !== parentSourceId;
+
+            if (titleChanged && parentChanged) {
+              highlights.set(node.id, { type: "edited+moved", oldTitle: orig.title, fromParent: parentTitleMap.get(p.source_id) });
+              editedCount++;
+              movedCount++;
+            } else if (titleChanged) {
+              highlights.set(node.id, { type: "edited", oldTitle: orig.title });
+              editedCount++;
+            } else if (parentChanged) {
+              highlights.set(node.id, { type: "moved", fromParent: parentTitleMap.get(p.source_id) });
+              movedCount++;
+            }
+          } else {
+            highlights.set(node.id, { type: "added" });
+            addedCount++;
+          }
+        }
+
         if (p.children.length > 0) {
-          await createChildren(p.children, node.id);
+          await createChildren(p.children, node.id, p.source_id ?? null);
         }
       }
     }
-    await createChildren(result.proposed, rootId);
+    await createChildren(result.proposed, rootId, rootId);
     await get().loadTree(contextId);
     set({ selectedNodeId: rootId });
+
+    // 5. Compute deleted nodes
+    const usedSourceIds = new Set<string>();
+    function collectSourceIds(nodes: ProposedNode[]) {
+      for (const n of nodes) {
+        if (n.source_id) usedSourceIds.add(n.source_id);
+        collectSourceIds(n.children);
+      }
+    }
+    collectSourceIds(result.proposed);
+
+    const deletedNames: string[] = [];
+    for (const [id, info] of origMap) {
+      if (id === rootId) continue;
+      if (!usedSourceIds.has(id)) deletedNames.push(info.title);
+    }
+
+    const summary: CompactSummary = {
+      added: addedCount,
+      edited: editedCount,
+      moved: movedCount,
+      deleted: deletedNames.length,
+      deletedNames,
+    };
+
+    return { highlights, summary };
+  },
+
+  undoCompact: async () => {
+    const { tree, undoStack } = get();
+    if (!tree || undoStack.length === 0) return;
+    const entry = undoStack[undoStack.length - 1];
+    if (entry.type !== "compact") return;
+    set({ undoStack: undoStack.slice(0, -1) });
+
+    // Delete all current children of root
+    const rootNode = findNode(tree, entry.rootId);
+    if (rootNode) {
+      for (const child of rootNode.children) {
+        await ipc.deleteNode(child.node.id);
+      }
+    }
+
+    // Restore original nodes
+    await ipc.restoreNodes(entry.originalNodes);
+    await get().loadTree(entry.contextId);
+    set({ selectedNodeId: entry.prevSelectedId });
   },
 
   undo: async () => {
@@ -418,6 +529,19 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       }
       case "move": {
         await ipc.moveNode(entry.nodeId, entry.oldParentId, entry.oldPosition);
+        await get().loadTree(entry.contextId);
+        set({ selectedNodeId: entry.prevSelectedId });
+        break;
+      }
+      case "compact": {
+        // Compact undo: delete new children, restore originals
+        const rootNode = findNode(get().tree!, entry.rootId);
+        if (rootNode) {
+          for (const child of rootNode.children) {
+            await ipc.deleteNode(child.node.id);
+          }
+        }
+        await ipc.restoreNodes(entry.originalNodes);
         await get().loadTree(entry.contextId);
         set({ selectedNodeId: entry.prevSelectedId });
         break;

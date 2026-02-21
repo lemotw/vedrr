@@ -51,6 +51,22 @@ export interface CompactResult {
   proposed: ProposedNode[];
 }
 
+export type CompactChangeType = "added" | "edited" | "moved" | "edited+moved";
+
+export interface CompactHighlightInfo {
+  type: CompactChangeType;
+  oldTitle?: string;
+  fromParent?: string;
+}
+
+export interface CompactSummary {
+  added: number;
+  edited: number;
+  moved: number;
+  deleted: number;
+  deletedNames: string[];
+}
+
 export interface AiProfile {
   id: string;
   name: string;

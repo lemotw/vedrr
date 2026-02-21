@@ -1,8 +1,7 @@
 import { create } from "zustand";
-import { Themes, DEFAULT_CUSTOM_COLORS, CUSTOM_COLOR_CSS_MAP } from "../lib/constants";
-import type { ThemeId, CustomThemeColors } from "../lib/constants";
-import type { CompactResult } from "../lib/types";
-import type { DiffOp } from "../lib/compactDiff";
+import { Themes, DEFAULT_CUSTOM_COLORS, CUSTOM_COLOR_CSS_MAP, CompactStates } from "../lib/constants";
+import type { ThemeId, CustomThemeColors, CompactState } from "../lib/constants";
+import type { CompactHighlightInfo, CompactSummary } from "../lib/types";
 
 function loadCustomColors(): CustomThemeColors {
   try {
@@ -49,9 +48,11 @@ interface UIStore {
   themeSwitcherOpen: boolean;
   customThemeColors: CustomThemeColors;
   aiSettingsOpen: boolean;
-  compactLoading: boolean;
-  compactResult: CompactResult | null;
-  compactDiff: DiffOp[] | null;
+  compactState: CompactState;
+  compactHighlights: Map<string, CompactHighlightInfo> | null;
+  compactSummary: CompactSummary | null;
+  compactBannerExpanded: boolean;
+  compactFading: boolean;
   compactError: string | null;
 
   toggleQuickSwitcher: () => void;
@@ -74,10 +75,13 @@ interface UIStore {
   closeThemeSwitcher: () => void;
   openAiSettings: () => void;
   closeAiSettings: () => void;
-  setCompactLoading: (v: boolean) => void;
-  setCompactResult: (result: CompactResult | null, diff: DiffOp[] | null) => void;
+  setCompactState: (state: CompactState) => void;
+  setCompactApplied: (summary: CompactSummary, highlights: Map<string, CompactHighlightInfo>) => void;
+  dismissCompactBanner: () => void;
+  clearCompactHighlights: () => void;
+  startCompactFade: (delayMs?: number) => void;
+  toggleCompactBannerExpanded: () => void;
   setCompactError: (error: string | null) => void;
-  closeCompactPreview: () => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -94,9 +98,11 @@ export const useUIStore = create<UIStore>((set) => ({
   themeSwitcherOpen: false,
   customThemeColors: loadCustomColors(),
   aiSettingsOpen: false,
-  compactLoading: false,
-  compactResult: null,
-  compactDiff: null,
+  compactState: CompactStates.IDLE,
+  compactHighlights: null,
+  compactSummary: null,
+  compactBannerExpanded: false,
+  compactFading: false,
   compactError: null,
 
   toggleQuickSwitcher: () => set((s) => ({ quickSwitcherOpen: !s.quickSwitcherOpen })),
@@ -139,8 +145,35 @@ export const useUIStore = create<UIStore>((set) => ({
   closeThemeSwitcher: () => set({ themeSwitcherOpen: false }),
   openAiSettings: () => set({ aiSettingsOpen: true }),
   closeAiSettings: () => set({ aiSettingsOpen: false }),
-  setCompactLoading: (v) => set({ compactLoading: v }),
-  setCompactResult: (result, diff) => set({ compactResult: result, compactDiff: diff, compactError: null }),
-  setCompactError: (error) => set({ compactError: error }),
-  closeCompactPreview: () => set({ compactResult: null, compactDiff: null, compactError: null }),
+  setCompactState: (state) => set({ compactState: state }),
+  setCompactApplied: (summary, highlights) => set({
+    compactState: CompactStates.APPLIED,
+    compactSummary: summary,
+    compactHighlights: highlights,
+    compactBannerExpanded: false,
+    compactFading: false,
+    compactError: null,
+  }),
+  dismissCompactBanner: () => set({
+    compactState: CompactStates.IDLE,
+    compactSummary: null,
+    compactBannerExpanded: false,
+  }),
+  clearCompactHighlights: () => set({
+    compactHighlights: null,
+    compactFading: false,
+    compactState: CompactStates.IDLE,
+    compactSummary: null,
+    compactBannerExpanded: false,
+  }),
+  startCompactFade: (delayMs = 0) => {
+    setTimeout(() => {
+      set({ compactFading: true });
+      setTimeout(() => {
+        set({ compactHighlights: null, compactFading: false });
+      }, 800);
+    }, delayMs);
+  },
+  toggleCompactBannerExpanded: () => set((s) => ({ compactBannerExpanded: !s.compactBannerExpanded })),
+  setCompactError: (error) => set({ compactError: error, compactState: CompactStates.IDLE }),
 }));
