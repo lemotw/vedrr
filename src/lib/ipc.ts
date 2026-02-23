@@ -53,6 +53,9 @@ export const ipc = {
   importImage: (contextId: string, nodeId: string, sourcePath: string) =>
     safeInvoke<string>(IpcCmd.IMPORT_IMAGE, { contextId, nodeId, sourcePath }),
 
+  saveMarkdownFile: (contextId: string, nodeId: string, content: string) =>
+    safeInvoke<string>(IpcCmd.SAVE_MARKDOWN_FILE, { contextId, nodeId, content }),
+
   deleteNode: (id: string) =>
     safeInvoke<void>(IpcCmd.DELETE_NODE, { id }),
 

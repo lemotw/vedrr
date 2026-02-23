@@ -4,6 +4,7 @@ import { useTreeStore } from "../stores/treeStore";
 import { useUIStore } from "../stores/uiStore";
 import type { TreeData } from "../lib/types";
 import { NodeTypes } from "../lib/constants";
+import { ipc } from "../lib/ipc";
 import { MarkdownEditor } from "./MarkdownEditor";
 
 function findNode(tree: TreeData, id: string): TreeData | null {
@@ -16,26 +17,61 @@ function findNode(tree: TreeData, id: string): TreeData | null {
 }
 
 export function ContentPanel() {
-  const { tree, updateNodeContent, updateNodeTitle } = useTreeStore();
+  const { tree, updateNodeTitle } = useTreeStore();
   const { markdownEditorNodeId } = useUIStore();
+  const [mdContent, setMdContent] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const targetId = markdownEditorNodeId;
   const selected = tree && targetId ? findNode(tree, targetId) : null;
   const node = selected?.node;
   const showPanel = node && node.node_type === NodeTypes.MARKDOWN;
 
+  const nodeId = node?.id;
+  const nodeFilePath = node?.file_path;
+  const nodeContextId = node?.context_id;
+
+  // Load .md file content when node changes
+  useEffect(() => {
+    setSaveError(null);
+    if (!nodeFilePath) return;
+
+    let cancelled = false;
+    setLoading(true);
+    ipc.readFileBytes(nodeFilePath)
+      .then((bytes) => {
+        if (cancelled) return;
+        const decoded = new TextDecoder("utf-8").decode(new Uint8Array(bytes));
+        setMdContent(decoded);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("[ContentPanel] Failed to read .md file:", err);
+        setMdContent("");
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [nodeId, nodeFilePath]);
+
   const handleSave = useCallback(
-    (content: string) => {
-      if (node) updateNodeContent(node.id, content);
+    (markdown: string) => {
+      if (!nodeContextId || !nodeId) return;
+      setSaveError(null);
+      ipc.saveMarkdownFile(nodeContextId, nodeId, markdown).catch((err) => {
+        console.error("[ContentPanel] Failed to save .md file:", err);
+        setSaveError(String(err));
+      });
     },
-    [node?.id, updateNodeContent],
+    [nodeId, nodeContextId],
   );
 
   const handleTitleChange = useCallback(
     (title: string) => {
-      if (node) updateNodeTitle(node.id, title);
+      if (nodeId) updateNodeTitle(nodeId, title);
     },
-    [node?.id, updateNodeTitle],
+    [nodeId, updateNodeTitle],
   );
 
   if (!showPanel || !node) return null;
@@ -54,11 +90,21 @@ export function ContentPanel() {
         <span className="text-[10px] text-text-secondary font-mono shrink-0">Esc</span>
       </div>
 
-      <MarkdownEditor
-        key={node.id}
-        content={node.content || ""}
-        onSave={handleSave}
-      />
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center text-text-secondary text-sm">Loading...</div>
+      ) : (
+        <MarkdownEditor
+          key={node.id}
+          content={mdContent}
+          onSave={handleSave}
+        />
+      )}
+
+      {saveError && (
+        <div className="px-3 py-1.5 text-[10px] text-red-400 bg-red-400/10 border-t border-red-400/20 shrink-0 font-mono truncate">
+          Save failed — {saveError}
+        </div>
+      )}
     </div>
   );
 }

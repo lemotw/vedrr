@@ -34,6 +34,7 @@ export const IpcCmd = {
   READ_FILE_BYTES: "read_file_bytes",
   SAVE_CLIPBOARD_IMAGE: "save_clipboard_image",
   IMPORT_IMAGE: "import_image",
+  SAVE_MARKDOWN_FILE: "save_markdown_file",
   CLONE_SUBTREE: "clone_subtree",
   RESTORE_NODES: "restore_nodes",
   LIST_AI_PROFILES: "list_ai_profiles",

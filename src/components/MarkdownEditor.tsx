@@ -3,12 +3,18 @@ import { useTranslation } from "react-i18next";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import { Markdown, type MarkdownStorage } from "tiptap-markdown";
 import { useUIStore } from "../stores/uiStore";
 import { cn } from "../lib/cn";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getMarkdown(editor: any): string {
+  return (editor.storage.markdown as MarkdownStorage).getMarkdown();
+}
+
 interface Props {
-  content: string;
-  onSave: (content: string) => void;
+  content: string; // Markdown string
+  onSave: (markdown: string) => void;
 }
 
 export function MarkdownEditor({ content, onSave }: Props) {
@@ -18,10 +24,10 @@ export function MarkdownEditor({ content, onSave }: Props) {
   const latestContent = useRef(content);
 
   const debouncedSave = useCallback(
-    (html: string) => {
-      latestContent.current = html;
+    (md: string) => {
+      latestContent.current = md;
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => onSave(html), 500);
+      saveTimer.current = setTimeout(() => onSave(md), 500);
     },
     [onSave],
   );
@@ -44,6 +50,11 @@ export function MarkdownEditor({ content, onSave }: Props) {
       Placeholder.configure({
         placeholder: t("markdownEditor.placeholder"),
       }),
+      Markdown.configure({
+        html: false,
+        transformPastedText: true,
+        transformCopiedText: true,
+      }),
     ],
     content: content || "",
     editorProps: {
@@ -63,14 +74,14 @@ export function MarkdownEditor({ content, onSave }: Props) {
     onFocus: () => setContentPanelFocused(true),
     onBlur: () => setContentPanelFocused(false),
     onUpdate: ({ editor: e }) => {
-      debouncedSave(e.getHTML());
+      debouncedSave(getMarkdown(e));
     },
   });
 
   // Sync content when switching nodes
   useEffect(() => {
     if (editor && !editor.isDestroyed) {
-      const current = editor.getHTML();
+      const current = getMarkdown(editor);
       // Only reset if content actually changed (avoid cursor jump)
       if (current !== content && content !== latestContent.current) {
         editor.commands.setContent(content || "");

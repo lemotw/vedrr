@@ -3,6 +3,7 @@ use tauri::State;
 use crate::AppState;
 use crate::error::AppError;
 use crate::models::{TreeData, TreeNode};
+use super::file_ops::md_file_path;
 
 fn row_to_node(row: &rusqlite::Row) -> rusqlite::Result<TreeNode> {
     Ok(TreeNode {
@@ -102,11 +103,29 @@ pub fn create_node(
         )
         .unwrap_or(-1);
 
+    // Compute file_path for markdown nodes (file created AFTER DB insert for atomicity)
+    let file_path: Option<String> = if node_type == "markdown" {
+        Some(md_file_path(&context_id, &id)?.to_string_lossy().to_string())
+    } else {
+        None
+    };
+
     db.execute(
-        "INSERT INTO tree_nodes (id, context_id, parent_id, position, node_type, title)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        rusqlite::params![id, context_id, parent_id, max_pos + 1, node_type, title],
+        "INSERT INTO tree_nodes (id, context_id, parent_id, position, node_type, title, file_path)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![id, context_id, parent_id, max_pos + 1, node_type, title, file_path],
     )?;
+
+    // Create .md file after successful DB insert
+    if node_type == "markdown" {
+        let fp = md_file_path(&context_id, &id)?;
+        if let Some(parent_dir) = fp.parent() {
+            std::fs::create_dir_all(parent_dir)?;
+        }
+        if !fp.exists() {
+            std::fs::write(&fp, b"")?;
+        }
+    }
 
     // Touch context
     db.execute(
@@ -150,7 +169,45 @@ pub fn update_node(
             rusqlite::params![c, id],
         )?;
     }
-    if let Some(nt) = node_type {
+    if let Some(ref nt) = node_type {
+        // Read current state once (I2: single query instead of multiple)
+        let (old_type, old_fp, ctx_id, old_content): (String, Option<String>, String, Option<String>) = db.query_row(
+            "SELECT node_type, file_path, context_id, content FROM tree_nodes WHERE id = ?1",
+            [&id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )?;
+
+        // Only handle file lifecycle on actual type changes
+        if old_type != *nt {
+            // Switching TO markdown: create .md file, migrate content
+            if nt == "markdown" && old_fp.is_none() {
+                let fp = md_file_path(&ctx_id, &id)?;
+                // DB first (C1: atomicity)
+                db.execute(
+                    "UPDATE tree_nodes SET file_path = ?1 WHERE id = ?2",
+                    rusqlite::params![fp.to_string_lossy().to_string(), id],
+                )?;
+                // Create .md file — seed with existing content, don't overwrite (C2: undo safety)
+                if let Some(parent_dir) = fp.parent() {
+                    std::fs::create_dir_all(parent_dir)?;
+                }
+                if !fp.exists() {
+                    let seed = old_content.unwrap_or_default();
+                    std::fs::write(&fp, seed.as_bytes())?;
+                }
+                // Clear DB content column (I3: no stale data)
+                db.execute("UPDATE tree_nodes SET content = NULL WHERE id = ?1", [&id])?;
+            }
+
+            // Switching AWAY from markdown: NULL file_path, do NOT delete file (C2: undo safety)
+            if old_type == "markdown" {
+                db.execute(
+                    "UPDATE tree_nodes SET file_path = NULL WHERE id = ?1",
+                    [&id],
+                )?;
+            }
+        }
+
         db.execute(
             "UPDATE tree_nodes SET node_type = ?1, updated_at = datetime('now') WHERE id = ?2",
             rusqlite::params![nt, id],
@@ -181,6 +238,8 @@ pub fn delete_node(state: State<'_, AppState>, id: String) -> Result<(), AppErro
         for child_id in children {
             delete_recursive(db, &child_id)?;
         }
+        // Note: .md files are intentionally NOT deleted to support undo.
+        // Orphan files are cleaned up separately.
         db.execute("DELETE FROM tree_nodes WHERE id = ?1", [node_id])?;
         Ok(())
     }
@@ -263,11 +322,39 @@ pub fn clone_subtree(
             )
             .unwrap_or(-1);
 
+        // Copy .md file for markdown nodes — DB first, file second
+        let cloned_file_path = if src.0 == "markdown" {
+            if let Some(ref orig_fp) = src.3 {
+                if orig_fp.ends_with(".md") && std::path::Path::new(orig_fp).exists() {
+                    Some(md_file_path(context_id, &new_id)?.to_string_lossy().to_string())
+                } else {
+                    src.3.clone()
+                }
+            } else {
+                None
+            }
+        } else {
+            src.3.clone()
+        };
+
         db.execute(
             "INSERT INTO tree_nodes (id, context_id, parent_id, position, node_type, title, content, file_path)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            rusqlite::params![new_id, context_id, new_parent_id, max_pos + 1, src.0, src.1, src.2, src.3],
+            rusqlite::params![new_id, context_id, new_parent_id, max_pos + 1, src.0, src.1, src.2, cloned_file_path],
         )?;
+
+        // Copy .md file after successful DB insert
+        if src.0 == "markdown" {
+            if let Some(ref orig_fp) = src.3 {
+                if orig_fp.ends_with(".md") && std::path::Path::new(orig_fp).exists() {
+                    let new_path = md_file_path(context_id, &new_id)?;
+                    if let Some(parent_dir) = new_path.parent() {
+                        std::fs::create_dir_all(parent_dir)?;
+                    }
+                    std::fs::copy(orig_fp, &new_path)?;
+                }
+            }
+        }
 
         // Clone children
         let children: Vec<String> = {

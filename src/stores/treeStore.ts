@@ -12,7 +12,7 @@ type UndoEntry =
   | { type: "add"; nodeId: string; contextId: string; prevSelectedId: string | null }
   | { type: "delete"; nodes: TreeNode[]; contextId: string; prevSelectedId: string | null }
   | { type: "title"; nodeId: string; old: string }
-  | { type: "type"; nodeId: string; old: NodeType }
+  | { type: "type"; nodeId: string; old: NodeType; oldContent?: string | null }
   | { type: "content"; nodeId: string; old: string | null }
   | { type: "reorder"; contextId: string; nodeId: string; parentId: string; oldPosition: number }
   | { type: "move"; nodeId: string; contextId: string; oldParentId: string; oldPosition: number; prevSelectedId: string | null }
@@ -231,10 +231,14 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     if (!tree) return;
     const target = findNode(tree, nodeId);
     if (target) {
-      set({ undoStack: pushUndo(undoStack, { type: "type", nodeId, old: target.node.node_type }) });
+      set({ undoStack: pushUndo(undoStack, { type: "type", nodeId, old: target.node.node_type, oldContent: target.node.content }) });
     }
     await ipc.updateNode(nodeId, { nodeType });
-    set({ tree: patchNode(get().tree!, nodeId, { node_type: nodeType }) });
+    // Reload tree to pick up file_path changes (e.g. markdown .md file creation)
+    const contextId = get().tree!.node.context_id;
+    const prevSelected = get().selectedNodeId;
+    const freshTree = await ipc.getTree(contextId);
+    set({ tree: freshTree, selectedNodeId: prevSelected });
   },
 
   pasteAsNode: async (parentId, contextId, data) => {
@@ -593,8 +597,17 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       }
       case "type": {
         await ipc.updateNode(entry.nodeId, { nodeType: entry.old });
-        const tree2 = get().tree;
-        if (tree2) set({ tree: patchNode(tree2, entry.nodeId, { node_type: entry.old }) });
+        // Restore DB content if saved (e.g., undoing text→markdown clears content in DB)
+        if (entry.oldContent !== undefined && entry.oldContent !== null) {
+          await ipc.updateNode(entry.nodeId, { content: entry.oldContent });
+        }
+        // Reload tree to pick up file_path changes from Rust
+        const ctxId = get().tree?.node.context_id;
+        if (ctxId) {
+          const prev = get().selectedNodeId;
+          const fresh = await ipc.getTree(ctxId);
+          set({ tree: fresh, selectedNodeId: prev });
+        }
         break;
       }
       case "content": {
