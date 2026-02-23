@@ -10,5 +10,29 @@
       "reset": "Reset"
     },
     "loading": "Loading..."
+  },
+  "statusBar": {
+    "noContext": "No Context",
+    "activeCount": "{{count}} active",
+    "tooltip": {
+      "settings": "Settings"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "tab": {
+      "general": "General",
+      "ai": "AI",
+      "theme": "Theme"
+    },
+    "general": {
+      "language": "Language",
+      "restartHint": "Restart may be needed for full effect."
+    },
+    "ai": {
+      "apiKeys": "API Keys",
+      "profiles": "Profiles",
+      "systemPrompt": "System Prompt (Dev)"
+    }
   }
 }

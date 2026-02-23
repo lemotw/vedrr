@@ -9,10 +9,10 @@ import { ThemeSection } from "./ThemeSwitcher";
 
 type SettingsTab = "general" | "ai" | "theme";
 
-const TABS: { id: SettingsTab; label: string }[] = [
-  { id: "general", label: "General" },
-  { id: "ai", label: "AI" },
-  { id: "theme", label: "Theme" },
+const TABS: { id: SettingsTab; labelKey: string }[] = [
+  { id: "general", labelKey: "settings.tab.general" },
+  { id: "ai", labelKey: "settings.tab.ai" },
+  { id: "theme", labelKey: "settings.tab.theme" },
 ];
 
 const LOCALES = [
@@ -29,7 +29,7 @@ function detectLocale(): string {
 // ── General Tab ──────────────────────────────────────────
 
 function GeneralTab() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [locale, setLocale] = useState(detectLocale);
 
   const handleChange = (value: string) => {
@@ -41,7 +41,7 @@ function GeneralTab() {
   return (
     <div className="px-6 py-4">
       <label className="flex items-center gap-3">
-        <span className="font-mono text-xs text-text-primary">Language</span>
+        <span className="font-mono text-xs text-text-primary">{t("settings.general.language")}</span>
         <select
           value={locale}
           onChange={(e) => handleChange(e.target.value)}
@@ -55,7 +55,7 @@ function GeneralTab() {
         </select>
       </label>
       <p className="mt-2 font-mono text-[10px] text-text-secondary">
-        Restart may be needed for full effect.
+        {t("settings.general.restartHint")}
       </p>
     </div>
   );
@@ -64,6 +64,7 @@ function GeneralTab() {
 // ── AI Tab ───────────────────────────────────────────────
 
 function AITab() {
+  const { t } = useTranslation();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
 
   const loadApiKeys = useCallback(async () => {
@@ -79,15 +80,15 @@ function AITab() {
 
   return (
     <div>
-      <Section title="API Keys">
+      <Section title={t("settings.ai.apiKeys")}>
         <ApiKeysSection onKeysChange={loadApiKeys} />
       </Section>
 
-      <Section title="Profiles">
+      <Section title={t("settings.ai.profiles")}>
         <ProfilesSection apiKeys={apiKeys} />
       </Section>
 
-      <Section title="System Prompt (Dev)" defaultOpen={false}>
+      <Section title={t("settings.ai.systemPrompt")} defaultOpen={false}>
         <SystemPromptSection />
       </Section>
     </div>
@@ -97,6 +98,7 @@ function AITab() {
 // ── Settings Panel ───────────────────────────────────────
 
 export function SettingsPanel() {
+  const { t } = useTranslation();
   const { settingsOpen, closeSettings } = useUIStore();
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const panelRef = useRef<HTMLDivElement>(null);
@@ -126,14 +128,14 @@ export function SettingsPanel() {
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label="Settings"
+        aria-label={t("settings.title")}
         className="flex h-[520px] max-h-[80vh] w-[600px] flex-col rounded-xl border border-border bg-bg-elevated shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
         {/* Header */}
         <div className="border-b border-border px-6 py-4">
-          <h2 className="font-heading text-lg text-text-primary">Settings</h2>
+          <h2 className="font-heading text-lg text-text-primary">{t("settings.title")}</h2>
         </div>
 
         {/* Body: tab nav + content */}
@@ -153,7 +155,7 @@ export function SettingsPanel() {
                   )}
                   onClick={() => setActiveTab(tab.id)}
                 >
-                  {tab.label}
+                  {t(tab.labelKey)}
                 </button>
               );
             })}

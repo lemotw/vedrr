@@ -10,5 +10,29 @@
       "reset": "重設"
     },
     "loading": "載入中..."
+  },
+  "statusBar": {
+    "noContext": "無 Context",
+    "activeCount": "{{count}} 個作用中",
+    "tooltip": {
+      "settings": "設定"
+    }
+  },
+  "settings": {
+    "title": "設定",
+    "tab": {
+      "general": "一般",
+      "ai": "AI",
+      "theme": "主題"
+    },
+    "general": {
+      "language": "語言",
+      "restartHint": "切換語言後可能需要重啟以完整生效。"
+    },
+    "ai": {
+      "apiKeys": "API Keys",
+      "profiles": "Profiles",
+      "systemPrompt": "System Prompt (Dev)"
+    }
   }
 }

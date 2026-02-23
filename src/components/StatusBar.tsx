@@ -1,9 +1,11 @@
+import { useTranslation } from "react-i18next";
 import { useContextStore } from "../stores/contextStore";
 import { useUIStore } from "../stores/uiStore";
 import { ContextStates, CompactStates } from "../lib/constants";
 import { modSymbol } from "../lib/platform";
 
 export function StatusBar() {
+  const { t } = useTranslation();
   const { contexts, currentContextId } = useContextStore();
   const { openQuickSwitcher, openSettings } = useUIStore();
   const compactState = useUIStore((s) => s.compactState);
@@ -17,10 +19,10 @@ export function StatusBar() {
     <div className="flex items-center justify-between h-11 px-5 bg-bg-card shrink-0">
       <div className="flex items-center gap-2.5">
         <span className="font-heading text-sm font-bold text-text-primary">
-          {current?.name ?? "No Context"}
+          {current?.name ?? t("statusBar.noContext")}
         </span>
         <span className="text-xs text-text-secondary">
-          {activeCount} active
+          {t("statusBar.activeCount", { count: activeCount })}
         </span>
       </div>
       <div className="flex items-center gap-2">
@@ -31,7 +33,7 @@ export function StatusBar() {
           }}
           disabled={locked}
           className={`px-2 py-1 text-xs rounded transition-colors ${locked ? "text-text-secondary/40 bg-bg-elevated/50 cursor-not-allowed" : "text-text-secondary bg-bg-elevated cursor-pointer hover:text-text-primary"}`}
-          title="Settings"
+          title={t("statusBar.tooltip.settings")}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />

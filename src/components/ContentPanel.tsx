@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useTreeStore } from "../stores/treeStore";
 import { useUIStore } from "../stores/uiStore";
 import type { TreeData } from "../lib/types";
@@ -71,6 +72,7 @@ function PanelTitle({
   onChange: (title: string) => void;
   autoFocus?: boolean;
 }) {
+  const { t } = useTranslation();
   const [value, setValue] = useState(title);
   const { setContentPanelFocused, closeMarkdownEditor } = useUIStore();
   const commitTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -107,7 +109,7 @@ function PanelTitle({
         if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
         if (e.key === "Escape") { e.preventDefault(); e.currentTarget.blur(); closeMarkdownEditor(); }
       }}
-      placeholder="Untitled"
+      placeholder={t("common.untitled")}
       className="flex-1 min-w-0 bg-transparent text-[13px] font-heading font-bold text-text-primary
         outline-none placeholder:text-text-secondary/50 truncate"
     />
