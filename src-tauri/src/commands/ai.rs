@@ -4,6 +4,13 @@ use crate::AppState;
 use crate::error::MindFlowError;
 use crate::models::{AiProfile, CompactResult, ProposedNode, TreeData, TreeNode};
 
+macro_rules! debug_log {
+    ($($arg:tt)*) => {
+        #[cfg(debug_assertions)]
+        eprintln!($($arg)*)
+    };
+}
+
 // ── Keychain ─────────────────────────────────────────────
 
 const KEYRING_SERVICE: &str = "com.mindflow.ai";
@@ -121,10 +128,25 @@ pub fn delete_ai_profile(
 
 // ── Tree serialization helpers ────────────────────────────
 
+const MAX_SUBTREE_DEPTH: u32 = 30;
+
 fn build_subtree(
     db: &rusqlite::Connection,
     node_id: &str,
 ) -> Result<TreeData, MindFlowError> {
+    build_subtree_inner(db, node_id, 0)
+}
+
+fn build_subtree_inner(
+    db: &rusqlite::Connection,
+    node_id: &str,
+    depth: u32,
+) -> Result<TreeData, MindFlowError> {
+    if depth > MAX_SUBTREE_DEPTH {
+        return Err(MindFlowError::Other(
+            format!("子樹深度超過上限 ({MAX_SUBTREE_DEPTH})，請選擇較小的子樹。")
+        ));
+    }
     let node = db.query_row(
         "SELECT id, context_id, parent_id, position, node_type, title, content, file_path, created_at, updated_at
          FROM tree_nodes WHERE id = ?1",
@@ -154,7 +176,7 @@ fn build_subtree(
 
     let mut children = Vec::new();
     for cid in child_ids {
-        children.push(build_subtree(db, &cid)?);
+        children.push(build_subtree_inner(db, &cid, depth + 1)?);
     }
 
     Ok(TreeData { node, children })
@@ -166,7 +188,11 @@ fn get_ancestor_path(
 ) -> Result<Vec<String>, MindFlowError> {
     let mut path = Vec::new();
     let mut current_id = node_id.to_string();
+    let mut visited = std::collections::HashSet::new();
     loop {
+        if !visited.insert(current_id.clone()) {
+            return Err(MindFlowError::Other("Circular reference detected in tree".into()));
+        }
         let result: Result<(Option<String>, String), _> = db.query_row(
             "SELECT parent_id, title FROM tree_nodes WHERE id = ?1",
             [&current_id],
@@ -181,7 +207,7 @@ fn get_ancestor_path(
                 path.push(title);
                 break;
             }
-            Err(_) => break,
+            Err(e) => return Err(MindFlowError::Database(e)),
         }
     }
     path.reverse();
@@ -215,19 +241,31 @@ fn tree_node_ids(tree: &TreeData) -> String {
     format!("{{\n{}\n}}", entries.join(",\n"))
 }
 
-fn build_prompt(ancestor_path: &[String], subtree: &TreeData) -> String {
+const MAX_SUBTREE_NODES: usize = 200;
+
+fn count_nodes(tree: &TreeData) -> usize {
+    1 + tree.children.iter().map(count_nodes).sum::<usize>()
+}
+
+const SYSTEM_PROMPT: &str = r#"你是一個知識管理助手，專門協助重組樹狀筆記結構。
+你必須嚴格回傳符合指定格式的 JSON，不要包含任何其他文字。
+source_id 必須使用節點 ID 對照表中的真實 ID，禁止虛構不存在的 ID。
+node_type 只能是 text/markdown/image/file 其中之一。
+image/file 類型節點必須保留（有綁定檔案路徑）。"#;
+
+fn build_user_prompt(ancestor_path: &[String], subtree: &TreeData) -> String {
     let path_str = ancestor_path.join(" > ");
     let tree_text = tree_to_prompt_text(subtree, 0);
     let id_map = tree_node_ids(subtree);
 
     format!(
-        r#"你是一個知識管理助手。以下是一棵樹狀筆記的子樹。
+        r#"以下是一棵樹狀筆記的子樹。
 
 上下文路徑：{path_str}
 目標節點及其子樹：
 {tree_text}
 
-節點 ID 對照：
+節點 ID 對照（source_id 必須從此表選取，不可自行編造）：
 {id_map}
 
 請幫我重組這棵子樹，讓結構更清晰。你可以：
@@ -235,10 +273,9 @@ fn build_prompt(ancestor_path: &[String], subtree: &TreeData) -> String {
 - 新增缺少的分類節點
 - 修改節點標題讓語意更明確
 - 移動節點到更合適的位置
-- image/file 類型節點建議保留（有綁定檔案路徑）
 
 重要：只回傳根節點的 children（不要包含根節點本身）。
-只回傳 JSON，不要任何其他文字：
+只回傳 JSON：
 {{
   "nodes": [
     {{
@@ -252,34 +289,36 @@ fn build_prompt(ancestor_path: &[String], subtree: &TreeData) -> String {
 
 source_id 規則：
 - 保留或修改的原始節點 → 填原始 id
-- 全新節點 → 填 null
-- 不要包含根節點本身，nodes 陣列只放根節點的直接子節點"#
+- 全新節點 → 填 null"#
     )
 }
 
 // ── LLM API call ──────────────────────────────────────────
 
 async fn call_llm(
+    client: &reqwest::Client,
     provider: &str,
     model: &str,
     api_key: &str,
-    prompt: &str,
+    system_prompt: &str,
+    user_prompt: &str,
 ) -> Result<String, MindFlowError> {
-    eprintln!("[llm] ════════════════ REQUEST ════════════════");
-    eprintln!("[llm] provider={provider}, model={model}");
-    eprintln!("[llm] prompt:\n{prompt}");
-    eprintln!("[llm] ════════════════════════════════════════");
-
-    let client = reqwest::Client::new();
+    debug_log!("[llm] ════════════════ REQUEST ════════════════");
+    debug_log!("[llm] provider={provider}, model={model}");
+    debug_log!("[llm] system_prompt length={}", system_prompt.len());
+    debug_log!("[llm] user_prompt length={}", user_prompt.len());
+    debug_log!("[llm] ════════════════════════════════════════");
 
     match provider {
         "anthropic" => {
             let body = serde_json::json!({
                 "model": model,
                 "max_tokens": 4096,
-                "messages": [{"role": "user", "content": prompt}]
+                "temperature": 0,
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": user_prompt}]
             });
-            eprintln!("[llm] POST https://api.anthropic.com/v1/messages");
+            debug_log!("[llm] POST https://api.anthropic.com/v1/messages");
             let resp = client
                 .post("https://api.anthropic.com/v1/messages")
                 .header("x-api-key", api_key)
@@ -291,13 +330,14 @@ async fn call_llm(
 
             let status = resp.status();
             let text = resp.text().await?;
-            eprintln!("[llm] ════════════════ RESPONSE ═══════════════");
-            eprintln!("[llm] status={status}");
-            eprintln!("[llm] raw body:\n{text}");
-            eprintln!("[llm] ════════════════════════════════════════");
+            debug_log!("[llm] ════════════════ RESPONSE ═══════════════");
+            debug_log!("[llm] status={status}");
+            debug_log!("[llm] raw body:\n{text}");
+            debug_log!("[llm] ════════════════════════════════════════");
             if !status.is_success() {
+                debug_log!("[llm] Anthropic error body: {text}");
                 return Err(MindFlowError::Other(format!(
-                    "Anthropic API error {status}: {text}"
+                    "Anthropic API error: HTTP {status}"
                 )));
             }
             let parsed: serde_json::Value = serde_json::from_str(&text)
@@ -305,16 +345,21 @@ async fn call_llm(
             let content_text = parsed["content"][0]["text"]
                 .as_str()
                 .ok_or_else(|| MindFlowError::Other("No text in Anthropic response".into()))?;
-            eprintln!("[llm] extracted content:\n{content_text}");
+            debug_log!("[llm] extracted content:\n{content_text}");
             Ok(content_text.to_string())
         }
         "openai" => {
             let body = serde_json::json!({
                 "model": model,
-                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 4096,
+                "temperature": 0,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
                 "response_format": {"type": "json_object"}
             });
-            eprintln!("[llm] POST https://api.openai.com/v1/chat/completions");
+            debug_log!("[llm] POST https://api.openai.com/v1/chat/completions");
             let resp = client
                 .post("https://api.openai.com/v1/chat/completions")
                 .header("Authorization", format!("Bearer {api_key}"))
@@ -325,13 +370,14 @@ async fn call_llm(
 
             let status = resp.status();
             let text = resp.text().await?;
-            eprintln!("[llm] ════════════════ RESPONSE ═══════════════");
-            eprintln!("[llm] status={status}");
-            eprintln!("[llm] raw body:\n{text}");
-            eprintln!("[llm] ════════════════════════════════════════");
+            debug_log!("[llm] ════════════════ RESPONSE ═══════════════");
+            debug_log!("[llm] status={status}");
+            debug_log!("[llm] raw body:\n{text}");
+            debug_log!("[llm] ════════════════════════════════════════");
             if !status.is_success() {
+                debug_log!("[llm] OpenAI error body: {text}");
                 return Err(MindFlowError::Other(format!(
-                    "OpenAI API error {status}: {text}"
+                    "OpenAI API error: HTTP {status}"
                 )));
             }
             let parsed: serde_json::Value = serde_json::from_str(&text)
@@ -339,7 +385,7 @@ async fn call_llm(
             let content_text = parsed["choices"][0]["message"]["content"]
                 .as_str()
                 .ok_or_else(|| MindFlowError::Other("No content in OpenAI response".into()))?;
-            eprintln!("[llm] extracted content:\n{content_text}");
+            debug_log!("[llm] extracted content:\n{content_text}");
             Ok(content_text.to_string())
         }
         _ => Err(MindFlowError::Other(format!(
@@ -381,15 +427,21 @@ pub async fn compact_node(
     node_id: String,
     profile_id: String,
 ) -> Result<CompactResult, MindFlowError> {
-    eprintln!("[compact] start — node_id={node_id}, profile_id={profile_id}");
+    debug_log!("[compact] start — node_id={node_id}, profile_id={profile_id}");
 
     // 1. Read profile + tree from DB
     let (subtree, ancestor_path, provider, model) = {
         let db = state.db.lock().unwrap();
 
         let subtree = build_subtree(&db, &node_id)?;
+        let node_count = count_nodes(&subtree);
+        if node_count > MAX_SUBTREE_NODES {
+            return Err(MindFlowError::Other(format!(
+                "子樹包含 {node_count} 個節點，超過上限 {MAX_SUBTREE_NODES}。請選擇較小的子樹重組。"
+            )));
+        }
         let ancestor_path = get_ancestor_path(&db, &node_id)?;
-        eprintln!("[compact] ancestor_path={:?}", ancestor_path);
+        debug_log!("[compact] ancestor_path={:?}", ancestor_path);
 
         let (provider, model): (String, String) = db
             .query_row(
@@ -401,30 +453,25 @@ pub async fn compact_node(
                 MindFlowError::Other("AI profile not found. Create one in AI Settings.".into())
             })?;
 
-        eprintln!("[compact] provider={provider}, model={model}");
+        debug_log!("[compact] provider={provider}, model={model}");
         (subtree, ancestor_path, provider, model)
     };
 
     // 2. Get API key from keychain
     let api_key = get_api_key_internal(&profile_id)?;
-    eprintln!("[compact] api_key_len={}", api_key.len());
 
     // 3. Build prompt
-    let prompt = build_prompt(&ancestor_path, &subtree);
-    eprintln!("[compact] prompt length={}", prompt.len());
+    let user_prompt = build_user_prompt(&ancestor_path, &subtree);
+    debug_log!("[compact] prompt length={}", user_prompt.len());
 
     // 4. Call LLM
-    eprintln!("[compact] calling LLM...");
-    let raw_response = call_llm(&provider, &model, &api_key, &prompt).await?;
-    eprintln!(
-        "[compact] LLM response length={}, preview={:.200}",
-        raw_response.len(),
-        raw_response
-    );
+    debug_log!("[compact] calling LLM...");
+    let raw_response = call_llm(&state.http_client, &provider, &model, &api_key, SYSTEM_PROMPT, &user_prompt).await?;
+    debug_log!("[compact] LLM response length={}", raw_response.len());
 
     // 5. Parse response
     let proposed = parse_proposed_nodes(&raw_response)?;
-    eprintln!("[compact] parsed {} proposed nodes", proposed.len());
+    debug_log!("[compact] parsed {} proposed nodes", proposed.len());
 
     Ok(CompactResult {
         original: subtree,

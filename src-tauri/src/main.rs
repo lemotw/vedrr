@@ -11,6 +11,7 @@ use std::sync::Mutex;
 
 pub struct AppState {
     pub db: Mutex<Connection>,
+    pub http_client: reqwest::Client,
 }
 
 fn main() {
@@ -18,11 +19,17 @@ fn main() {
     let conn = Connection::open(&db_path).expect("Failed to open database");
     db::init_db(&conn).expect("Failed to init database");
 
+    let http_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .expect("Failed to build HTTP client");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             db: Mutex::new(conn),
+            http_client,
         })
         .invoke_handler(tauri::generate_handler![
             commands::context::create_context,

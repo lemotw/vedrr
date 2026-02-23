@@ -4,7 +4,6 @@ import { useTreeStore } from "../stores/treeStore";
 import { useContextStore } from "../stores/contextStore";
 import { NodeTypes, CompactStates } from "../lib/constants";
 import type { TreeData } from "../lib/types";
-import { ipc } from "../lib/ipc";
 import { cn } from "../lib/cn";
 import { modSymbol } from "../lib/platform";
 
@@ -57,6 +56,15 @@ export function ContextMenu() {
   const hasChildren = node ? node.children.length > 0 : false;
   const isNodeCollapsed = collapsedNodes.has(contextMenuNodeId);
 
+  // Compact lock: disable mutations on nodes outside compact subtree
+  const compactLocked = (() => {
+    const { compactState, compactRootId } = useUIStore.getState();
+    if (compactState !== CompactStates.APPLIED || !compactRootId) return false;
+    const compactRoot = findNode(tree, compactRootId);
+    if (!compactRoot) return false;
+    return findNode(compactRoot, contextMenuNodeId) === null;
+  })();
+
   const exec = (fn: () => void) => {
     closeContextMenu();
     fn();
@@ -71,12 +79,14 @@ export function ContextMenu() {
         if (nodeType === NodeTypes.MARKDOWN) openMarkdownEditor(contextMenuNodeId);
         else setEditingNode(contextMenuNodeId);
       }),
+      disabled: compactLocked,
     },
     {
       label: "Change Type",
       shortcut: "T",
       icon: "◆",
       action: () => exec(() => openTypePopover(contextMenuNodeId)),
+      disabled: compactLocked,
     },
     {
       label: isNodeCollapsed ? "Expand" : "Collapse",
@@ -100,13 +110,14 @@ export function ContextMenu() {
       shortcut: "Tab",
       icon: "↳",
       action: () => exec(() => addChild(contextMenuNodeId, currentContextId)),
+      disabled: compactLocked,
     },
     {
       label: "Add Sibling",
       shortcut: "⇧Tab",
       icon: "↵",
       action: () => exec(() => addSibling(contextMenuNodeId, currentContextId)),
-      disabled: isRoot,
+      disabled: isRoot || compactLocked,
     },
     "separator",
     {
@@ -127,14 +138,14 @@ export function ContextMenu() {
         cutNode(contextMenuNodeId);
         navigator.clipboard.writeText("mindflow:node:" + contextMenuNodeId);
       }),
-      disabled: isRoot,
+      disabled: isRoot || compactLocked,
     },
     {
       label: "Paste",
       shortcut: `${modSymbol}V`,
       icon: "⎘",
       action: () => exec(() => pasteNodeUnder(contextMenuNodeId, currentContextId)),
-      disabled: !copiedNodeId,
+      disabled: !copiedNodeId || compactLocked,
     },
     "separator",
     {
@@ -142,42 +153,20 @@ export function ContextMenu() {
       shortcut: "Alt+↑",
       icon: "↑",
       action: () => exec(() => reorderNode(contextMenuNodeId, "up", currentContextId)),
-      disabled: isRoot,
+      disabled: isRoot || compactLocked,
     },
     {
       label: "Move Down",
       shortcut: "Alt+↓",
       icon: "↓",
       action: () => exec(() => reorderNode(contextMenuNodeId, "down", currentContextId)),
-      disabled: isRoot,
+      disabled: isRoot || compactLocked,
     },
     {
       label: "AI Compact",
-      shortcut: "C",
+      shortcut: "",
       icon: "⚡",
-      action: () => exec(async () => {
-        if (useUIStore.getState().compactState !== CompactStates.IDLE) return;
-        const profileId = localStorage.getItem("mindflow-active-ai-profile");
-        if (!profileId) {
-          useUIStore.getState().setCompactError("No AI profile selected. Open AI Settings to create and select one.");
-          return;
-        }
-        useUIStore.getState().setCompactState(CompactStates.LOADING);
-        try {
-          const result = await ipc.compactNode(contextMenuNodeId, profileId);
-          const { applyCompact } = useTreeStore.getState();
-          const { highlights, summary } = await applyCompact(result);
-          const totalChanges = summary.added + summary.edited + summary.moved + summary.deleted;
-          if (totalChanges === 0) {
-            useUIStore.getState().setCompactState(CompactStates.IDLE);
-          } else {
-            useUIStore.getState().setCompactApplied(summary, highlights);
-          }
-        } catch (e) {
-          console.error("[compact] error:", e);
-          useUIStore.getState().setCompactError(String(e));
-        }
-      }),
+      action: () => exec(() => useTreeStore.getState().triggerCompact(contextMenuNodeId)),
     },
     "separator",
     {
@@ -186,7 +175,7 @@ export function ContextMenu() {
       icon: "✕",
       action: () => exec(() => deleteNode(contextMenuNodeId, currentContextId)),
       danger: true,
-      disabled: isRoot,
+      disabled: isRoot || compactLocked,
     },
   ];
 

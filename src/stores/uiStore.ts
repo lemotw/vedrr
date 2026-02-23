@@ -52,8 +52,10 @@ interface UIStore {
   compactHighlights: Map<string, CompactHighlightInfo> | null;
   compactSummary: CompactSummary | null;
   compactBannerExpanded: boolean;
+  compactRootId: string | null;
   compactFading: boolean;
   compactError: string | null;
+  compactBannerFlash: number;
 
   toggleQuickSwitcher: () => void;
   openQuickSwitcher: () => void;
@@ -76,13 +78,17 @@ interface UIStore {
   openAiSettings: () => void;
   closeAiSettings: () => void;
   setCompactState: (state: CompactState) => void;
-  setCompactApplied: (summary: CompactSummary, highlights: Map<string, CompactHighlightInfo>) => void;
+  setCompactApplied: (rootId: string, summary: CompactSummary, highlights: Map<string, CompactHighlightInfo>) => void;
   dismissCompactBanner: () => void;
   clearCompactHighlights: () => void;
   startCompactFade: (delayMs?: number) => void;
   toggleCompactBannerExpanded: () => void;
   setCompactError: (error: string | null) => void;
+  flashCompactBanner: () => void;
 }
+
+let fadeTimer1 = 0;
+let fadeTimer2 = 0;
 
 export const useUIStore = create<UIStore>((set) => ({
   quickSwitcherOpen: false,
@@ -99,11 +105,13 @@ export const useUIStore = create<UIStore>((set) => ({
   customThemeColors: loadCustomColors(),
   aiSettingsOpen: false,
   compactState: CompactStates.IDLE,
+  compactRootId: null,
   compactHighlights: null,
   compactSummary: null,
   compactBannerExpanded: false,
   compactFading: false,
   compactError: null,
+  compactBannerFlash: 0,
 
   toggleQuickSwitcher: () => set((s) => ({ quickSwitcherOpen: !s.quickSwitcherOpen })),
   openQuickSwitcher: () => set({ quickSwitcherOpen: true }),
@@ -146,8 +154,9 @@ export const useUIStore = create<UIStore>((set) => ({
   openAiSettings: () => set({ aiSettingsOpen: true }),
   closeAiSettings: () => set({ aiSettingsOpen: false }),
   setCompactState: (state) => set({ compactState: state }),
-  setCompactApplied: (summary, highlights) => set({
+  setCompactApplied: (rootId, summary, highlights) => set({
     compactState: CompactStates.APPLIED,
+    compactRootId: rootId,
     compactSummary: summary,
     compactHighlights: highlights,
     compactBannerExpanded: false,
@@ -156,24 +165,47 @@ export const useUIStore = create<UIStore>((set) => ({
   }),
   dismissCompactBanner: () => set({
     compactState: CompactStates.IDLE,
+    compactRootId: null,
     compactSummary: null,
     compactBannerExpanded: false,
   }),
-  clearCompactHighlights: () => set({
-    compactHighlights: null,
-    compactFading: false,
-    compactState: CompactStates.IDLE,
-    compactSummary: null,
-    compactBannerExpanded: false,
-  }),
+  clearCompactHighlights: () => {
+    clearTimeout(fadeTimer1);
+    clearTimeout(fadeTimer2);
+    set({
+      compactHighlights: null,
+      compactFading: false,
+      compactState: CompactStates.IDLE,
+      compactRootId: null,
+      compactSummary: null,
+      compactBannerExpanded: false,
+      compactError: null,
+    });
+  },
   startCompactFade: (delayMs = 0) => {
-    setTimeout(() => {
+    // Cancel any previous fade timers
+    clearTimeout(fadeTimer1);
+    clearTimeout(fadeTimer2);
+    fadeTimer1 = window.setTimeout(() => {
       set({ compactFading: true });
-      setTimeout(() => {
+      fadeTimer2 = window.setTimeout(() => {
         set({ compactHighlights: null, compactFading: false });
       }, 800);
     }, delayMs);
   },
   toggleCompactBannerExpanded: () => set((s) => ({ compactBannerExpanded: !s.compactBannerExpanded })),
-  setCompactError: (error) => set({ compactError: error, compactState: CompactStates.IDLE }),
+  setCompactError: (error) => {
+    clearTimeout(fadeTimer1);
+    clearTimeout(fadeTimer2);
+    set({
+      compactError: error,
+      compactState: CompactStates.IDLE,
+      compactRootId: null,
+      compactSummary: null,
+      compactHighlights: null,
+      compactBannerExpanded: false,
+      compactFading: false,
+    });
+  },
+  flashCompactBanner: () => set((s) => ({ compactBannerFlash: s.compactBannerFlash + 1 })),
 }));

@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { TreeData, TreeNode, NodeType, CompactResult, ProposedNode, CompactHighlightInfo, CompactSummary } from "../lib/types";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { ipc } from "../lib/ipc";
-import { NodeTypes, PasteKind } from "../lib/constants";
+import { NodeTypes, PasteKind, CompactStates } from "../lib/constants";
 import { useUIStore } from "./uiStore";
 import { useContextStore } from "./contextStore";
 
@@ -51,7 +51,8 @@ interface TreeStore {
   pickAndImportImage: (nodeId: string) => Promise<void>;
   reorderNode: (nodeId: string, direction: "up" | "down", contextId: string) => Promise<void>;
   dragMoveNode: (nodeId: string, newParentId: string, position: number, contextId: string) => Promise<void>;
-  applyCompact: (result: CompactResult) => Promise<{ highlights: Map<string, CompactHighlightInfo>; summary: CompactSummary }>;
+  triggerCompact: (nodeId: string) => void;
+  applyCompact: (result: CompactResult) => Promise<{ highlights: Map<string, CompactHighlightInfo>; summary: CompactSummary; rootId: string }>;
   undoCompact: () => Promise<void>;
   undo: () => Promise<void>;
   clearUndo: () => void;
@@ -91,10 +92,14 @@ function clearCut(get: () => TreeStore, set: (s: Partial<TreeStore>) => void) {
   if (get().isCut) set({ copiedNodeId: null, isCut: false });
 }
 
-function clearHighlightsIfActive() {
-  if (useUIStore.getState().compactHighlights) {
-    useUIStore.getState().clearCompactHighlights();
-  }
+function isCompactLocked(nodeId: string): boolean {
+  const { compactState, compactRootId } = useUIStore.getState();
+  if (compactState !== CompactStates.APPLIED || !compactRootId) return false;
+  const tree = useTreeStore.getState().tree;
+  if (!tree) return false;
+  const compactRoot = findNode(tree, compactRootId);
+  if (!compactRoot) return false;
+  return findNode(compactRoot, nodeId) === null;
 }
 
 export const useTreeStore = create<TreeStore>((set, get) => ({
@@ -127,6 +132,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   pasteNodeUnder: async (targetParentId, contextId) => {
+    if (isCompactLocked(targetParentId)) return;
     const { copiedNodeId, isCut, tree, selectedNodeId, undoStack } = get();
     if (!copiedNodeId) return;
     const newId = await ipc.cloneSubtree(copiedNodeId, targetParentId, contextId);
@@ -146,8 +152,8 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   addChild: async (parentId, contextId) => {
+    if (isCompactLocked(parentId)) return;
     clearCut(get, set);
-    clearHighlightsIfActive();
     const { selectedNodeId, undoStack } = get();
     const node = await ipc.createNode(contextId, parentId, NodeTypes.TEXT, "");
     set({ undoStack: pushUndo(undoStack, { type: "add", nodeId: node.id, contextId, prevSelectedId: selectedNodeId }) });
@@ -157,12 +163,12 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   addSibling: async (nodeId, contextId) => {
+    if (isCompactLocked(nodeId)) return;
     clearCut(get, set);
-    clearHighlightsIfActive();
     const { tree, selectedNodeId, undoStack } = get();
     if (!tree) return;
     const parent = findParent(tree, nodeId);
-    if (!parent) return;
+    if (!parent || isCompactLocked(parent.node.id)) return;
     const node = await ipc.createNode(contextId, parent.node.id, NodeTypes.TEXT, "");
     set({ undoStack: pushUndo(undoStack, { type: "add", nodeId: node.id, contextId, prevSelectedId: selectedNodeId }) });
     await get().loadTree(contextId);
@@ -171,8 +177,10 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   deleteNode: async (nodeId, contextId) => {
+    if (isCompactLocked(nodeId)) return;
+    const { compactRootId } = useUIStore.getState();
+    if (compactRootId && nodeId === compactRootId) return;
     clearCut(get, set);
-    clearHighlightsIfActive();
     const { tree, selectedNodeId, undoStack } = get();
     if (!tree || tree.node.id === nodeId) return;
     const target = findNode(tree, nodeId);
@@ -193,6 +201,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   updateNodeTitle: async (nodeId, title) => {
+    if (isCompactLocked(nodeId)) return;
     clearCut(get, set);
     const { tree, undoStack } = get();
     if (!tree) return;
@@ -210,6 +219,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   updateNodeContent: async (nodeId, content) => {
+    if (isCompactLocked(nodeId)) return;
     clearCut(get, set);
     const { tree, undoStack } = get();
     if (!tree) return;
@@ -222,6 +232,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   updateNodeType: async (nodeId, nodeType) => {
+    if (isCompactLocked(nodeId)) return;
     clearCut(get, set);
     const { tree, undoStack } = get();
     if (!tree) return;
@@ -234,6 +245,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   pasteAsNode: async (parentId, contextId, data) => {
+    if (isCompactLocked(parentId)) return;
     clearCut(get, set);
     const { selectedNodeId, undoStack } = get();
     if (data.kind === PasteKind.IMAGE) {
@@ -260,6 +272,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   openOrAttachFile: async (nodeId) => {
+    if (isCompactLocked(nodeId)) return;
     const { tree } = get();
     if (!tree) return;
     const target = findNode(tree, nodeId);
@@ -283,6 +296,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   pickAndImportImage: async (nodeId) => {
+    if (isCompactLocked(nodeId)) return;
     const { tree } = get();
     if (!tree) return;
     const target = findNode(tree, nodeId);
@@ -305,8 +319,8 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   reorderNode: async (nodeId, direction, contextId) => {
+    if (isCompactLocked(nodeId)) return;
     clearCut(get, set);
-    clearHighlightsIfActive();
     const { tree, undoStack } = get();
     if (!tree) return;
     const parent = findParent(tree, nodeId);
@@ -329,8 +343,8 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
   },
 
   dragMoveNode: async (nodeId, newParentId, position, contextId) => {
+    if (isCompactLocked(nodeId) || isCompactLocked(newParentId)) return;
     clearCut(get, set);
-    clearHighlightsIfActive();
     const { tree, undoStack, selectedNodeId } = get();
     if (!tree) return;
     const node = findNode(tree, nodeId);
@@ -349,6 +363,49 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     await get().loadTree(contextId);
   },
 
+  triggerCompact: (nodeId: string) => {
+    if (useUIStore.getState().compactState !== CompactStates.IDLE) {
+      useUIStore.getState().flashCompactBanner();
+      return;
+    }
+    const profileId = localStorage.getItem("mindflow-active-ai-profile");
+    if (!profileId) {
+      useUIStore.getState().setCompactError("尚未選擇 AI 設定檔，請先在 AI 設定中建立並選擇。");
+      return;
+    }
+    useUIStore.getState().setCompactState(CompactStates.LOADING);
+    ipc.compactNode(nodeId, profileId)
+      .then(async (result) => {
+        const { highlights, summary, rootId } = await get().applyCompact(result);
+        const totalChanges = summary.added + summary.edited + summary.moved + summary.deleted;
+        if (totalChanges === 0) {
+          useUIStore.getState().setCompactState(CompactStates.IDLE);
+        } else {
+          useUIStore.getState().setCompactApplied(rootId, summary, highlights);
+        }
+      })
+      .catch((err) => {
+        console.error("[compact] error:", err);
+        const msg = String(err);
+        // Humanize common backend errors
+        if (msg.includes("HTTP 401") || msg.includes("HTTP 403")) {
+          useUIStore.getState().setCompactError("API 金鑰無效或已過期，請至 AI 設定更新。");
+        } else if (msg.includes("HTTP 429")) {
+          useUIStore.getState().setCompactError("API 請求過於頻繁，請稍後再試。");
+        } else if (msg.includes("子樹包含") || msg.includes("子樹深度")) {
+          useUIStore.getState().setCompactError(msg.replace(/^.*?子樹/, "子樹"));
+        } else if (msg.includes("No API key") || msg.includes("Keyring")) {
+          useUIStore.getState().setCompactError("找不到 API 金鑰，請至 AI 設定重新輸入。");
+        } else if (msg.includes("AI profile not found")) {
+          useUIStore.getState().setCompactError("AI 設定檔已刪除，請重新選擇。");
+        } else if (msg.includes("timeout") || msg.includes("Timeout")) {
+          useUIStore.getState().setCompactError("AI 回應逾時，請稍後再試或選擇較小的子樹。");
+        } else {
+          useUIStore.getState().setCompactError("AI 重組失敗，請稍後再試。");
+        }
+      });
+  },
+
   applyCompact: async (result: CompactResult) => {
     const { tree, undoStack, selectedNodeId } = get();
     if (!tree) throw new Error("No tree loaded");
@@ -358,10 +415,10 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     const rootNode = findNode(tree, rootId);
     if (!rootNode) throw new Error("Root node not found");
 
-    // 1. Build origMap: id → { title, parentId }
-    const origMap = new Map<string, { title: string; parentId: string | null }>();
+    // 1. Build origMap: id → { title, parentId, content, file_path }
+    const origMap = new Map<string, { title: string; parentId: string | null; content: string | null; file_path: string | null }>();
     function walkOrig(td: TreeData) {
-      origMap.set(td.node.id, { title: td.node.title, parentId: td.node.parent_id });
+      origMap.set(td.node.id, { title: td.node.title, parentId: td.node.parent_id, content: td.node.content, file_path: td.node.file_path });
       for (const c of td.children) walkOrig(c);
     }
     walkOrig(rootNode);
@@ -380,115 +437,134 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     const allNodes = flattenNodes(rootNode).filter(n => n.id !== rootId);
     set({ undoStack: pushUndo(undoStack, { type: "compact", contextId, rootId, originalNodes: allNodes, prevSelectedId: selectedNodeId }) });
 
-    // 3. Delete existing children
-    for (const child of rootNode.children) {
-      await ipc.deleteNode(child.node.id);
-    }
-
-    // 4. Unwrap root if AI included it in proposed (LLM sometimes wraps root)
-    let proposedChildren = result.proposed;
-    if (
-      proposedChildren.length === 1 &&
-      proposedChildren[0].source_id === rootId
-    ) {
-      // AI returned the root node itself — unwrap to its children
-      const wrappedRoot = proposedChildren[0];
-      // Update root title if AI changed it
-      if (wrappedRoot.title && wrappedRoot.title !== rootNode.node.title) {
-        await ipc.updateNode(rootId, { title: wrappedRoot.title });
+    // 3. Delete existing children + rebuild (with rollback on failure)
+    try {
+      for (const child of rootNode.children) {
+        await ipc.deleteNode(child.node.id);
       }
-      proposedChildren = wrappedRoot.children;
-    }
 
-    // 5. Rebuild from proposed tree + collect highlights
-    const highlights = new Map<string, CompactHighlightInfo>();
-    let addedCount = 0;
-    let editedCount = 0;
-    let movedCount = 0;
+      // 4. Unwrap root if AI included it in proposed (LLM sometimes wraps root)
+      let proposedChildren = result.proposed;
+      if (
+        proposedChildren.length === 1 &&
+        proposedChildren[0].source_id === rootId
+      ) {
+        const wrappedRoot = proposedChildren[0];
+        if (wrappedRoot.title && wrappedRoot.title !== rootNode.node.title) {
+          await ipc.updateNode(rootId, { title: wrappedRoot.title });
+        }
+        proposedChildren = wrappedRoot.children;
+      }
 
-    async function createChildren(proposed: ProposedNode[], parentId: string, parentSourceId: string | null) {
-      for (const p of proposed) {
-        const nodeType = (["text", "markdown", "image", "file"].includes(p.node_type) ? p.node_type : "text") as string;
-        const node = await ipc.createNode(contextId, parentId, nodeType, p.title);
+      // 5. Rebuild from proposed tree + collect highlights
+      const highlights = new Map<string, CompactHighlightInfo>();
+      let addedCount = 0;
+      let editedCount = 0;
+      let movedCount = 0;
 
-        if (!p.source_id) {
-          highlights.set(node.id, { type: "added" });
-          addedCount++;
-        } else {
-          const orig = origMap.get(p.source_id);
-          if (orig) {
-            const titleChanged = orig.title !== p.title;
-            const parentChanged = orig.parentId !== parentSourceId;
+      async function createChildren(proposed: ProposedNode[], parentId: string, parentSourceId: string | null) {
+        for (const p of proposed) {
+          const nodeType = (["text", "markdown", "image", "file"].includes(p.node_type) ? p.node_type : "text") as string;
+          const node = await ipc.createNode(contextId, parentId, nodeType, p.title);
 
-            if (titleChanged && parentChanged) {
-              highlights.set(node.id, { type: "edited+moved", oldTitle: orig.title, fromParent: parentTitleMap.get(p.source_id) });
-              editedCount++;
-              movedCount++;
-            } else if (titleChanged) {
-              highlights.set(node.id, { type: "edited", oldTitle: orig.title });
-              editedCount++;
-            } else if (parentChanged) {
-              highlights.set(node.id, { type: "moved", fromParent: parentTitleMap.get(p.source_id) });
-              movedCount++;
-            }
-          } else {
+          if (!p.source_id) {
             highlights.set(node.id, { type: "added" });
             addedCount++;
+          } else {
+            const orig = origMap.get(p.source_id);
+            if (orig) {
+              // Preserve content and file_path from source node
+              const updates: Record<string, string> = {};
+              if (orig.content) updates.content = orig.content;
+              if (orig.file_path) updates.filePath = orig.file_path;
+              if (Object.keys(updates).length > 0) {
+                await ipc.updateNode(node.id, updates);
+              }
+
+              const titleChanged = orig.title !== p.title;
+              const parentChanged = orig.parentId !== parentSourceId;
+
+              if (titleChanged && parentChanged) {
+                highlights.set(node.id, { type: "edited+moved", oldTitle: orig.title, fromParent: parentTitleMap.get(p.source_id) });
+                editedCount++;
+                movedCount++;
+              } else if (titleChanged) {
+                highlights.set(node.id, { type: "edited", oldTitle: orig.title });
+                editedCount++;
+              } else if (parentChanged) {
+                highlights.set(node.id, { type: "moved", fromParent: parentTitleMap.get(p.source_id) });
+                movedCount++;
+              }
+            } else {
+              highlights.set(node.id, { type: "added" });
+              addedCount++;
+            }
+          }
+
+          if (p.children.length > 0) {
+            await createChildren(p.children, node.id, p.source_id ?? null);
           }
         }
+      }
+      await createChildren(proposedChildren, rootId, rootId);
+      await get().loadTree(contextId);
+      set({ selectedNodeId: rootId });
 
-        if (p.children.length > 0) {
-          await createChildren(p.children, node.id, p.source_id ?? null);
+      // 6. Compute deleted nodes
+      const usedSourceIds = new Set<string>();
+      function collectSourceIds(nodes: ProposedNode[]) {
+        for (const n of nodes) {
+          if (n.source_id) usedSourceIds.add(n.source_id);
+          collectSourceIds(n.children);
         }
       }
-    }
-    await createChildren(proposedChildren, rootId, rootId);
-    await get().loadTree(contextId);
-    set({ selectedNodeId: rootId });
+      collectSourceIds(proposedChildren);
 
-    // 6. Compute deleted nodes
-    const usedSourceIds = new Set<string>();
-    function collectSourceIds(nodes: ProposedNode[]) {
-      for (const n of nodes) {
-        if (n.source_id) usedSourceIds.add(n.source_id);
-        collectSourceIds(n.children);
+      const deletedNames: string[] = [];
+      for (const [id, info] of origMap) {
+        if (id === rootId) continue;
+        if (!usedSourceIds.has(id)) deletedNames.push(info.title);
       }
+
+      const summary: CompactSummary = {
+        added: addedCount,
+        edited: editedCount,
+        moved: movedCount,
+        deleted: deletedNames.length,
+        deletedNames,
+      };
+
+      return { highlights, summary, rootId };
+    } catch (err) {
+      // Rollback: restore original nodes from undo snapshot
+      await ipc.restoreNodes(allNodes);
+      await get().loadTree(contextId);
+      throw err;
     }
-    collectSourceIds(proposedChildren);
-
-    const deletedNames: string[] = [];
-    for (const [id, info] of origMap) {
-      if (id === rootId) continue;
-      if (!usedSourceIds.has(id)) deletedNames.push(info.title);
-    }
-
-    const summary: CompactSummary = {
-      added: addedCount,
-      edited: editedCount,
-      moved: movedCount,
-      deleted: deletedNames.length,
-      deletedNames,
-    };
-
-    return { highlights, summary };
   },
 
   undoCompact: async () => {
     const { tree, undoStack } = get();
     if (!tree || undoStack.length === 0) return;
-    const entry = undoStack[undoStack.length - 1];
-    if (entry.type !== "compact") return;
-    set({ undoStack: undoStack.slice(0, -1) });
 
-    // Delete all current children of root
+    // Scan backwards for the compact entry (edits during APPLIED sit on top)
+    let compactIdx = -1;
+    for (let i = undoStack.length - 1; i >= 0; i--) {
+      if (undoStack[i].type === "compact") { compactIdx = i; break; }
+    }
+    if (compactIdx < 0) return;
+    const entry = undoStack[compactIdx] as Extract<UndoEntry, { type: "compact" }>;
+
+    // Remove compact entry + all subsequent edits made during APPLIED
+    set({ undoStack: undoStack.slice(0, compactIdx) });
+
+    // Delete all current children of root, then restore originals
     const rootNode = findNode(tree, entry.rootId);
     if (rootNode) {
       for (const child of rootNode.children) {
         await ipc.deleteNode(child.node.id);
       }
     }
-
-    // Restore original nodes
     await ipc.restoreNodes(entry.originalNodes);
     await get().loadTree(entry.contextId);
     set({ selectedNodeId: entry.prevSelectedId });

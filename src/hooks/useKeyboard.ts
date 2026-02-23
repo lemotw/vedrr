@@ -5,7 +5,6 @@ import { useContextStore } from "../stores/contextStore";
 import type { TreeData } from "../lib/types";
 import { NodeTypes, PasteKind, CompactStates } from "../lib/constants";
 import { isModKey } from "../lib/platform";
-import { ipc } from "../lib/ipc";
 
 function findNodeInTree(tree: TreeData, id: string): TreeData | null {
   if (tree.node.id === id) return tree;
@@ -57,23 +56,28 @@ export function useKeyboard() {
       // Block ALL keys when modal overlays are open
       if (useUIStore.getState().aiSettingsOpen) return;
 
-      // Mod+K — Quick Switcher (always active)
+      // Helper: check if compact is busy (LOADING or APPLIED — locks context-switching actions)
+      const isCompactBusy = () => useUIStore.getState().compactState !== CompactStates.IDLE;
+
+      // Mod+K — Quick Switcher (blocked during APPLIED)
       if (isModKey(e) && e.key === "k" && !e.shiftKey) {
         e.preventDefault();
+        if (isCompactBusy()) { useUIStore.getState().flashCompactBanner(); return; }
         openQuickSwitcher();
         return;
       }
 
-      // Mod+F — Node Search (always active)
+      // Mod+F — Node Search
       if (isModKey(e) && e.key === "f" && !e.shiftKey) {
         e.preventDefault();
         openNodeSearch();
         return;
       }
 
-      // Mod+Z — Undo (always active, unless editing text)
+      // Mod+Z — Undo (blocked during APPLIED — use 'u' for full compact rollback)
       if (isModKey(e) && e.key === "z" && !e.shiftKey && !editingNodeId && !contentPanelFocused) {
         e.preventDefault();
+        if (isCompactBusy()) { useUIStore.getState().flashCompactBanner(); return; }
         undo();
         return;
       }
@@ -87,20 +91,12 @@ export function useKeyboard() {
         return;
       }
 
-      // Mod+X — Cut node (when not editing): copy + mark as cut
+      // Mod+X — Cut node
       if (isModKey(e) && e.key === "x" && !editingNodeId && !contentPanelFocused && !quickSwitcherOpen
           && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
         e.preventDefault();
         cutNode(selectedNodeId);
         navigator.clipboard.writeText("mindflow:node:" + selectedNodeId);
-        return;
-      }
-
-      // Escape/Enter dismisses compact banner in APPLIED state
-      if ((e.key === "Escape" || e.key === "Enter") && !editingNodeId && useUIStore.getState().compactState === CompactStates.APPLIED) {
-        e.preventDefault();
-        useUIStore.getState().dismissCompactBanner();
-        useUIStore.getState().startCompactFade(3000);
         return;
       }
 
@@ -129,10 +125,20 @@ export function useKeyboard() {
       if (quickSwitcherOpen || nodeSearchOpen || editingNodeId || typePopoverNodeId || contentPanelFocused || contextMenuNodeId) return;
       if (!tree || !currentContextId) return;
 
+      // Compact lock: block mutations on nodes outside compact subtree
+      const compactLocked = (() => {
+        const { compactState, compactRootId } = useUIStore.getState();
+        if (compactState !== CompactStates.APPLIED || !compactRootId || !selectedNodeId) return false;
+        const root = findNodeInTree(tree, compactRootId);
+        if (!root) return false;
+        return findNodeInTree(root, selectedNodeId) === null;
+      })();
+
       // Alt+j/↓ Alt+k/↑ — reorder node among siblings
       // Alt+l/→ — reparent into previous sibling (become its last child)
       // Alt+h/← — reparent to grandparent (become sibling of parent)
       if (e.altKey && selectedNodeId && selectedNodeId !== tree.node.id) {
+        if (compactLocked) { useUIStore.getState().flashCompactBanner(); return; }
         if (e.code === "KeyJ" || e.key === "ArrowDown") {
           e.preventDefault();
           reorderNode(selectedNodeId, "down", currentContextId);
@@ -170,19 +176,12 @@ export function useKeyboard() {
         }
       }
 
-      // Helper: trigger highlight fade on navigation
-      const fadeHighlightsOnNav = () => {
-        if (useUIStore.getState().compactHighlights) {
-          useUIStore.getState().startCompactFade(0);
-        }
-      };
 
       switch (e.key) {
         // j/↓ k/↑ — move between nodes at the same depth level (across subtrees)
         case "j":
         case "ArrowDown": {
           e.preventDefault();
-          fadeHighlightsOnNav();
           if (!selectedNodeId) break;
           const depthDown = getNodeDepth(tree, selectedNodeId);
           if (depthDown < 0) break;
@@ -196,7 +195,6 @@ export function useKeyboard() {
         case "k":
         case "ArrowUp": {
           e.preventDefault();
-          fadeHighlightsOnNav();
           if (!selectedNodeId) break;
           const depthUp = getNodeDepth(tree, selectedNodeId);
           if (depthUp < 0) break;
@@ -210,7 +208,6 @@ export function useKeyboard() {
         case "l":
         case "ArrowRight": {
           e.preventDefault();
-          fadeHighlightsOnNav();
           if (!selectedNodeId) break;
           const nodeR = findNodeInTree(tree, selectedNodeId);
           if (nodeR && nodeR.children.length > 0) {
@@ -234,23 +231,15 @@ export function useKeyboard() {
         case "h":
         case "ArrowLeft": {
           e.preventDefault();
-          fadeHighlightsOnNav();
           if (!selectedNodeId) break;
           const parent = findParentInTree(tree, selectedNodeId);
           if (parent) selectNode(parent.node.id);
           break;
         }
-        case "u": {
-          if (useUIStore.getState().compactState === CompactStates.APPLIED) {
-            e.preventDefault();
-            useUIStore.getState().clearCompactHighlights();
-            useTreeStore.getState().undoCompact();
-          }
-          break;
-        }
         case "Enter": {
           e.preventDefault();
           if (!selectedNodeId) break;
+          if (compactLocked) { useUIStore.getState().flashCompactBanner(); break; }
           const selectedNode = findNodeInTree(tree, selectedNodeId);
           if (selectedNode && selectedNode.node.node_type === NodeTypes.MARKDOWN) {
             openMarkdownEditor(selectedNodeId);
@@ -262,6 +251,7 @@ export function useKeyboard() {
         case "Tab": {
           e.preventDefault();
           if (!selectedNodeId) break;
+          if (compactLocked) { useUIStore.getState().flashCompactBanner(); break; }
           if (e.shiftKey) {
             addSibling(selectedNodeId, currentContextId);
           } else {
@@ -271,45 +261,22 @@ export function useKeyboard() {
         }
         case "o": {
           e.preventDefault();
-          if (selectedNodeId) openOrAttachFile(selectedNodeId);
+          if (!selectedNodeId) break;
+          if (compactLocked) { useUIStore.getState().flashCompactBanner(); break; }
+          openOrAttachFile(selectedNodeId);
           break;
         }
         case "t": {
           e.preventDefault();
-          if (selectedNodeId) openTypePopover(selectedNodeId);
-          break;
-        }
-        case "c": {
-          if (isModKey(e)) break; // Mod+C is handled above
-          e.preventDefault();
-          if (!selectedNodeId || !currentContextId) break;
-          if (useUIStore.getState().compactState !== CompactStates.IDLE) break;
-          const profileId = localStorage.getItem("mindflow-active-ai-profile");
-          if (!profileId) {
-            useUIStore.getState().setCompactError("No AI profile selected. Open AI Settings to create and select one.");
-            break;
-          }
-          useUIStore.getState().setCompactState(CompactStates.LOADING);
-          ipc.compactNode(selectedNodeId, profileId)
-            .then(async (result) => {
-              const { applyCompact } = useTreeStore.getState();
-              const { highlights, summary } = await applyCompact(result);
-              const totalChanges = summary.added + summary.edited + summary.moved + summary.deleted;
-              if (totalChanges === 0) {
-                useUIStore.getState().setCompactState(CompactStates.IDLE);
-              } else {
-                useUIStore.getState().setCompactApplied(summary, highlights);
-              }
-            })
-            .catch((err) => {
-              console.error("[compact] error:", err);
-              useUIStore.getState().setCompactError(String(err));
-            });
+          if (!selectedNodeId) break;
+          if (compactLocked) { useUIStore.getState().flashCompactBanner(); break; }
+          openTypePopover(selectedNodeId);
           break;
         }
         case "Backspace":
         case "Delete": {
           if (!selectedNodeId || selectedNodeId === tree.node.id) break;
+          if (compactLocked) { useUIStore.getState().flashCompactBanner(); break; }
           e.preventDefault();
           deleteNode(selectedNodeId, currentContextId);
           break;
@@ -321,6 +288,15 @@ export function useKeyboard() {
       if (useUIStore.getState().aiSettingsOpen) return;
       if (quickSwitcherOpen || nodeSearchOpen || editingNodeId || typePopoverNodeId || contentPanelFocused || contextMenuNodeId) return;
       if (!tree || !currentContextId || !selectedNodeId) return;
+      // Block paste on nodes outside compact subtree
+      const { compactState: pCS, compactRootId: pCR } = useUIStore.getState();
+      if (pCS === CompactStates.APPLIED && pCR) {
+        const pRoot = findNodeInTree(tree, pCR);
+        if (pRoot && !findNodeInTree(pRoot, selectedNodeId)) {
+          useUIStore.getState().flashCompactBanner();
+          return;
+        }
+      }
       const items = e.clipboardData?.items;
 
       // 1. Clipboard has image → paste as image node
