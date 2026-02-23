@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useUIStore } from "../stores/uiStore";
 import { useContextStore } from "../stores/contextStore";
 import { ask } from "@tauri-apps/plugin-dialog";
@@ -18,6 +19,7 @@ function timeAgo(dateStr: string): string {
 }
 
 export function QuickSwitcher() {
+  const { t } = useTranslation();
   const { quickSwitcherOpen, closeQuickSwitcher } = useUIStore();
   const { contexts, loadContexts, switchContext, createContext, archiveContext, activateContext, deleteContext, currentContextId } = useContextStore();
   const [search, setSearch] = useState("");
@@ -56,7 +58,7 @@ export function QuickSwitcher() {
   };
 
   const handleCreate = async () => {
-    const name = search.trim() || "New Context";
+    const name = search.trim() || t("quickSwitcher.defaultName");
     await createContext(name);
     closeQuickSwitcher();
   };
@@ -74,8 +76,8 @@ export function QuickSwitcher() {
   const handleDelete = async (e: React.MouseEvent, ctx: ContextSummary) => {
     e.stopPropagation();
     const confirmed = await ask(
-      `確定要永久刪除「${ctx.name}」？此操作無法復原。`,
-      { title: "刪除確認", kind: "warning" },
+      t("quickSwitcher.confirm.deleteMessage", { name: ctx.name }),
+      { title: t("quickSwitcher.confirm.deleteTitle"), kind: "warning" },
     );
     if (confirmed) {
       await deleteContext(ctx.id);
@@ -175,7 +177,7 @@ export function QuickSwitcher() {
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label="Quick Switcher"
+        aria-label={t("quickSwitcher.ariaLabel")}
         className="relative w-[480px] bg-bg-elevated rounded-2xl overflow-hidden flex flex-col max-h-[520px] outline-none"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
@@ -186,7 +188,7 @@ export function QuickSwitcher() {
             ref={inputRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search..."
+            placeholder={t("quickSwitcher.placeholder")}
             aria-autocomplete="list"
             aria-controls="qs-list"
             aria-activedescendant={allItems[selectedIndex] ? `qs-item-${selectedIndex}` : undefined}
@@ -203,7 +205,7 @@ export function QuickSwitcher() {
             <>
               <div className="px-4 pt-3 pb-1.5">
                 <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
-                  ACTIVE
+                  {t("quickSwitcher.section.active")}
                 </span>
               </div>
               {active.map((ctx) => {
@@ -234,17 +236,17 @@ export function QuickSwitcher() {
                         className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
                           text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)] transition-all cursor-pointer"
                         onClick={(e) => handleArchive(e, ctx)}
-                        title="Archive"
+                        title={t("quickSwitcher.button.archive")}
                       >
-                        Archive
+                        {t("quickSwitcher.button.archive")}
                       </button>
                       <button
                         className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
                           text-text-secondary hover:text-[#FF4444] hover:bg-[var(--color-hover)] transition-all cursor-pointer"
                         onClick={(e) => handleDelete(e, ctx)}
-                        title="Delete"
+                        title={t("quickSwitcher.button.delete")}
                       >
-                        Delete
+                        {t("quickSwitcher.button.delete")}
                       </button>
                     </div>
                     <span className="text-[10px] text-text-secondary font-mono shrink-0">
@@ -261,7 +263,7 @@ export function QuickSwitcher() {
               {active.length > 0 && <div className="h-px bg-border mx-0" />}
               <div className="px-4 pt-3 pb-1.5">
                 <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
-                  ARCHIVED
+                  {t("quickSwitcher.section.archived")}
                 </span>
               </div>
               {archived.map((ctx) => {
@@ -288,17 +290,17 @@ export function QuickSwitcher() {
                         className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
                           text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)] transition-all cursor-pointer"
                         onClick={(e) => handleActivate(e, ctx)}
-                        title="Activate"
+                        title={t("quickSwitcher.button.restore")}
                       >
-                        Restore
+                        {t("quickSwitcher.button.restore")}
                       </button>
                       <button
                         className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
                           text-text-secondary hover:text-[#FF4444] hover:bg-[var(--color-hover)] transition-all cursor-pointer"
                         onClick={(e) => handleDelete(e, ctx)}
-                        title="Delete"
+                        title={t("quickSwitcher.button.delete")}
                       >
-                        Delete
+                        {t("quickSwitcher.button.delete")}
                       </button>
                     </div>
                     <span className="text-[10px] text-text-secondary font-mono shrink-0">
@@ -312,7 +314,7 @@ export function QuickSwitcher() {
 
           {allItems.length === 0 && (
             <div className="px-4 py-8 text-center text-text-secondary text-[13px]">
-              {search ? "No matches" : "No contexts yet"}
+              {search ? t("quickSwitcher.noMatch") : t("quickSwitcher.empty")}
             </div>
           )}
         </div>
@@ -323,7 +325,7 @@ export function QuickSwitcher() {
             onClick={handleCreate}
             className="px-3 py-1.5 text-[12px] font-bold text-white bg-accent-primary rounded-md font-mono cursor-pointer flex items-center gap-2"
           >
-            + New
+            {t("quickSwitcher.button.new")}
             <span className="text-[10px] opacity-70">{modSymbol}N</span>
           </button>
         </div>
