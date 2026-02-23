@@ -1,14 +1,17 @@
 import { useContextStore } from "../stores/contextStore";
 import { useUIStore } from "../stores/uiStore";
-import { ContextStates } from "../lib/constants";
+import { ContextStates, CompactStates } from "../lib/constants";
 import { modSymbol } from "../lib/platform";
 
 export function StatusBar() {
   const { contexts, currentContextId } = useContextStore();
   const { openQuickSwitcher, toggleThemeSwitcher, openAiSettings } = useUIStore();
+  const compactState = useUIStore((s) => s.compactState);
 
   const current = contexts.find((c) => c.id === currentContextId);
   const activeCount = contexts.filter((c) => c.state === ContextStates.ACTIVE).length;
+
+  const locked = compactState !== CompactStates.IDLE;
 
   return (
     <div className="flex items-center justify-between h-11 px-5 bg-bg-card shrink-0">
@@ -22,8 +25,12 @@ export function StatusBar() {
       </div>
       <div className="flex items-center gap-2">
         <button
-          onClick={openAiSettings}
-          className="px-2 py-1 text-xs text-text-secondary bg-bg-elevated rounded cursor-pointer hover:text-text-primary transition-colors"
+          onClick={() => {
+            if (locked) { useUIStore.getState().flashCompactBanner(); return; }
+            openAiSettings();
+          }}
+          disabled={locked}
+          className={`px-2 py-1 text-xs rounded transition-colors ${locked ? "text-text-secondary/40 bg-bg-elevated/50 cursor-not-allowed" : "text-text-secondary bg-bg-elevated cursor-pointer hover:text-text-primary"}`}
           title="AI Settings"
         >
           AI
@@ -36,8 +43,12 @@ export function StatusBar() {
           ◐
         </button>
         <button
-          onClick={openQuickSwitcher}
-          className="px-2 py-1 text-xs text-text-secondary bg-bg-elevated rounded cursor-pointer hover:bg-bg-card"
+          onClick={() => {
+            if (locked) { useUIStore.getState().flashCompactBanner(); return; }
+            openQuickSwitcher();
+          }}
+          disabled={locked}
+          className={`px-2 py-1 text-xs rounded transition-colors ${locked ? "text-text-secondary/40 bg-bg-elevated/50 cursor-not-allowed" : "text-text-secondary bg-bg-elevated cursor-pointer hover:bg-bg-card"}`}
         >
           {modSymbol}K
         </button>

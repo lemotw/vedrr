@@ -22,12 +22,13 @@ interface Props {
   isDropTarget?: boolean;
   compactHighlight?: CompactHighlightInfo | null;
   compactFading?: boolean;
+  dimmed?: boolean;
   onClick: () => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dragHandleListeners?: Record<string, any>;
 }
 
-export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, compactHighlight, compactFading, onClick, dragHandleListeners }: Props) {
+export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, compactHighlight, compactFading, dimmed, onClick, dragHandleListeners }: Props) {
   const { letter, color } = NODE_TYPE_CONFIG[node.node_type as NodeType];
   const { updateNodeTitle, openOrAttachFile, pickAndImportImage } = useTreeStore();
   const { editingNodeId, setEditingNode, openTypePopover, openContextMenu } = useUIStore();
@@ -71,6 +72,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, co
           isDropTarget && "ring-2 ring-accent-primary bg-accent-primary/10",
           !isDropTarget && isSelected && "ring-1 ring-accent-primary",
           isCutNode && "opacity-40",
+          dimmed && "opacity-40 pointer-events-none",
         )}
         onClick={onClick}
         onDoubleClick={() => setEditingNode(node.id)}
@@ -140,6 +142,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, co
           !isDropTarget && isSelected && "ring-1 ring-accent-primary",
           !isDropTarget && !isSelected && "hover:ring-1 hover:ring-border",
           isCutNode && "opacity-40",
+          dimmed && "opacity-40 pointer-events-none",
         )}
         style={hl ? {
           backgroundColor: hl.bg,

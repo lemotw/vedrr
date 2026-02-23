@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import type { TreeData } from "../lib/types";
 import { NODE_TYPE_CONFIG } from "../lib/types";
 import { useContextStore } from "../stores/contextStore";
 import { useTreeStore, findNode, findParent } from "../stores/treeStore";
 import { useUIStore } from "../stores/uiStore";
+import { CompactStates } from "../lib/constants";
 import { DragStateContext, useDragState } from "../lib/dragContext";
 import { NodeCard } from "./NodeCard";
 import {
@@ -66,12 +67,14 @@ function SortableChildRow({
   isFirst,
   isLast,
   ancestorCut,
+  compactNodeIds,
 }: {
   data: TreeData;
   parentId: string;
   isFirst: boolean;
   isLast: boolean;
   ancestorCut?: boolean;
+  compactNodeIds?: Set<string> | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -113,6 +116,7 @@ function SortableChildRow({
         <TreeBranch
           data={data}
           ancestorCut={ancestorCut}
+          compactNodeIds={compactNodeIds}
           dragHandleListeners={listeners}
         />
       </div>
@@ -132,11 +136,13 @@ function TreeBranch({
   data,
   isRoot,
   ancestorCut,
+  compactNodeIds,
   dragHandleListeners,
 }: {
   data: TreeData;
   isRoot?: boolean;
   ancestorCut?: boolean;
+  compactNodeIds?: Set<string> | null;
   dragHandleListeners?: ReturnType<typeof useSortable>["listeners"];
 }) {
   const { selectedNodeId, selectNode, addChild, addSibling, copiedNodeId, isCut } =
@@ -151,6 +157,7 @@ function TreeBranch({
   const isSelected = selectedNodeId === data.node.id;
   const isCutHere = isCut && copiedNodeId === data.node.id;
   const inCutSubtree = ancestorCut || isCutHere;
+  const isOutsideCompact = compactNodeIds != null && !compactNodeIds.has(data.node.id);
 
   // Highlight: this node is a reparent drop target
   const isReparentTarget =
@@ -170,6 +177,7 @@ function TreeBranch({
       isDropTarget={isReparentTarget}
       compactHighlight={highlight}
       compactFading={compactFading}
+      dimmed={isOutsideCompact}
       onClick={() => selectNode(data.node.id)}
       dragHandleListeners={!isRoot ? dragHandleListeners : undefined}
     />
@@ -184,8 +192,8 @@ function TreeBranch({
         ) : (
           nodeCard
         )}
-        {/* Add child button — visible on hover or when selected */}
-        {currentContextId && (
+        {/* Add child button — visible on hover or when selected; hidden outside compact subtree */}
+        {currentContextId && !isOutsideCompact && (
           <AddButton
             className={isSelected
               ? "opacity-100 mx-1"
@@ -235,11 +243,12 @@ function TreeBranch({
                 isFirst={i === 0}
                 isLast={i === data.children.length - 1}
                 ancestorCut={inCutSubtree}
+                compactNodeIds={compactNodeIds}
               />
             ))}
           </SortableContext>
-          {/* Add sibling button at end of children list */}
-          {currentContextId && (
+          {/* Add sibling button at end of children list; hidden outside compact subtree */}
+          {currentContextId && !isOutsideCompact && (
             <div className="flex items-center opacity-0 hover:opacity-100 transition-opacity" style={{ paddingTop: 6, paddingLeft: 20 }}>
               <AddButton
                 onClick={() => {
@@ -259,6 +268,18 @@ function TreeBranch({
 export function TreeCanvas() {
   const { currentContextId } = useContextStore();
   const { tree, loadTree, dragMoveNode } = useTreeStore();
+  const compactState = useUIStore((s) => s.compactState);
+  const compactRootId = useUIStore((s) => s.compactRootId);
+
+  const compactNodeIds = useMemo(() => {
+    if (compactState !== CompactStates.APPLIED || !compactRootId || !tree) return null;
+    const root = findNode(tree, compactRootId);
+    if (!root) return null;
+    const ids = new Set<string>();
+    (function walk(td: TreeData) { ids.add(td.node.id); td.children.forEach(walk); })(root);
+    return ids;
+  }, [compactState, compactRootId, tree]);
+
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -279,9 +300,11 @@ export function TreeCanvas() {
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const id = event.active.id as string;
+    // Block drag on nodes outside compact subtree
+    if (compactNodeIds && !compactNodeIds.has(id)) return;
     setActiveId(id);
     setActiveParentId(event.active.data.current?.parentId as string ?? null);
-  }, []);
+  }, [compactNodeIds]);
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
     const id = event.over?.id as string ?? null;
@@ -400,7 +423,7 @@ export function TreeCanvas() {
         onDragEnd={handleDragEnd}
       >
         <div className="p-8 pl-15 overflow-auto h-full">
-          <TreeBranch data={tree} isRoot />
+          <TreeBranch data={tree} isRoot compactNodeIds={compactNodeIds} />
         </div>
         <DragOverlay dropAnimation={null}>
           {activeTreeData && (

@@ -127,6 +127,15 @@
   }
 }
 
+/* Compact banner flash — draws attention when a blocked action is attempted */
+@keyframes compact-flash {
+  0% { background-color: rgba(255, 107, 53, 0.18); }
+  100% { background-color: transparent; }
+}
+.compact-flash-anim {
+  animation: compact-flash 0.6s ease-out;
+}
+
 /* Tiptap editor styles */
 .prose-editor {
   font-family: var(--font-mono);
