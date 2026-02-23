@@ -45,9 +45,8 @@ interface UIStore {
   contextMenuPosition: { x: number; y: number } | null;
   collapsedNodes: Set<string>;
   currentTheme: ThemeId;
-  themeSwitcherOpen: boolean;
+  settingsOpen: boolean;
   customThemeColors: CustomThemeColors;
-  aiSettingsOpen: boolean;
   compactState: CompactState;
   compactHighlights: Map<string, CompactHighlightInfo> | null;
   compactSummary: CompactSummary | null;
@@ -73,10 +72,8 @@ interface UIStore {
   toggleCollapse: (nodeId: string) => void;
   setTheme: (theme: ThemeId) => void;
   setCustomColor: (key: keyof CustomThemeColors, value: string) => void;
-  toggleThemeSwitcher: () => void;
-  closeThemeSwitcher: () => void;
-  openAiSettings: () => void;
-  closeAiSettings: () => void;
+  openSettings: () => void;
+  closeSettings: () => void;
   setCompactState: (state: CompactState) => void;
   setCompactApplied: (rootId: string, summary: CompactSummary, highlights: Map<string, CompactHighlightInfo>) => void;
   dismissCompactBanner: () => void;
@@ -101,9 +98,8 @@ export const useUIStore = create<UIStore>((set) => ({
   contextMenuPosition: null,
   collapsedNodes: new Set<string>(),
   currentTheme: (localStorage.getItem("mindflow-theme") as ThemeId) || Themes.MOCHA,
-  themeSwitcherOpen: false,
+  settingsOpen: false,
   customThemeColors: loadCustomColors(),
-  aiSettingsOpen: false,
   compactState: CompactStates.IDLE,
   compactRootId: null,
   compactHighlights: null,
@@ -149,10 +145,8 @@ export const useUIStore = create<UIStore>((set) => ({
     applyCustomColors(colors);
     set({ customThemeColors: colors });
   },
-  toggleThemeSwitcher: () => set((s) => ({ themeSwitcherOpen: !s.themeSwitcherOpen })),
-  closeThemeSwitcher: () => set({ themeSwitcherOpen: false }),
-  openAiSettings: () => set({ aiSettingsOpen: true }),
-  closeAiSettings: () => set({ aiSettingsOpen: false }),
+  openSettings: () => set({ settingsOpen: true }),
+  closeSettings: () => set({ settingsOpen: false }),
   setCompactState: (state) => set({ compactState: state }),
   setCompactApplied: (rootId, summary, highlights) => set({
     compactState: CompactStates.APPLIED,

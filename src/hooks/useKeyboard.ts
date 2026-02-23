@@ -59,7 +59,7 @@ export function useKeyboard() {
       const ui = useUIStore.getState();
 
       // Block ALL keys when modal overlays are open
-      if (ui.aiSettingsOpen) return;
+      if (ui.settingsOpen) return;
 
       // Helper: check if compact is busy (LOADING or APPLIED — locks context-switching actions)
       const isCompactBusy = () => useUIStore.getState().compactState !== CompactStates.IDLE;
@@ -291,7 +291,7 @@ export function useKeyboard() {
 
     function handlePaste(e: ClipboardEvent) {
       const ui = useUIStore.getState();
-      if (ui.aiSettingsOpen) return;
+      if (ui.settingsOpen) return;
       if (ui.quickSwitcherOpen || ui.nodeSearchOpen || ui.editingNodeId || ui.typePopoverNodeId || ui.contentPanelFocused || ui.contextMenuNodeId) return;
       if (!tree || !currentContextId || !selectedNodeId) return;
       // Block paste on nodes outside compact subtree

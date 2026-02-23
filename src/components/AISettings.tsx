@@ -1,22 +1,21 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useUIStore } from "../stores/uiStore";
+import { useState, useEffect, useRef } from "react";
 import { ipc } from "../lib/ipc";
 import { cn } from "../lib/cn";
 import type { AiProfile, ApiKey, ModelInfo } from "../lib/types";
 
-const PROVIDERS = [
+export const PROVIDERS = [
   { id: "anthropic", name: "Anthropic" },
   { id: "openai", name: "OpenAI" },
   { id: "gemini", name: "Gemini" },
 ];
 
-function providerDisplayName(providerId: string): string {
+export function providerDisplayName(providerId: string): string {
   return PROVIDERS.find((p) => p.id === providerId)?.name || providerId;
 }
 
 // ── Section: API Keys ─────────────────────────────────────
 
-function ApiKeysSection({ onKeysChange }: { onKeysChange?: () => void }) {
+export function ApiKeysSection({ onKeysChange }: { onKeysChange?: () => void }) {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -165,7 +164,7 @@ function ApiKeysSection({ onKeysChange }: { onKeysChange?: () => void }) {
 
 // ── Section: Profiles ─────────────────────────────────────
 
-function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
+export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
   const [profiles, setProfiles] = useState<AiProfile[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -395,7 +394,7 @@ function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
 
 // ── Section: System Prompt ────────────────────────────────
 
-function SystemPromptSection() {
+export function SystemPromptSection() {
   const [prompt, setPrompt] = useState("");
   const [original, setOriginal] = useState("");
   const [saving, setSaving] = useState(false);
@@ -473,7 +472,7 @@ function SystemPromptSection() {
 
 // ── Collapsible Section Wrapper ───────────────────────────
 
-function Section({
+export function Section({
   title,
   defaultOpen = true,
   children,
@@ -506,77 +505,3 @@ function Section({
   );
 }
 
-// ── Main Component ────────────────────────────────────────
-
-export function AISettings() {
-  const { aiSettingsOpen, closeAiSettings } = useUIStore();
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-
-  const loadApiKeys = useCallback(async () => {
-    try {
-      const list = await ipc.listApiKeys();
-      setApiKeys(list);
-    } catch (e) {
-      console.error("[ai-settings] load api keys failed:", e);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (aiSettingsOpen) {
-      loadApiKeys();
-      requestAnimationFrame(() => panelRef.current?.focus());
-    }
-  }, [aiSettingsOpen, loadApiKeys]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      closeAiSettings();
-    }
-  };
-
-  if (!aiSettingsOpen) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay"
-      onClick={closeAiSettings}
-    >
-      <div
-        ref={panelRef}
-        tabIndex={-1}
-        className="flex max-h-[80vh] w-[500px] flex-col rounded-xl border border-border bg-bg-elevated shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKeyDown}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="font-heading text-lg text-text-primary">AI Settings</h2>
-        </div>
-
-        {/* Scrollable body */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <Section title="API Keys">
-            <ApiKeysSection onKeysChange={loadApiKeys} />
-          </Section>
-
-          <Section title="Profiles">
-            <ProfilesSection apiKeys={apiKeys} />
-          </Section>
-
-          <Section title="System Prompt (Dev)" defaultOpen={false}>
-            <SystemPromptSection />
-          </Section>
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-border px-6 py-3">
-          <p className="font-mono text-[10px] text-text-secondary">
-            Add API keys, then create profiles to use with AI Compact.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}

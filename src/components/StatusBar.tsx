@@ -5,7 +5,7 @@ import { modSymbol } from "../lib/platform";
 
 export function StatusBar() {
   const { contexts, currentContextId } = useContextStore();
-  const { openQuickSwitcher, toggleThemeSwitcher, openAiSettings } = useUIStore();
+  const { openQuickSwitcher, openSettings } = useUIStore();
   const compactState = useUIStore((s) => s.compactState);
 
   const current = contexts.find((c) => c.id === currentContextId);
@@ -27,20 +27,13 @@ export function StatusBar() {
         <button
           onClick={() => {
             if (locked) { useUIStore.getState().flashCompactBanner(); return; }
-            openAiSettings();
+            openSettings();
           }}
           disabled={locked}
           className={`px-2 py-1 text-xs rounded transition-colors ${locked ? "text-text-secondary/40 bg-bg-elevated/50 cursor-not-allowed" : "text-text-secondary bg-bg-elevated cursor-pointer hover:text-text-primary"}`}
-          title="AI Settings"
+          title="Settings"
         >
-          AI
-        </button>
-        <button
-          onClick={toggleThemeSwitcher}
-          className="px-2 py-1 text-xs text-text-secondary bg-bg-elevated rounded cursor-pointer hover:text-text-primary transition-colors"
-          title="Theme"
-        >
-          ◐
+          Settings
         </button>
         <button
           onClick={() => {

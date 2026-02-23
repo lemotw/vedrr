@@ -6,8 +6,7 @@ import { QuickSwitcher } from "./components/QuickSwitcher";
 import { NodeTypePopover } from "./components/NodeTypePopover";
 import { NodeSearch } from "./components/NodeSearch";
 import { ContextMenu } from "./components/ContextMenu";
-import { ThemeSwitcher } from "./components/ThemeSwitcher";
-import { AISettings } from "./components/AISettings";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { CompactBanner } from "./components/CompactBanner";
 import { useContextStore } from "./stores/contextStore";
 import { useTreeStore } from "./stores/treeStore";
@@ -60,8 +59,7 @@ export default function App() {
       <NodeTypePopover />
       <NodeSearch />
       <ContextMenu />
-      <ThemeSwitcher />
-      <AISettings />
+      <SettingsPanel />
       {compactState === CompactStates.LOADING && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
           <div className="rounded-xl border border-border bg-bg-elevated px-8 py-6 shadow-2xl">
