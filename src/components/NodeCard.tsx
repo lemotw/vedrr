@@ -28,15 +28,17 @@ interface Props {
   dragHandleListeners?: Record<string, any>;
 }
 
-export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, compactHighlight, compactFading, dimmed, onClick, dragHandleListeners }: Props) {
-  const { letter, color } = NODE_TYPE_CONFIG[node.node_type as NodeType];
-  const { updateNodeTitle, openOrAttachFile, pickAndImportImage } = useTreeStore();
-  const { editingNodeId, setEditingNode, openTypePopover, openContextMenu } = useUIStore();
-  const isEditing = editingNodeId === node.id;
-  const cardRef = useRef<HTMLDivElement>(null);
+function useNodeEdit(
+  node: TreeNode,
+  isEditing: boolean,
+  isSelected: boolean | undefined,
+  setEditingNode: (id: string | null) => void,
+  updateNodeTitle: (id: string, title: string) => Promise<void>,
+) {
+  const [editValue, setEditValue] = useState(node.title);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastEnterRef = useRef<number>(0);
-  const [editValue, setEditValue] = useState(node.title);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isSelected && cardRef.current) {
@@ -63,38 +65,81 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, co
     setEditingNode(null);
   };
 
-  if (isRoot) {
-    return (
-      <div
-        ref={cardRef}
-        className={cn(
-          "cursor-pointer px-1 py-0.5 rounded",
-          isDropTarget && "ring-2 ring-accent-primary bg-accent-primary/10",
-          !isDropTarget && isSelected && "ring-1 ring-accent-primary",
-          isCutNode && "opacity-40",
-          dimmed && "opacity-40 pointer-events-none",
-        )}
-        onClick={onClick}
-        onDoubleClick={() => setEditingNode(node.id)}
-        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
-      >
-        {isEditing ? (
-          <input
-            ref={inputRef}
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={commitEdit}
-            onKeyDown={(e) => { e.stopPropagation(); if (e.nativeEvent.isComposing) return; if (e.key === "Enter") { e.preventDefault(); const now = Date.now(); if (now - lastEnterRef.current < 300) { commitEdit(); } lastEnterRef.current = now; } if (e.key === "Escape") { e.preventDefault(); setEditingNode(null); } }}
-            className="bg-transparent font-heading text-[28px] font-bold text-text-primary outline-none border-b border-accent-primary"
-          />
-        ) : (
-          <span className="font-heading text-[28px] font-bold text-text-primary">
-            {node.title || "Untitled"}
-          </span>
-        )}
-      </div>
-    );
-  }
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const now = Date.now();
+      if (now - lastEnterRef.current < 300) { commitEdit(); }
+      lastEnterRef.current = now;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setEditingNode(null);
+    }
+  };
+
+  return { editValue, setEditValue, inputRef, cardRef, commitEdit, handleInputKeyDown };
+}
+
+function RootNodeHeading({ node, isSelected, isCutNode, isDropTarget, dimmed, onClick }: Props) {
+  const updateNodeTitle = useTreeStore(s => s.updateNodeTitle);
+  const editingNodeId = useUIStore(s => s.editingNodeId);
+  const setEditingNode = useUIStore(s => s.setEditingNode);
+  const openContextMenu = useUIStore(s => s.openContextMenu);
+  const isEditing = editingNodeId === node.id;
+
+  const { editValue, setEditValue, inputRef, cardRef, commitEdit, handleInputKeyDown } = useNodeEdit(
+    node, isEditing, isSelected, setEditingNode, updateNodeTitle,
+  );
+
+  return (
+    <div
+      ref={cardRef}
+      className={cn(
+        "cursor-pointer px-1 py-0.5 rounded",
+        isDropTarget && "ring-2 ring-accent-primary bg-accent-primary/10",
+        !isDropTarget && isSelected && "ring-1 ring-accent-primary",
+        isCutNode && "opacity-40",
+        dimmed && "opacity-40 pointer-events-none",
+      )}
+      onClick={onClick}
+      onDoubleClick={() => setEditingNode(node.id)}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
+    >
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={commitEdit}
+          onKeyDown={handleInputKeyDown}
+          className="bg-transparent font-heading text-[28px] font-bold text-text-primary outline-none border-b border-accent-primary"
+        />
+      ) : (
+        <span className="font-heading text-[28px] font-bold text-text-primary">
+          {node.title || "Untitled"}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, compactHighlight, compactFading, dimmed, onClick, dragHandleListeners }: Props) {
+  const { letter, color } = NODE_TYPE_CONFIG[node.node_type as NodeType];
+  const updateNodeTitle = useTreeStore(s => s.updateNodeTitle);
+  const openOrAttachFile = useTreeStore(s => s.openOrAttachFile);
+  const pickAndImportImage = useTreeStore(s => s.pickAndImportImage);
+  const editingNodeId = useUIStore(s => s.editingNodeId);
+  const setEditingNode = useUIStore(s => s.setEditingNode);
+  const openTypePopover = useUIStore(s => s.openTypePopover);
+  const openContextMenu = useUIStore(s => s.openContextMenu);
+  const isEditing = editingNodeId === node.id;
+
+  const { editValue, setEditValue, inputRef, cardRef, commitEdit, handleInputKeyDown } = useNodeEdit(
+    node, isEditing, isSelected, setEditingNode, updateNodeTitle,
+  );
 
   const isFileish = node.node_type === NodeTypes.FILE;
   const isImage = node.node_type === NodeTypes.IMAGE && node.file_path;
@@ -187,7 +232,7 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, co
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={commitEdit}
-              onKeyDown={(e) => { e.stopPropagation(); if (e.nativeEvent.isComposing) return; if (e.key === "Enter") { e.preventDefault(); const now = Date.now(); if (now - lastEnterRef.current < 300) { commitEdit(); } lastEnterRef.current = now; } if (e.key === "Escape") { e.preventDefault(); setEditingNode(null); } }}
+              onKeyDown={handleInputKeyDown}
               className="bg-transparent text-[13px] text-text-primary outline-none border-b border-accent-primary min-w-[60px]"
             />
           ) : (
@@ -244,4 +289,9 @@ export function NodeCard({ node, isRoot, isSelected, isCutNode, isDropTarget, co
       )}
     </>
   );
+}
+
+export function NodeCard(props: Props) {
+  if (props.isRoot) return <RootNodeHeading {...props} />;
+  return <LeafNodeCard {...props} />;
 }

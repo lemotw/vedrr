@@ -10,6 +10,7 @@ import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { AISettings } from "./components/AISettings";
 import { CompactBanner } from "./components/CompactBanner";
 import { useContextStore } from "./stores/contextStore";
+import { useTreeStore } from "./stores/treeStore";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useUIStore } from "./stores/uiStore";
 import { ContextStates, CompactStates } from "./lib/constants";
@@ -31,6 +32,19 @@ export default function App() {
       else openQuickSwitcher();
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync root node title changes → context list (replaces circular treeStore→contextStore import)
+  useEffect(() => {
+    let prevRootTitle: string | undefined;
+    const unsub = useTreeStore.subscribe((state) => {
+      const title = state.tree?.node.title;
+      if (prevRootTitle !== undefined && title !== prevRootTitle) {
+        useContextStore.getState().loadContexts();
+      }
+      prevRootTitle = title;
+    });
+    return unsub;
+  }, []);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-bg-page">

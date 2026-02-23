@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, memo } from "react";
 import type { TreeData } from "../lib/types";
 import { NODE_TYPE_CONFIG } from "../lib/types";
 import { useContextStore } from "../stores/contextStore";
@@ -61,7 +61,7 @@ function AddButton({
   );
 }
 
-function SortableChildRow({
+const SortableChildRow = memo(function SortableChildRow({
   data,
   parentId,
   isFirst,
@@ -122,7 +122,7 @@ function SortableChildRow({
       </div>
     </div>
   );
-}
+});
 
 function RootDropZone({ nodeId, children }: { nodeId: string; children: React.ReactNode }) {
   const { setNodeRef } = useDroppable({
@@ -132,7 +132,7 @@ function RootDropZone({ nodeId, children }: { nodeId: string; children: React.Re
   return <div ref={setNodeRef}>{children}</div>;
 }
 
-function TreeBranch({
+const TreeBranch = memo(function TreeBranch({
   data,
   isRoot,
   ancestorCut,
@@ -145,15 +145,19 @@ function TreeBranch({
   compactNodeIds?: Set<string> | null;
   dragHandleListeners?: ReturnType<typeof useSortable>["listeners"];
 }) {
-  const { selectedNodeId, selectNode, addChild, addSibling, copiedNodeId, isCut } =
-    useTreeStore();
-  const { currentContextId } = useContextStore();
-  const { collapsedNodes, toggleCollapse } = useUIStore();
-  const compactHighlights = useUIStore((s) => s.compactHighlights);
-  const compactFading = useUIStore((s) => s.compactFading);
+  const selectedNodeId = useTreeStore(s => s.selectedNodeId);
+  const selectNode = useTreeStore(s => s.selectNode);
+  const addChild = useTreeStore(s => s.addChild);
+  const addSibling = useTreeStore(s => s.addSibling);
+  const copiedNodeId = useTreeStore(s => s.copiedNodeId);
+  const isCut = useTreeStore(s => s.isCut);
+  const currentContextId = useContextStore(s => s.currentContextId);
+  const isCollapsed = useUIStore(s => s.collapsedNodes.has(data.node.id));
+  const toggleCollapse = useUIStore(s => s.toggleCollapse);
+  const compactHighlights = useUIStore(s => s.compactHighlights);
+  const compactFading = useUIStore(s => s.compactFading);
   const dragState = useDragState();
   const hasChildren = data.children.length > 0;
-  const isCollapsed = collapsedNodes.has(data.node.id);
   const isSelected = selectedNodeId === data.node.id;
   const isCutHere = isCut && copiedNodeId === data.node.id;
   const inCutSubtree = ancestorCut || isCutHere;
@@ -263,13 +267,15 @@ function TreeBranch({
       )}
     </div>
   );
-}
+});
 
 export function TreeCanvas() {
-  const { currentContextId } = useContextStore();
-  const { tree, loadTree, dragMoveNode } = useTreeStore();
-  const compactState = useUIStore((s) => s.compactState);
-  const compactRootId = useUIStore((s) => s.compactRootId);
+  const currentContextId = useContextStore(s => s.currentContextId);
+  const tree = useTreeStore(s => s.tree);
+  const loadTree = useTreeStore(s => s.loadTree);
+  const dragMoveNode = useTreeStore(s => s.dragMoveNode);
+  const compactState = useUIStore(s => s.compactState);
+  const compactRootId = useUIStore(s => s.compactRootId);
 
   const compactNodeIds = useMemo(() => {
     if (compactState !== CompactStates.APPLIED || !compactRootId || !tree) return null;
@@ -292,6 +298,7 @@ export function TreeCanvas() {
 
   useEffect(() => {
     if (currentContextId) {
+      useTreeStore.getState().clearUndo();
       loadTree(currentContextId);
     }
   }, [currentContextId, loadTree]);
@@ -395,6 +402,11 @@ export function TreeCanvas() {
     }
   }, [tree, currentContextId, dragMoveNode]);
 
+  const dragContextValue = useMemo(
+    () => ({ activeId, activeParentId, overId, overParentId, reparentIntent }),
+    [activeId, activeParentId, overId, overParentId, reparentIntent],
+  );
+
   if (!currentContextId) {
     return (
       <div className="flex items-center justify-center h-full text-text-secondary text-sm">
@@ -414,7 +426,7 @@ export function TreeCanvas() {
   const childCount = activeTreeData ? activeTreeData.children.length : 0;
 
   return (
-    <DragStateContext.Provider value={{ activeId, activeParentId, overId, overParentId, reparentIntent }}>
+    <DragStateContext.Provider value={dragContextValue}>
       <DndContext
         sensors={sensors}
         collisionDetection={combinedCollision}

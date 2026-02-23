@@ -125,6 +125,14 @@
   *:focus {
     outline: none;
   }
+
+  button:focus-visible,
+  input:focus-visible,
+  a:focus-visible,
+  [role="option"]:focus-visible {
+    outline: 2px solid var(--color-accent-primary);
+    outline-offset: 2px;
+  }
 }
 
 /* Compact banner flash — draws attention when a blocked action is attempted */

@@ -4,7 +4,6 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { ipc } from "../lib/ipc";
 import { NodeTypes, PasteKind, CompactStates } from "../lib/constants";
 import { useUIStore } from "./uiStore";
-import { useContextStore } from "./contextStore";
 
 // ── Undo types ─────────────────────────────────────────────
 const MAX_UNDO = 50;
@@ -111,10 +110,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
 
   loadTree: async (contextId: string) => {
     const tree = await ipc.getTree(contextId);
-    const { selectedNodeId } = get();
-    // Auto-select root if nothing selected
-    const autoSelect = !selectedNodeId && tree ? tree.node.id : selectedNodeId;
-    set({ tree, selectedNodeId: autoSelect });
+    set({ tree, selectedNodeId: tree ? tree.node.id : null });
   },
 
   selectNode: (id) => {
@@ -212,9 +208,6 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     await ipc.updateNode(nodeId, { title });
     if (tree) {
       set({ tree: patchNode(get().tree!, nodeId, { title }) });
-      if (tree.node.id === nodeId) {
-        useContextStore.getState().loadContexts();
-      }
     }
   },
 
@@ -595,9 +588,6 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
         const tree = get().tree;
         if (tree) {
           set({ tree: patchNode(tree, entry.nodeId, { title: entry.old }) });
-          if (tree.node.id === entry.nodeId) {
-            useContextStore.getState().loadContexts();
-          }
         }
         break;
       }

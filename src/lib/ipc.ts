@@ -4,51 +4,60 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { Context, ContextSummary, TreeData, TreeNode, CompactResult, AiProfile } from "./types";
 import { IpcCmd } from "./constants";
 
+async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  try {
+    return await invoke<T>(cmd, args);
+  } catch (err) {
+    console.error(`[ipc] ${cmd} failed:`, err);
+    throw err;
+  }
+}
+
 export const ipc = {
   createContext: (name: string, tags: string[] = []) =>
-    invoke<Context>(IpcCmd.CREATE_CONTEXT, { name, tags }),
+    safeInvoke<Context>(IpcCmd.CREATE_CONTEXT, { name, tags }),
 
   listContexts: () =>
-    invoke<ContextSummary[]>(IpcCmd.LIST_CONTEXTS),
+    safeInvoke<ContextSummary[]>(IpcCmd.LIST_CONTEXTS),
 
   switchContext: (id: string) =>
-    invoke<void>(IpcCmd.SWITCH_CONTEXT, { id }),
+    safeInvoke<void>(IpcCmd.SWITCH_CONTEXT, { id }),
 
   archiveContext: (id: string) =>
-    invoke<void>(IpcCmd.ARCHIVE_CONTEXT, { id }),
+    safeInvoke<void>(IpcCmd.ARCHIVE_CONTEXT, { id }),
 
   activateContext: (id: string) =>
-    invoke<void>(IpcCmd.ACTIVATE_CONTEXT, { id }),
+    safeInvoke<void>(IpcCmd.ACTIVATE_CONTEXT, { id }),
 
   renameContext: (id: string, name: string) =>
-    invoke<void>(IpcCmd.RENAME_CONTEXT, { id, name }),
+    safeInvoke<void>(IpcCmd.RENAME_CONTEXT, { id, name }),
 
   deleteContext: (id: string) =>
-    invoke<void>(IpcCmd.DELETE_CONTEXT, { id }),
+    safeInvoke<void>(IpcCmd.DELETE_CONTEXT, { id }),
 
   getTree: (contextId: string) =>
-    invoke<TreeData | null>(IpcCmd.GET_TREE, { contextId }),
+    safeInvoke<TreeData | null>(IpcCmd.GET_TREE, { contextId }),
 
   createNode: (contextId: string, parentId: string, nodeType: string, title: string) =>
-    invoke<TreeNode>(IpcCmd.CREATE_NODE, { contextId, parentId, nodeType, title }),
+    safeInvoke<TreeNode>(IpcCmd.CREATE_NODE, { contextId, parentId, nodeType, title }),
 
   updateNode: (id: string, updates: { title?: string; content?: string; nodeType?: string; filePath?: string }) =>
-    invoke<void>(IpcCmd.UPDATE_NODE, { id, ...updates }),
+    safeInvoke<void>(IpcCmd.UPDATE_NODE, { id, ...updates }),
 
   readFileBytes: (filePath: string) =>
-    invoke<number[]>(IpcCmd.READ_FILE_BYTES, { filePath }),
+    safeInvoke<number[]>(IpcCmd.READ_FILE_BYTES, { filePath }),
 
   saveClipboardImage: (contextId: string, nodeId: string, data: number[], extension: string) =>
-    invoke<string>(IpcCmd.SAVE_CLIPBOARD_IMAGE, { contextId, nodeId, data, extension }),
+    safeInvoke<string>(IpcCmd.SAVE_CLIPBOARD_IMAGE, { contextId, nodeId, data, extension }),
 
   importImage: (contextId: string, nodeId: string, sourcePath: string) =>
-    invoke<string>(IpcCmd.IMPORT_IMAGE, { contextId, nodeId, sourcePath }),
+    safeInvoke<string>(IpcCmd.IMPORT_IMAGE, { contextId, nodeId, sourcePath }),
 
   deleteNode: (id: string) =>
-    invoke<void>(IpcCmd.DELETE_NODE, { id }),
+    safeInvoke<void>(IpcCmd.DELETE_NODE, { id }),
 
   moveNode: (id: string, newParentId: string, position: number) =>
-    invoke<void>(IpcCmd.MOVE_NODE, { id, newParentId, position }),
+    safeInvoke<void>(IpcCmd.MOVE_NODE, { id, newParentId, position }),
 
   revealFile: (filePath: string) =>
     revealItemInDir(filePath),
@@ -57,10 +66,10 @@ export const ipc = {
     openDialog({ multiple: false, directory: false }),
 
   cloneSubtree: (sourceId: string, targetParentId: string, contextId: string) =>
-    invoke<string>(IpcCmd.CLONE_SUBTREE, { sourceId, targetParentId, contextId }),
+    safeInvoke<string>(IpcCmd.CLONE_SUBTREE, { sourceId, targetParentId, contextId }),
 
   restoreNodes: (nodes: TreeNode[]) =>
-    invoke<void>(IpcCmd.RESTORE_NODES, { nodes }),
+    safeInvoke<void>(IpcCmd.RESTORE_NODES, { nodes }),
 
   pickImage: () =>
     openDialog({
@@ -70,14 +79,14 @@ export const ipc = {
     }),
 
   listAiProfiles: () =>
-    invoke<AiProfile[]>(IpcCmd.LIST_AI_PROFILES),
+    safeInvoke<AiProfile[]>(IpcCmd.LIST_AI_PROFILES),
 
   createAiProfile: (name: string, provider: string, model: string, apiKey: string) =>
-    invoke<AiProfile>(IpcCmd.CREATE_AI_PROFILE, { name, provider, model, apiKey }),
+    safeInvoke<AiProfile>(IpcCmd.CREATE_AI_PROFILE, { name, provider, model, apiKey }),
 
   deleteAiProfile: (id: string) =>
-    invoke<void>(IpcCmd.DELETE_AI_PROFILE, { id }),
+    safeInvoke<void>(IpcCmd.DELETE_AI_PROFILE, { id }),
 
   compactNode: (nodeId: string, profileId: string) =>
-    invoke<CompactResult>(IpcCmd.COMPACT_NODE, { nodeId, profileId }),
+    safeInvoke<CompactResult>(IpcCmd.COMPACT_NODE, { nodeId, profileId }),
 };

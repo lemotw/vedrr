@@ -47,14 +47,19 @@ function getNodesAtDepth(tree: TreeData, targetDepth: number, collapsedNodes: Se
 }
 
 export function useKeyboard() {
-  const { openQuickSwitcher, quickSwitcherOpen, editingNodeId, setEditingNode, typePopoverNodeId, openTypePopover, contentPanelFocused, markdownEditorNodeId, openMarkdownEditor, closeMarkdownEditor, nodeSearchOpen, openNodeSearch, contextMenuNodeId, closeContextMenu, collapsedNodes, toggleCollapse } = useUIStore();
-  const { tree, selectedNodeId, copiedNodeId, isCut, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, pasteAsNode, openOrAttachFile, reorderNode, dragMoveNode, undo } = useTreeStore();
-  const { currentContextId } = useContextStore();
+  const tree = useTreeStore(s => s.tree);
+  const selectedNodeId = useTreeStore(s => s.selectedNodeId);
+  const copiedNodeId = useTreeStore(s => s.copiedNodeId);
+  const isCut = useTreeStore(s => s.isCut);
+  const currentContextId = useContextStore(s => s.currentContextId);
+  const collapsedNodes = useUIStore(s => s.collapsedNodes);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      const ui = useUIStore.getState();
+
       // Block ALL keys when modal overlays are open
-      if (useUIStore.getState().aiSettingsOpen) return;
+      if (ui.aiSettingsOpen) return;
 
       // Helper: check if compact is busy (LOADING or APPLIED — locks context-switching actions)
       const isCompactBusy = () => useUIStore.getState().compactState !== CompactStates.IDLE;
@@ -63,66 +68,66 @@ export function useKeyboard() {
       if (isModKey(e) && e.key === "k" && !e.shiftKey) {
         e.preventDefault();
         if (isCompactBusy()) { useUIStore.getState().flashCompactBanner(); return; }
-        openQuickSwitcher();
+        ui.openQuickSwitcher();
         return;
       }
 
       // Mod+F — Node Search
       if (isModKey(e) && e.key === "f" && !e.shiftKey) {
         e.preventDefault();
-        openNodeSearch();
+        ui.openNodeSearch();
         return;
       }
 
       // Mod+Z — Undo (blocked during APPLIED — use 'u' for full compact rollback)
-      if (isModKey(e) && e.key === "z" && !e.shiftKey && !editingNodeId && !contentPanelFocused) {
+      if (isModKey(e) && e.key === "z" && !e.shiftKey && !ui.editingNodeId && !ui.contentPanelFocused) {
         e.preventDefault();
         if (isCompactBusy()) { useUIStore.getState().flashCompactBanner(); return; }
-        undo();
+        useTreeStore.getState().undo();
         return;
       }
 
       // Mod+C — Copy node (when not editing): write marker to clipboard
-      if (isModKey(e) && e.key === "c" && !editingNodeId && !contentPanelFocused && !quickSwitcherOpen
+      if (isModKey(e) && e.key === "c" && !ui.editingNodeId && !ui.contentPanelFocused && !ui.quickSwitcherOpen
           && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
         e.preventDefault();
-        copyNode(selectedNodeId);
+        useTreeStore.getState().copyNode(selectedNodeId);
         navigator.clipboard.writeText("mindflow:node:" + selectedNodeId);
         return;
       }
 
       // Mod+X — Cut node
-      if (isModKey(e) && e.key === "x" && !editingNodeId && !contentPanelFocused && !quickSwitcherOpen
+      if (isModKey(e) && e.key === "x" && !ui.editingNodeId && !ui.contentPanelFocused && !ui.quickSwitcherOpen
           && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
         e.preventDefault();
-        cutNode(selectedNodeId);
+        useTreeStore.getState().cutNode(selectedNodeId);
         navigator.clipboard.writeText("mindflow:node:" + selectedNodeId);
         return;
       }
 
       // Escape closes context menu
-      if (e.key === "Escape" && contextMenuNodeId) {
+      if (e.key === "Escape" && ui.contextMenuNodeId) {
         e.preventDefault();
-        closeContextMenu();
+        ui.closeContextMenu();
         return;
       }
 
       // Escape closes markdown editor (before other guards so it works while editing)
-      if (e.key === "Escape" && markdownEditorNodeId) {
+      if (e.key === "Escape" && ui.markdownEditorNodeId) {
         e.preventDefault();
-        closeMarkdownEditor();
+        ui.closeMarkdownEditor();
         return;
       }
 
       // Escape clears copied/cut node
       if (e.key === "Escape" && copiedNodeId) {
         e.preventDefault();
-        copyNode(null);
+        useTreeStore.getState().copyNode(null);
         return;
       }
 
       // Don't handle tree keys when switcher/search is open, editing, content panel focused, type popover or context menu open
-      if (quickSwitcherOpen || nodeSearchOpen || editingNodeId || typePopoverNodeId || contentPanelFocused || contextMenuNodeId) return;
+      if (ui.quickSwitcherOpen || ui.nodeSearchOpen || ui.editingNodeId || ui.typePopoverNodeId || ui.contentPanelFocused || ui.contextMenuNodeId) return;
       if (!tree || !currentContextId) return;
 
       // Compact lock: block mutations on nodes outside compact subtree
@@ -141,12 +146,12 @@ export function useKeyboard() {
         if (compactLocked) { useUIStore.getState().flashCompactBanner(); return; }
         if (e.code === "KeyJ" || e.key === "ArrowDown") {
           e.preventDefault();
-          reorderNode(selectedNodeId, "down", currentContextId);
+          useTreeStore.getState().reorderNode(selectedNodeId, "down", currentContextId);
           return;
         }
         if (e.code === "KeyK" || e.key === "ArrowUp") {
           e.preventDefault();
-          reorderNode(selectedNodeId, "up", currentContextId);
+          useTreeStore.getState().reorderNode(selectedNodeId, "up", currentContextId);
           return;
         }
         if (e.code === "KeyL" || e.key === "ArrowRight") {
@@ -161,7 +166,7 @@ export function useKeyboard() {
           const lastPos = prevSibling.children.length > 0
             ? prevSibling.children[prevSibling.children.length - 1].node.position + 1
             : 0;
-          dragMoveNode(selectedNodeId, prevSibling.node.id, lastPos, currentContextId);
+          useTreeStore.getState().dragMoveNode(selectedNodeId, prevSibling.node.id, lastPos, currentContextId);
           return;
         }
         if (e.code === "KeyH" || e.key === "ArrowLeft") {
@@ -171,7 +176,7 @@ export function useKeyboard() {
           if (!parent || parent.node.id === tree.node.id) return; // parent is root, can't go higher
           const grandparent = findParentInTree(tree, parent.node.id);
           if (!grandparent) return;
-          dragMoveNode(selectedNodeId, grandparent.node.id, parent.node.position + 1, currentContextId);
+          useTreeStore.getState().dragMoveNode(selectedNodeId, grandparent.node.id, parent.node.position + 1, currentContextId);
           return;
         }
       }
@@ -188,7 +193,7 @@ export function useKeyboard() {
           const layerDown = getNodesAtDepth(tree, depthDown, collapsedNodes);
           const idxDown = layerDown.findIndex(s => s.node.id === selectedNodeId);
           if (idxDown < layerDown.length - 1) {
-            selectNode(layerDown[idxDown + 1].node.id);
+            useTreeStore.getState().selectNode(layerDown[idxDown + 1].node.id);
           }
           break;
         }
@@ -201,7 +206,7 @@ export function useKeyboard() {
           const layerUp = getNodesAtDepth(tree, depthUp, collapsedNodes);
           const idxUp = layerUp.findIndex(s => s.node.id === selectedNodeId);
           if (idxUp > 0) {
-            selectNode(layerUp[idxUp - 1].node.id);
+            useTreeStore.getState().selectNode(layerUp[idxUp - 1].node.id);
           }
           break;
         }
@@ -212,9 +217,9 @@ export function useKeyboard() {
           const nodeR = findNodeInTree(tree, selectedNodeId);
           if (nodeR && nodeR.children.length > 0) {
             if (collapsedNodes.has(selectedNodeId)) {
-              toggleCollapse(selectedNodeId);
+              useUIStore.getState().toggleCollapse(selectedNodeId);
             } else {
-              selectNode(nodeR.children[0].node.id);
+              useTreeStore.getState().selectNode(nodeR.children[0].node.id);
             }
           }
           break;
@@ -224,7 +229,7 @@ export function useKeyboard() {
           if (!selectedNodeId) break;
           const nodeZ = findNodeInTree(tree, selectedNodeId);
           if (nodeZ && nodeZ.children.length > 0) {
-            toggleCollapse(selectedNodeId);
+            useUIStore.getState().toggleCollapse(selectedNodeId);
           }
           break;
         }
@@ -233,7 +238,7 @@ export function useKeyboard() {
           e.preventDefault();
           if (!selectedNodeId) break;
           const parent = findParentInTree(tree, selectedNodeId);
-          if (parent) selectNode(parent.node.id);
+          if (parent) useTreeStore.getState().selectNode(parent.node.id);
           break;
         }
         case "Enter": {
@@ -242,9 +247,9 @@ export function useKeyboard() {
           if (compactLocked) { useUIStore.getState().flashCompactBanner(); break; }
           const selectedNode = findNodeInTree(tree, selectedNodeId);
           if (selectedNode && selectedNode.node.node_type === NodeTypes.MARKDOWN) {
-            openMarkdownEditor(selectedNodeId);
+            useUIStore.getState().openMarkdownEditor(selectedNodeId);
           } else {
-            setEditingNode(selectedNodeId);
+            useUIStore.getState().setEditingNode(selectedNodeId);
           }
           break;
         }
@@ -253,9 +258,9 @@ export function useKeyboard() {
           if (!selectedNodeId) break;
           if (compactLocked) { useUIStore.getState().flashCompactBanner(); break; }
           if (e.shiftKey) {
-            addSibling(selectedNodeId, currentContextId);
+            useTreeStore.getState().addSibling(selectedNodeId, currentContextId);
           } else {
-            addChild(selectedNodeId, currentContextId);
+            useTreeStore.getState().addChild(selectedNodeId, currentContextId);
           }
           break;
         }
@@ -263,14 +268,14 @@ export function useKeyboard() {
           e.preventDefault();
           if (!selectedNodeId) break;
           if (compactLocked) { useUIStore.getState().flashCompactBanner(); break; }
-          openOrAttachFile(selectedNodeId);
+          useTreeStore.getState().openOrAttachFile(selectedNodeId);
           break;
         }
         case "t": {
           e.preventDefault();
           if (!selectedNodeId) break;
           if (compactLocked) { useUIStore.getState().flashCompactBanner(); break; }
-          openTypePopover(selectedNodeId);
+          useUIStore.getState().openTypePopover(selectedNodeId);
           break;
         }
         case "Backspace":
@@ -278,15 +283,16 @@ export function useKeyboard() {
           if (!selectedNodeId || selectedNodeId === tree.node.id) break;
           if (compactLocked) { useUIStore.getState().flashCompactBanner(); break; }
           e.preventDefault();
-          deleteNode(selectedNodeId, currentContextId);
+          useTreeStore.getState().deleteNode(selectedNodeId, currentContextId);
           break;
         }
       }
     }
 
     function handlePaste(e: ClipboardEvent) {
-      if (useUIStore.getState().aiSettingsOpen) return;
-      if (quickSwitcherOpen || nodeSearchOpen || editingNodeId || typePopoverNodeId || contentPanelFocused || contextMenuNodeId) return;
+      const ui = useUIStore.getState();
+      if (ui.aiSettingsOpen) return;
+      if (ui.quickSwitcherOpen || ui.nodeSearchOpen || ui.editingNodeId || ui.typePopoverNodeId || ui.contentPanelFocused || ui.contextMenuNodeId) return;
       if (!tree || !currentContextId || !selectedNodeId) return;
       // Block paste on nodes outside compact subtree
       const { compactState: pCS, compactRootId: pCR } = useUIStore.getState();
@@ -308,7 +314,7 @@ export function useKeyboard() {
             if (!blob) continue;
             e.preventDefault();
             const ext = item.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
-            pasteAsNode(selectedNodeId, currentContextId, { kind: PasteKind.IMAGE, blob, ext });
+            useTreeStore.getState().pasteAsNode(selectedNodeId, currentContextId, { kind: PasteKind.IMAGE, blob, ext });
             return;
           }
         }
@@ -325,10 +331,10 @@ export function useKeyboard() {
                 // Internal node copy → clone subtree
                 const sourceId = text.replace("mindflow:node:", "");
                 if (sourceId) {
-                  pasteNodeUnder(selectedNodeId!, currentContextId!);
+                  useTreeStore.getState().pasteNodeUnder(selectedNodeId!, currentContextId!);
                 }
               } else if (text.trim()) {
-                pasteAsNode(selectedNodeId!, currentContextId!, { kind: PasteKind.TEXT, text });
+                useTreeStore.getState().pasteAsNode(selectedNodeId!, currentContextId!, { kind: PasteKind.TEXT, text });
               }
             });
             return;
@@ -343,6 +349,5 @@ export function useKeyboard() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("paste", handlePaste);
     };
-  }, [tree, selectedNodeId, copiedNodeId, isCut, currentContextId, quickSwitcherOpen, nodeSearchOpen, editingNodeId, typePopoverNodeId, contentPanelFocused, markdownEditorNodeId, contextMenuNodeId, collapsedNodes,
-      openQuickSwitcher, openNodeSearch, selectNode, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, setEditingNode, openTypePopover, pasteAsNode, openOrAttachFile, reorderNode, dragMoveNode, undo, openMarkdownEditor, closeMarkdownEditor, closeContextMenu, toggleCollapse]);
+  }, [tree, selectedNodeId, copiedNodeId, isCut, currentContextId, collapsedNodes]);
 }

@@ -173,6 +173,9 @@ export function QuickSwitcher() {
       <div
         ref={panelRef}
         tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Quick Switcher"
         className="relative w-[480px] bg-bg-elevated rounded-2xl overflow-hidden flex flex-col max-h-[520px] outline-none"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
@@ -184,6 +187,9 @@ export function QuickSwitcher() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search..."
+            aria-autocomplete="list"
+            aria-controls="qs-list"
+            aria-activedescendant={allItems[selectedIndex] ? `qs-item-${selectedIndex}` : undefined}
             className="flex-1 bg-transparent text-[13px] text-text-primary placeholder:text-text-secondary outline-none font-mono"
           />
           <span className="text-[10px] text-text-secondary bg-bg-elevated px-2 py-1 rounded">
@@ -192,7 +198,7 @@ export function QuickSwitcher() {
         </div>
 
         {/* List */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto" role="listbox" id="qs-list">
           {active.length > 0 && (
             <>
               <div className="px-4 pt-3 pb-1.5">
@@ -206,6 +212,9 @@ export function QuickSwitcher() {
                 return (
                   <div
                     key={ctx.id}
+                    role="option"
+                    id={`qs-item-${idx}`}
+                    aria-selected={idx === selectedIndex}
                     className={cn(
                       "group/row flex items-center px-4 py-2.5 cursor-pointer",
                       idx === selectedIndex && "bg-[var(--color-hover)]",
@@ -252,6 +261,9 @@ export function QuickSwitcher() {
                 return (
                   <div
                     key={ctx.id}
+                    role="option"
+                    id={`qs-item-${idx}`}
+                    aria-selected={idx === selectedIndex}
                     className={cn(
                       "group/row flex items-center px-4 py-2.5 cursor-pointer",
                       idx === selectedIndex && "bg-[var(--color-hover)]",
