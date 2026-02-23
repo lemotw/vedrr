@@ -67,12 +67,25 @@ export interface CompactSummary {
   deletedNames: string[];
 }
 
-export interface AiProfile {
+export interface ModelInfo {
+  id: string;
+  name: string;
+}
+
+export interface ApiKey {
   id: string;
   name: string;
   provider: string;
+  created_at: string;
+}
+
+export interface AiProfile {
+  id: string;
+  name: string;
+  api_key_id: string | null;
+  api_key_name: string | null;
+  provider: string;
   model: string;
-  has_api_key: boolean;
   created_at: string;
 }
 
