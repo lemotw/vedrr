@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useUIStore } from "../stores/uiStore";
 import { useTreeStore } from "../stores/treeStore";
 import type { TreeData, TreeNode } from "../lib/types";
@@ -11,17 +12,18 @@ interface FlatNode {
   path: string; // breadcrumb path (excluding root)
 }
 
-function flattenTree(tree: TreeData, ancestors: string[] = []): FlatNode[] {
+function flattenTree(tree: TreeData, untitledLabel: string, ancestors: string[] = []): FlatNode[] {
   const result: FlatNode[] = [];
   const path = ancestors.length > 0 ? ancestors.join(" › ") : "";
   result.push({ node: tree.node, path });
   for (const child of tree.children) {
-    result.push(...flattenTree(child, [...ancestors, tree.node.title || "Untitled"]));
+    result.push(...flattenTree(child, untitledLabel, [...ancestors, tree.node.title || untitledLabel]));
   }
   return result;
 }
 
 export function NodeSearch() {
+  const { t } = useTranslation();
   const { nodeSearchOpen, closeNodeSearch } = useUIStore();
   const { tree, selectNode } = useTreeStore();
   const [query, setQuery] = useState("");
@@ -32,8 +34,8 @@ export function NodeSearch() {
   // Flatten tree once
   const allNodes = useMemo(() => {
     if (!tree) return [];
-    return flattenTree(tree);
-  }, [tree]);
+    return flattenTree(tree, t("common.untitled"));
+  }, [tree, t]);
 
   // Filter by query
   const results = useMemo(() => {
@@ -104,7 +106,7 @@ export function NodeSearch() {
           <input
             ref={inputRef}
             className="flex-1 bg-transparent text-text-primary font-mono text-[13px] outline-none placeholder:text-text-secondary"
-            placeholder="搜尋節點..."
+            placeholder={t("nodeSearch.placeholder")}
             value={query}
             onChange={e => { setQuery(e.target.value); setSelectedIdx(0); }}
             onKeyDown={handleKeyDown}
@@ -115,7 +117,7 @@ export function NodeSearch() {
         {/* Results */}
         <div ref={listRef} className="flex-1 overflow-y-auto">
           {query.trim() && results.length === 0 && (
-            <div className="px-4 py-8 text-center text-text-secondary font-mono text-xs">找不到符合的節點</div>
+            <div className="px-4 py-8 text-center text-text-secondary font-mono text-xs">{t("nodeSearch.empty")}</div>
           )}
           {results.map((item, idx) => {
             const cfg = NODE_TYPE_CONFIG[item.node.node_type];
@@ -137,7 +139,7 @@ export function NodeSearch() {
                     {cfg?.letter}
                   </span>
                   <span className={cn("font-mono text-[13px] text-text-primary", idx === selectedIdx && "font-semibold")}>
-                    {item.node.title || "Untitled"}
+                    {item.node.title || t("common.untitled")}
                   </span>
                 </div>
                 {item.path && (
@@ -150,7 +152,7 @@ export function NodeSearch() {
 
         {/* Footer */}
         <div className="flex items-center h-10 px-4 bg-bg-card shrink-0">
-          <span className="font-mono text-[10px] text-text-secondary">↑↓ 選擇  Enter 跳轉  Esc 關閉</span>
+          <span className="font-mono text-[10px] text-text-secondary">{t("nodeSearch.footer")}</span>
         </div>
       </div>
     </div>

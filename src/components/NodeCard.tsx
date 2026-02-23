@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { TreeNode, NodeType, CompactHighlightInfo } from "../lib/types";
 import { NODE_TYPE_CONFIG } from "../lib/types";
 import { NodeTypes, imageMime } from "../lib/constants";
@@ -84,6 +85,7 @@ function useNodeEdit(
 }
 
 function RootNodeHeading({ node, isSelected, isCutNode, isDropTarget, dimmed, onClick }: Props) {
+  const { t } = useTranslation();
   const updateNodeTitle = useTreeStore(s => s.updateNodeTitle);
   const editingNodeId = useUIStore(s => s.editingNodeId);
   const setEditingNode = useUIStore(s => s.setEditingNode);
@@ -119,7 +121,7 @@ function RootNodeHeading({ node, isSelected, isCutNode, isDropTarget, dimmed, on
         />
       ) : (
         <span className="font-heading text-[28px] font-bold text-text-primary">
-          {node.title || "Untitled"}
+          {node.title || t("common.untitled")}
         </span>
       )}
     </div>
@@ -127,6 +129,7 @@ function RootNodeHeading({ node, isSelected, isCutNode, isDropTarget, dimmed, on
 }
 
 function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, compactHighlight, compactFading, dimmed, onClick, dragHandleListeners }: Props) {
+  const { t } = useTranslation();
   const { letter, color } = NODE_TYPE_CONFIG[node.node_type as NodeType];
   const updateNodeTitle = useTreeStore(s => s.updateNodeTitle);
   const openOrAttachFile = useTreeStore(s => s.openOrAttachFile);
@@ -220,7 +223,7 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, compactHighli
           <div
             className="flex items-center justify-center w-5 h-5 rounded bg-bg-elevated shrink-0 cursor-pointer hover:ring-1 hover:ring-border"
             onClick={(e) => { e.stopPropagation(); openTypePopover(node.id); }}
-            title="Change type (T)"
+            title={t("nodeCard.tooltip.changeType")}
           >
             <span className="text-[10px] font-bold font-mono" style={{ color }}>
               {letter}
@@ -238,7 +241,7 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, compactHighli
           ) : (
             <div className="flex flex-col">
               <span className="text-[13px] text-text-primary">
-                {node.title || "Untitled"}
+                {node.title || t("common.untitled")}
               </span>
               {compactHighlight?.oldTitle && (
                 <span className="text-[10px]" style={{ color: HIGHLIGHT_COLORS[compactHighlight.type]?.text }}>
@@ -257,9 +260,9 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, compactHighli
               className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 cursor-pointer
                 bg-bg-elevated text-text-secondary hover:text-text-primary hover:ring-1 hover:ring-border transition-colors"
               onClick={(e) => { e.stopPropagation(); openOrAttachFile(node.id); }}
-              title={node.file_path ? "Reveal in Finder (O)" : "Attach file (O)"}
+              title={node.file_path ? t("nodeCard.tooltip.revealFile") : t("nodeCard.tooltip.attachFile")}
             >
-              {node.file_path ? "open" : "attach"}
+              {node.file_path ? t("nodeCard.button.open") : t("nodeCard.button.attach")}
             </button>
           )}
           {node.node_type === NodeTypes.IMAGE && !node.file_path && (
@@ -267,9 +270,9 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, compactHighli
               className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 cursor-pointer
                 bg-bg-elevated text-text-secondary hover:text-text-primary hover:ring-1 hover:ring-border transition-colors"
               onClick={(e) => { e.stopPropagation(); pickAndImportImage(node.id); }}
-              title="Choose image"
+              title={t("nodeCard.tooltip.chooseImage")}
             >
-              pick
+              {t("nodeCard.button.pick")}
             </button>
           )}
         </div>

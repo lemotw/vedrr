@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, memo } from "react";
+import { useTranslation } from "react-i18next";
 import type { TreeData } from "../lib/types";
 import { NODE_TYPE_CONFIG } from "../lib/types";
 import { useContextStore } from "../stores/contextStore";
@@ -145,6 +146,7 @@ const TreeBranch = memo(function TreeBranch({
   compactNodeIds?: Set<string> | null;
   dragHandleListeners?: ReturnType<typeof useSortable>["listeners"];
 }) {
+  const { t } = useTranslation();
   const selectedNodeId = useTreeStore(s => s.selectedNodeId);
   const selectNode = useTreeStore(s => s.selectNode);
   const addChild = useTreeStore(s => s.addChild);
@@ -204,7 +206,7 @@ const TreeBranch = memo(function TreeBranch({
               : "opacity-0 group-hover/node:opacity-100 mx-1"
             }
             onClick={() => addChild(data.node.id, currentContextId)}
-            title="Add child (Tab)"
+            title={t("treeCanvas.tooltip.addChild")}
           />
         )}
         {hasChildren && (
@@ -220,7 +222,7 @@ const TreeBranch = memo(function TreeBranch({
         <button
           className="flex items-center gap-1 px-1 self-center cursor-pointer hover:opacity-80 transition-opacity"
           onClick={() => toggleCollapse(data.node.id)}
-          title="Expand (z)"
+          title={t("treeCanvas.tooltip.expand")}
         >
           {data.children.map((child) => (
             <span
@@ -259,7 +261,7 @@ const TreeBranch = memo(function TreeBranch({
                   const lastChild = data.children[data.children.length - 1];
                   addSibling(lastChild.node.id, currentContextId);
                 }}
-                title="Add sibling (Shift+Tab)"
+                title={t("treeCanvas.tooltip.addSibling")}
               />
             </div>
           )}

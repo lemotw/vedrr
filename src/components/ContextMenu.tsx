@@ -1,4 +1,5 @@
 import { useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useUIStore } from "../stores/uiStore";
 import { useTreeStore } from "../stores/treeStore";
 import { useContextStore } from "../stores/contextStore";
@@ -8,6 +9,7 @@ import { cn } from "../lib/cn";
 import { modSymbol } from "../lib/platform";
 
 interface MenuItem {
+  key: string;
   label: string;
   shortcut: string;
   icon: string;
@@ -33,6 +35,7 @@ function copyTreeToClipboard(tree: TreeData) {
 }
 
 export function ContextMenu() {
+  const { t } = useTranslation();
   const { contextMenuNodeId, contextMenuPosition, closeContextMenu, setEditingNode, openTypePopover, openMarkdownEditor, collapsedNodes, toggleCollapse } = useUIStore();
   const { tree, copiedNodeId, copyNode, cutNode, pasteNodeUnder, addChild, addSibling, deleteNode, reorderNode } = useTreeStore();
   const { currentContextId } = useContextStore();
@@ -72,7 +75,8 @@ export function ContextMenu() {
 
   const items: MenuEntry[] = [
     {
-      label: "Edit",
+      key: "edit",
+      label: t("contextMenu.edit"),
       shortcut: "Enter",
       icon: "✎",
       action: () => exec(() => {
@@ -82,21 +86,24 @@ export function ContextMenu() {
       disabled: compactLocked,
     },
     {
-      label: "Change Type",
+      key: "changeType",
+      label: t("contextMenu.changeType"),
       shortcut: "T",
       icon: "◆",
       action: () => exec(() => openTypePopover(contextMenuNodeId)),
       disabled: compactLocked,
     },
     {
-      label: isNodeCollapsed ? "Expand" : "Collapse",
+      key: "expandCollapse",
+      label: isNodeCollapsed ? t("contextMenu.expand") : t("contextMenu.collapse"),
       shortcut: "Z",
       icon: isNodeCollapsed ? "▸" : "▾",
       action: () => exec(() => toggleCollapse(contextMenuNodeId)),
       disabled: !hasChildren,
     },
     {
-      label: "Copy as Markdown",
+      key: "copyMarkdown",
+      label: t("contextMenu.copyMarkdown"),
       shortcut: "",
       icon: "📋",
       action: () => exec(() => {
@@ -106,14 +113,16 @@ export function ContextMenu() {
     },
     "separator",
     {
-      label: "Add Child",
+      key: "addChild",
+      label: t("contextMenu.addChild"),
       shortcut: "Tab",
       icon: "↳",
       action: () => exec(() => addChild(contextMenuNodeId, currentContextId)),
       disabled: compactLocked,
     },
     {
-      label: "Add Sibling",
+      key: "addSibling",
+      label: t("contextMenu.addSibling"),
       shortcut: "⇧Tab",
       icon: "↵",
       action: () => exec(() => addSibling(contextMenuNodeId, currentContextId)),
@@ -121,27 +130,30 @@ export function ContextMenu() {
     },
     "separator",
     {
-      label: "Copy",
+      key: "copy",
+      label: t("contextMenu.copy"),
       shortcut: `${modSymbol}C`,
       icon: "⧉",
       action: () => exec(() => {
         copyNode(contextMenuNodeId);
-        navigator.clipboard.writeText("mindflow:node:" + contextMenuNodeId);
+        navigator.clipboard.writeText("vedrr:node:" + contextMenuNodeId);
       }),
       disabled: isRoot,
     },
     {
-      label: "Cut",
+      key: "cut",
+      label: t("contextMenu.cut"),
       shortcut: `${modSymbol}X`,
       icon: "✂",
       action: () => exec(() => {
         cutNode(contextMenuNodeId);
-        navigator.clipboard.writeText("mindflow:node:" + contextMenuNodeId);
+        navigator.clipboard.writeText("vedrr:node:" + contextMenuNodeId);
       }),
       disabled: isRoot || compactLocked,
     },
     {
-      label: "Paste",
+      key: "paste",
+      label: t("contextMenu.paste"),
       shortcut: `${modSymbol}V`,
       icon: "⎘",
       action: () => exec(() => pasteNodeUnder(contextMenuNodeId, currentContextId)),
@@ -149,28 +161,32 @@ export function ContextMenu() {
     },
     "separator",
     {
-      label: "Move Up",
+      key: "moveUp",
+      label: t("contextMenu.moveUp"),
       shortcut: "Alt+↑",
       icon: "↑",
       action: () => exec(() => reorderNode(contextMenuNodeId, "up", currentContextId)),
       disabled: isRoot || compactLocked,
     },
     {
-      label: "Move Down",
+      key: "moveDown",
+      label: t("contextMenu.moveDown"),
       shortcut: "Alt+↓",
       icon: "↓",
       action: () => exec(() => reorderNode(contextMenuNodeId, "down", currentContextId)),
       disabled: isRoot || compactLocked,
     },
     {
-      label: "AI Compact",
+      key: "aiCompact",
+      label: t("contextMenu.aiCompact"),
       shortcut: "",
       icon: "⚡",
       action: () => exec(() => useTreeStore.getState().triggerCompact(contextMenuNodeId)),
     },
     "separator",
     {
-      label: "Delete",
+      key: "delete",
+      label: t("contextMenu.delete"),
       shortcut: "Del",
       icon: "✕",
       action: () => exec(() => deleteNode(contextMenuNodeId, currentContextId)),
@@ -183,7 +199,7 @@ export function ContextMenu() {
   const filtered = items.filter((item) => {
     if (item === "separator") return true;
     if (!isRoot && item.rootOnly) return false;
-    if (isRoot && (item.label === "Add Sibling" || item.label === "Copy" || item.label === "Cut" || item.label === "Move Up" || item.label === "Move Down" || item.label === "Delete")) return false;
+    if (isRoot && ["addSibling", "copy", "cut", "moveUp", "moveDown", "delete"].includes(item.key)) return false;
     return true;
   });
 
@@ -218,7 +234,7 @@ export function ContextMenu() {
             <div key={`sep-${i}`} className="h-px bg-border my-1 mx-2" />
           ) : (
             <button
-              key={item.label}
+              key={item.key}
               className={cn(
                 "flex items-center w-full px-3 py-1.5 text-left gap-3 transition-colors cursor-pointer",
                 item.disabled ? "opacity-40 pointer-events-none" : "hover:bg-[var(--color-hover)]",

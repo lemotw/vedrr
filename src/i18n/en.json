@@ -39,6 +39,47 @@
       "deleteMessage": "Permanently delete \"{{name}}\"? This cannot be undone."
     }
   },
+  "contextMenu": {
+    "edit": "Edit",
+    "changeType": "Change Type",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "copyMarkdown": "Copy as Markdown",
+    "addChild": "Add Child",
+    "addSibling": "Add Sibling",
+    "copy": "Copy",
+    "cut": "Cut",
+    "paste": "Paste",
+    "moveUp": "Move Up",
+    "moveDown": "Move Down",
+    "aiCompact": "AI Compact",
+    "delete": "Delete"
+  },
+  "nodeCard": {
+    "tooltip": {
+      "changeType": "Change type (T)",
+      "revealFile": "Reveal in Finder (O)",
+      "attachFile": "Attach file (O)",
+      "chooseImage": "Choose image"
+    },
+    "button": {
+      "open": "open",
+      "attach": "attach",
+      "pick": "pick"
+    }
+  },
+  "treeCanvas": {
+    "tooltip": {
+      "addChild": "Add child (Tab)",
+      "addSibling": "Add sibling (Shift+Tab)",
+      "expand": "Expand (z)"
+    }
+  },
+  "nodeSearch": {
+    "placeholder": "Search nodes...",
+    "empty": "No matching nodes",
+    "footer": "↑↓ Select  Enter Go  Esc Close"
+  },
   "settings": {
     "title": "Settings",
     "tab": {
