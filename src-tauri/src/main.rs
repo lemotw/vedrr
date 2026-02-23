@@ -21,6 +21,7 @@ fn main() {
 
     let http_client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(60))
+        .user_agent("MindFlow/0.1.0")
         .build()
         .expect("Failed to build HTTP client");
 
@@ -53,6 +54,12 @@ fn main() {
             commands::ai::create_ai_profile,
             commands::ai::delete_ai_profile,
             commands::ai::compact_node,
+            commands::ai::create_api_key,
+            commands::ai::list_api_keys,
+            commands::ai::delete_api_key,
+            commands::ai::get_system_prompt,
+            commands::ai::set_system_prompt,
+            commands::ai::list_models,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

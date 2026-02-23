@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Context, ContextSummary, TreeData, TreeNode, CompactResult, AiProfile } from "./types";
+import type { Context, ContextSummary, TreeData, TreeNode, CompactResult, AiProfile, ApiKey, ModelInfo } from "./types";
 import { IpcCmd } from "./constants";
 
 async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -81,12 +81,30 @@ export const ipc = {
   listAiProfiles: () =>
     safeInvoke<AiProfile[]>(IpcCmd.LIST_AI_PROFILES),
 
-  createAiProfile: (name: string, provider: string, model: string, apiKey: string) =>
-    safeInvoke<AiProfile>(IpcCmd.CREATE_AI_PROFILE, { name, provider, model, apiKey }),
+  createAiProfile: (name: string, apiKeyId: string, model: string) =>
+    safeInvoke<AiProfile>(IpcCmd.CREATE_AI_PROFILE, { name, apiKeyId, model }),
 
   deleteAiProfile: (id: string) =>
     safeInvoke<void>(IpcCmd.DELETE_AI_PROFILE, { id }),
 
   compactNode: (nodeId: string, profileId: string) =>
     safeInvoke<CompactResult>(IpcCmd.COMPACT_NODE, { nodeId, profileId }),
+
+  createApiKey: (name: string, provider: string, apiKey: string) =>
+    safeInvoke<ApiKey>(IpcCmd.CREATE_API_KEY, { name, provider, apiKey }),
+
+  listApiKeys: () =>
+    safeInvoke<ApiKey[]>(IpcCmd.LIST_API_KEYS),
+
+  deleteApiKey: (id: string) =>
+    safeInvoke<void>(IpcCmd.DELETE_API_KEY, { id }),
+
+  getSystemPrompt: () =>
+    safeInvoke<string>(IpcCmd.GET_SYSTEM_PROMPT),
+
+  setSystemPrompt: (prompt: string) =>
+    safeInvoke<void>(IpcCmd.SET_SYSTEM_PROMPT, { prompt }),
+
+  listModels: (apiKeyId: string) =>
+    safeInvoke<ModelInfo[]>(IpcCmd.LIST_MODELS, { apiKeyId }),
 };

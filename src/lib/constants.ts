@@ -40,6 +40,12 @@ export const IpcCmd = {
   CREATE_AI_PROFILE: "create_ai_profile",
   DELETE_AI_PROFILE: "delete_ai_profile",
   COMPACT_NODE: "compact_node",
+  CREATE_API_KEY: "create_api_key",
+  LIST_API_KEYS: "list_api_keys",
+  DELETE_API_KEY: "delete_api_key",
+  GET_SYSTEM_PROMPT: "get_system_prompt",
+  SET_SYSTEM_PROMPT: "set_system_prompt",
+  LIST_MODELS: "list_models",
 } as const;
 
 // ── Themes ─────────────────────────────────────────────────

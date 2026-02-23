@@ -43,13 +43,28 @@ pub struct TreeData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AiProfile {
+pub struct ApiKey {
     pub id: String,
     pub name: String,
     pub provider: String,
-    pub model: String,
-    pub has_api_key: bool,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiProfile {
+    pub id: String,
+    pub name: String,
+    pub api_key_id: Option<String>,
+    pub api_key_name: Option<String>,
+    pub provider: String,
+    pub model: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelInfo {
+    pub id: String,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,3 +81,4 @@ pub struct CompactResult {
     pub original: TreeData,
     pub proposed: Vec<ProposedNode>,
 }
+

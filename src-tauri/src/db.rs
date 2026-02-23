@@ -49,6 +49,13 @@ pub fn init_db(conn: &Connection) -> Result<(), MindFlowError> {
             value TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            provider TEXT NOT NULL CHECK (provider IN ('anthropic', 'openai', 'gemini')),
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
         CREATE TABLE IF NOT EXISTS ai_profiles (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
@@ -56,7 +63,20 @@ pub fn init_db(conn: &Connection) -> Result<(), MindFlowError> {
             model TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS model_cache (
+            provider TEXT PRIMARY KEY,
+            models_json TEXT NOT NULL,
+            cached_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
     ",
     )?;
+
+    // Migration: add api_key_id column to ai_profiles (idempotent — fails silently if exists)
+    let _ = conn.execute(
+        "ALTER TABLE ai_profiles ADD COLUMN api_key_id TEXT REFERENCES api_keys(id) ON DELETE SET NULL",
+        [],
+    );
+
     Ok(())
 }
