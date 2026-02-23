@@ -72,9 +72,7 @@ function AITab() {
     }
   }, []);
 
-  useEffect(() => {
-    ipc.listApiKeys().then(setApiKeys).catch((e) => console.error("[settings] load api keys failed:", e));
-  }, []);
+  useEffect(() => { loadApiKeys(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div>
@@ -126,7 +124,7 @@ export function SettingsPanel() {
         role="dialog"
         aria-modal="true"
         aria-label="Settings"
-        className="flex h-[520px] w-[600px] flex-col rounded-xl border border-border bg-bg-elevated shadow-2xl outline-none"
+        className="flex h-[520px] max-h-[80vh] w-[600px] flex-col rounded-xl border border-border bg-bg-elevated shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
