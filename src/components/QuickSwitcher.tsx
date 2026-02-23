@@ -229,19 +229,27 @@ export function QuickSwitcher() {
                       </span>
                       <span className="text-[13px] text-text-primary font-mono truncate">{ctx.name}</span>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span className="text-[10px] text-text-secondary font-mono">
-                        {ctx.node_count}n · {timeAgo(ctx.last_accessed_at)}
-                      </span>
+                    <div className="flex items-center gap-1 shrink-0 mx-2">
                       <button
                         className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
                           text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)] transition-all cursor-pointer"
                         onClick={(e) => handleArchive(e, ctx)}
                         title="Archive"
                       >
-                        📦
+                        Archive
+                      </button>
+                      <button
+                        className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
+                          text-text-secondary hover:text-[#FF4444] hover:bg-[var(--color-hover)] transition-all cursor-pointer"
+                        onClick={(e) => handleDelete(e, ctx)}
+                        title="Delete"
+                      >
+                        Delete
                       </button>
                     </div>
+                    <span className="text-[10px] text-text-secondary font-mono shrink-0">
+                      {ctx.node_count}n · {timeAgo(ctx.last_accessed_at)}
+                    </span>
                   </div>
                 );
               })}
@@ -275,17 +283,14 @@ export function QuickSwitcher() {
                       <span className="text-[10px] text-text-secondary shrink-0">○</span>
                       <span className="text-[13px] text-text-secondary font-mono truncate">{ctx.name}</span>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span className="text-[10px] text-text-secondary font-mono">
-                        {ctx.node_count}n · {timeAgo(ctx.last_accessed_at)}
-                      </span>
+                    <div className="flex items-center gap-1 shrink-0 mx-2">
                       <button
                         className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
                           text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)] transition-all cursor-pointer"
                         onClick={(e) => handleActivate(e, ctx)}
                         title="Activate"
                       >
-                        ↩
+                        Restore
                       </button>
                       <button
                         className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
@@ -293,9 +298,12 @@ export function QuickSwitcher() {
                         onClick={(e) => handleDelete(e, ctx)}
                         title="Delete"
                       >
-                        ✕
+                        Delete
                       </button>
                     </div>
+                    <span className="text-[10px] text-text-secondary font-mono shrink-0">
+                      {ctx.node_count}n · {timeAgo(ctx.last_accessed_at)}
+                    </span>
                   </div>
                 );
               })}
