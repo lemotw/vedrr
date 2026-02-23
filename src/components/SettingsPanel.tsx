@@ -21,7 +21,7 @@ const LOCALES = [
 ];
 
 function detectLocale(): string {
-  const saved = localStorage.getItem("mindflow-locale");
+  const saved = localStorage.getItem("vedrr-locale");
   if (saved) return saved;
   return navigator.language.startsWith("zh") ? "zh-TW" : "en";
 }
@@ -34,7 +34,7 @@ function GeneralTab() {
 
   const handleChange = (value: string) => {
     setLocale(value);
-    localStorage.setItem("mindflow-locale", value);
+    localStorage.setItem("vedrr-locale", value);
     i18n.changeLanguage(value);
   };
 
@@ -176,7 +176,7 @@ export function SettingsPanel() {
         {/* Footer */}
         <div className="border-t border-border px-6 py-3">
           <p className="font-mono text-[10px] text-text-secondary">
-            MindFlow v0.1.0
+            vedrr v0.1.0
           </p>
         </div>
       </div>

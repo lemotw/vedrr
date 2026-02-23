@@ -1,8 +1,8 @@
-use crate::error::MindFlowError;
+use crate::error::AppError;
 use std::path::Path;
 
 #[tauri::command]
-pub fn read_file_bytes(file_path: String) -> Result<Vec<u8>, MindFlowError> {
+pub fn read_file_bytes(file_path: String) -> Result<Vec<u8>, AppError> {
     Ok(std::fs::read(&file_path)?)
 }
 
@@ -12,10 +12,10 @@ pub fn save_clipboard_image(
     node_id: String,
     data: Vec<u8>,
     extension: String,
-) -> Result<String, MindFlowError> {
+) -> Result<String, AppError> {
     let dest_dir = dirs::home_dir()
         .unwrap()
-        .join("MindFlow/files")
+        .join("vedrr/files")
         .join(&context_id);
     std::fs::create_dir_all(&dest_dir)?;
 
@@ -32,7 +32,7 @@ pub fn import_image(
     context_id: String,
     node_id: String,
     source_path: String,
-) -> Result<String, MindFlowError> {
+) -> Result<String, AppError> {
     let src = Path::new(&source_path);
     let extension = src
         .extension()
@@ -41,7 +41,7 @@ pub fn import_image(
 
     let dest_dir = dirs::home_dir()
         .unwrap()
-        .join("MindFlow/files")
+        .join("vedrr/files")
         .join(&context_id);
     std::fs::create_dir_all(&dest_dir)?;
 

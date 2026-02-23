@@ -1,4 +1,4 @@
-# Mind Flow — CLAUDE.md
+# vedrr — CLAUDE.md
 
 ## Project Overview
 
@@ -33,7 +33,7 @@ User Action → useKeyboard / Component
        ↓
  Tauri invoke → Rust Command
        ↓
- SQLite (~/MindFlow/data/mindflow.db)
+ SQLite (~/vedrr/data/vedrr.db)
 ```
 
 ## File Structure
@@ -61,9 +61,9 @@ src/
 
 src-tauri/src/
 ├── main.rs                     # Tauri entry, AppState { db: Mutex<Connection> }
-├── db.rs                       # DB path (~MindFlow/data/mindflow.db), schema init, WAL mode
+├── db.rs                       # DB path (~vedrr/data/vedrr.db), schema init, WAL mode
 ├── models.rs                   # Rust structs: Context, ContextSummary, TreeNode, TreeData
-├── error.rs                    # MindFlowError enum + Serialize for IPC
+├── error.rs                    # AppError enum + Serialize for IPC
 └── commands/
     ├── context.rs              # create/list/switch/archive/activate/rename/delete
     ├── node.rs                 # get_tree/create_node/update_node/delete_node/move_node
@@ -112,8 +112,8 @@ tree_nodes (id, context_id → contexts, parent_id → self, position, node_type
 
 ## File Storage
 
-- DB: `~/MindFlow/data/mindflow.db`
-- Images: `~/MindFlow/files/{context_id}/{node_id_prefix}.{ext}`
+- DB: `~/vedrr/data/vedrr.db`
+- Images: `~/vedrr/files/{context_id}/{node_id_prefix}.{ext}`
 
 ## Constants & Enums
 
@@ -158,4 +158,4 @@ All string enums are centralized in `src/lib/constants.ts`:
 ### State Management
 
 - **Markdown editor**: Explicit open/close via `uiStore.openMarkdownEditor(nodeId)` / `closeMarkdownEditor()`. Auto-closes when `treeStore.selectNode` switches to a different node.
-- **Image import**: `import_image` Rust command copies file into `~/MindFlow/files/` so originals can be deleted safely. Frontend `pickImage()` restricts to image extensions via `tauri-plugin-dialog` filters.
+- **Image import**: `import_image` Rust command copies file into `~/vedrr/files/` so originals can be deleted safely. Frontend `pickImage()` restricts to image extensions via `tauri-plugin-dialog` filters.

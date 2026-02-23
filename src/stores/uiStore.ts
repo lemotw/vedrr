@@ -5,7 +5,7 @@ import type { CompactHighlightInfo, CompactSummary } from "../lib/types";
 
 function loadCustomColors(): CustomThemeColors {
   try {
-    const raw = localStorage.getItem("mindflow-custom-theme");
+    const raw = localStorage.getItem("vedrr-custom-theme");
     if (raw) return { ...DEFAULT_CUSTOM_COLORS, ...JSON.parse(raw) };
   } catch { /* ignore */ }
   return { ...DEFAULT_CUSTOM_COLORS };
@@ -97,7 +97,7 @@ export const useUIStore = create<UIStore>((set) => ({
   contextMenuNodeId: null,
   contextMenuPosition: null,
   collapsedNodes: new Set<string>(),
-  currentTheme: (localStorage.getItem("mindflow-theme") as ThemeId) || Themes.MOCHA,
+  currentTheme: (localStorage.getItem("vedrr-theme") as ThemeId) || Themes.MOCHA,
   settingsOpen: false,
   customThemeColors: loadCustomColors(),
   compactState: CompactStates.IDLE,
@@ -128,7 +128,7 @@ export const useUIStore = create<UIStore>((set) => ({
     return { collapsedNodes: next };
   }),
   setTheme: (theme) => {
-    localStorage.setItem("mindflow-theme", theme);
+    localStorage.setItem("vedrr-theme", theme);
     clearCustomColors();
     if (theme === Themes.CUSTOM) {
       document.documentElement.setAttribute("data-theme", "custom");
@@ -141,7 +141,7 @@ export const useUIStore = create<UIStore>((set) => ({
   },
   setCustomColor: (key, value) => {
     const colors = { ...useUIStore.getState().customThemeColors, [key]: value };
-    localStorage.setItem("mindflow-custom-theme", JSON.stringify(colors));
+    localStorage.setItem("vedrr-custom-theme", JSON.stringify(colors));
     applyCustomColors(colors);
     set({ customThemeColors: colors });
   },

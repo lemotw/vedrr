@@ -361,7 +361,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       useUIStore.getState().flashCompactBanner();
       return;
     }
-    const profileId = localStorage.getItem("mindflow-active-ai-profile");
+    const profileId = localStorage.getItem("vedrr-active-ai-profile");
     if (!profileId) {
       useUIStore.getState().setCompactError("尚未選擇 AI 設定檔，請先在 AI 設定中建立並選擇。");
       return;

@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::AppState;
-use crate::error::MindFlowError;
+use crate::error::AppError;
 use crate::models::{AiProfile, ApiKey, CompactResult, ModelInfo, ProposedNode, TreeData, TreeNode};
 
 macro_rules! debug_log {
@@ -13,27 +13,27 @@ macro_rules! debug_log {
 
 // ── Keychain ─────────────────────────────────────────────
 
-const KEYRING_SERVICE: &str = "com.mindflow.ai";
+const KEYRING_SERVICE: &str = "com.vedrr.ai";
 
 fn apikey_keyring_account(id: &str) -> String {
     format!("apikey_{id}")
 }
 
-fn set_apikey_secret(id: &str, key: &str) -> Result<(), MindFlowError> {
+fn set_apikey_secret(id: &str, key: &str) -> Result<(), AppError> {
     let entry = keyring::Entry::new(KEYRING_SERVICE, &apikey_keyring_account(id))
-        .map_err(|e| MindFlowError::Other(format!("Keyring error: {e}")))?;
+        .map_err(|e| AppError::Other(format!("Keyring error: {e}")))?;
     entry
         .set_password(key)
-        .map_err(|e| MindFlowError::Other(format!("Keyring set error: {e}")))?;
+        .map_err(|e| AppError::Other(format!("Keyring set error: {e}")))?;
     Ok(())
 }
 
-fn get_apikey_secret(id: &str) -> Result<String, MindFlowError> {
+fn get_apikey_secret(id: &str) -> Result<String, AppError> {
     let entry = keyring::Entry::new(KEYRING_SERVICE, &apikey_keyring_account(id))
-        .map_err(|e| MindFlowError::Other(format!("Keyring error: {e}")))?;
+        .map_err(|e| AppError::Other(format!("Keyring error: {e}")))?;
     entry
         .get_password()
-        .map_err(|e| MindFlowError::Other(format!("No API key secret for {id}: {e}")))
+        .map_err(|e| AppError::Other(format!("No API key secret for {id}: {e}")))
 }
 
 fn delete_apikey_secret(id: &str) {
@@ -43,23 +43,23 @@ fn delete_apikey_secret(id: &str) {
 }
 
 // Migration: old profile-level keychain lookup
-fn get_legacy_profile_secret(profile_id: &str) -> Result<String, MindFlowError> {
+fn get_legacy_profile_secret(profile_id: &str) -> Result<String, AppError> {
     let account = format!("profile_{profile_id}");
     let entry = keyring::Entry::new(KEYRING_SERVICE, &account)
-        .map_err(|e| MindFlowError::Other(format!("Keyring error: {e}")))?;
+        .map_err(|e| AppError::Other(format!("Keyring error: {e}")))?;
     entry
         .get_password()
-        .map_err(|e| MindFlowError::Other(format!("No legacy key for profile {profile_id}: {e}")))
+        .map_err(|e| AppError::Other(format!("No legacy key for profile {profile_id}: {e}")))
 }
 
 // Migration: old provider-level keychain lookup
-fn get_legacy_provider_secret(provider: &str) -> Result<String, MindFlowError> {
+fn get_legacy_provider_secret(provider: &str) -> Result<String, AppError> {
     let account = format!("provider_{provider}");
     let entry = keyring::Entry::new(KEYRING_SERVICE, &account)
-        .map_err(|e| MindFlowError::Other(format!("Keyring error: {e}")))?;
+        .map_err(|e| AppError::Other(format!("Keyring error: {e}")))?;
     entry
         .get_password()
-        .map_err(|e| MindFlowError::Other(format!("No legacy key for provider {provider}: {e}")))
+        .map_err(|e| AppError::Other(format!("No legacy key for provider {provider}: {e}")))
 }
 
 // ── API Key CRUD ────────────────────────────────────────
@@ -70,7 +70,7 @@ pub fn create_api_key(
     name: String,
     provider: String,
     api_key: String,
-) -> Result<ApiKey, MindFlowError> {
+) -> Result<ApiKey, AppError> {
     let id = uuid::Uuid::new_v4().to_string();
     set_apikey_secret(&id, &api_key)?;
 
@@ -92,7 +92,7 @@ pub fn create_api_key(
 #[tauri::command]
 pub fn list_api_keys(
     state: State<'_, AppState>,
-) -> Result<Vec<ApiKey>, MindFlowError> {
+) -> Result<Vec<ApiKey>, AppError> {
     let db = state.db.lock().unwrap();
     let mut stmt = db.prepare(
         "SELECT id, name, provider, created_at FROM api_keys ORDER BY created_at",
@@ -114,7 +114,7 @@ pub fn list_api_keys(
 pub fn delete_api_key(
     state: State<'_, AppState>,
     id: String,
-) -> Result<(), MindFlowError> {
+) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     // Nullify profiles referencing this key
     db.execute(
@@ -131,7 +131,7 @@ pub fn delete_api_key(
 #[tauri::command]
 pub fn list_ai_profiles(
     state: State<'_, AppState>,
-) -> Result<Vec<AiProfile>, MindFlowError> {
+) -> Result<Vec<AiProfile>, AppError> {
     let db = state.db.lock().unwrap();
     let mut stmt = db.prepare(
         "SELECT p.id, p.name, p.api_key_id, k.name, COALESCE(k.provider, p.provider), p.model, p.created_at
@@ -161,7 +161,7 @@ pub fn create_ai_profile(
     name: String,
     api_key_id: String,
     model: String,
-) -> Result<AiProfile, MindFlowError> {
+) -> Result<AiProfile, AppError> {
     let db = state.db.lock().unwrap();
 
     // Look up api_key to get provider
@@ -171,7 +171,7 @@ pub fn create_ai_profile(
             [&api_key_id],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
-        .map_err(|_| MindFlowError::Other("API key not found".into()))?;
+        .map_err(|_| AppError::Other("API key not found".into()))?;
 
     let id = uuid::Uuid::new_v4().to_string();
     db.execute(
@@ -200,7 +200,7 @@ pub fn create_ai_profile(
 pub fn delete_ai_profile(
     state: State<'_, AppState>,
     id: String,
-) -> Result<(), MindFlowError> {
+) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     db.execute("DELETE FROM ai_profiles WHERE id = ?1", [&id])?;
     Ok(())
@@ -209,7 +209,7 @@ pub fn delete_ai_profile(
 // ── System Prompt CRUD ───────────────────────────────────
 
 #[tauri::command]
-pub fn get_system_prompt(state: State<'_, AppState>) -> Result<String, MindFlowError> {
+pub fn get_system_prompt(state: State<'_, AppState>) -> Result<String, AppError> {
     let db = state.db.lock().unwrap();
     let result: Result<String, _> = db.query_row(
         "SELECT value FROM ai_settings WHERE key = 'system_prompt'",
@@ -223,7 +223,7 @@ pub fn get_system_prompt(state: State<'_, AppState>) -> Result<String, MindFlowE
 pub fn set_system_prompt(
     state: State<'_, AppState>,
     prompt: String,
-) -> Result<(), MindFlowError> {
+) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     if prompt.is_empty() {
         // Reset to default: delete custom prompt so get_system_prompt falls back to SYSTEM_PROMPT
@@ -258,7 +258,7 @@ async fn fetch_models_from_provider(
     client: &reqwest::Client,
     provider: &str,
     secret: &str,
-) -> Result<Vec<ModelInfo>, MindFlowError> {
+) -> Result<Vec<ModelInfo>, AppError> {
     match provider {
         "anthropic" => {
             let resp = client
@@ -270,15 +270,15 @@ async fn fetch_models_from_provider(
             let status = resp.status();
             let text = resp.text().await?;
             if !status.is_success() {
-                return Err(MindFlowError::Other(format!(
+                return Err(AppError::Other(format!(
                     "Anthropic list models: HTTP {status}"
                 )));
             }
             let parsed: serde_json::Value = serde_json::from_str(&text)
-                .map_err(|e| MindFlowError::Other(format!("JSON parse error: {e}")))?;
+                .map_err(|e| AppError::Other(format!("JSON parse error: {e}")))?;
             let data = parsed["data"]
                 .as_array()
-                .ok_or_else(|| MindFlowError::Other("No data array in Anthropic response".into()))?;
+                .ok_or_else(|| AppError::Other("No data array in Anthropic response".into()))?;
             let mut models: Vec<ModelInfo> = data
                 .iter()
                 .filter_map(|m| {
@@ -305,15 +305,15 @@ async fn fetch_models_from_provider(
             let status = resp.status();
             let text = resp.text().await?;
             if !status.is_success() {
-                return Err(MindFlowError::Other(format!(
+                return Err(AppError::Other(format!(
                     "OpenAI list models: HTTP {status}"
                 )));
             }
             let parsed: serde_json::Value = serde_json::from_str(&text)
-                .map_err(|e| MindFlowError::Other(format!("JSON parse error: {e}")))?;
+                .map_err(|e| AppError::Other(format!("JSON parse error: {e}")))?;
             let data = parsed["data"]
                 .as_array()
-                .ok_or_else(|| MindFlowError::Other("No data array in OpenAI response".into()))?;
+                .ok_or_else(|| AppError::Other("No data array in OpenAI response".into()))?;
             let prefixes = ["gpt-4o", "gpt-4o-mini", "o3-mini", "o1", "o3", "o4-mini"];
             let mut models: Vec<ModelInfo> = data
                 .iter()
@@ -345,15 +345,15 @@ async fn fetch_models_from_provider(
             let status = resp.status();
             let text = resp.text().await?;
             if !status.is_success() {
-                return Err(MindFlowError::Other(format!(
+                return Err(AppError::Other(format!(
                     "Gemini list models: HTTP {status}"
                 )));
             }
             let parsed: serde_json::Value = serde_json::from_str(&text)
-                .map_err(|e| MindFlowError::Other(format!("JSON parse error: {e}")))?;
+                .map_err(|e| AppError::Other(format!("JSON parse error: {e}")))?;
             let arr = parsed["models"]
                 .as_array()
-                .ok_or_else(|| MindFlowError::Other("No models array in Gemini response".into()))?;
+                .ok_or_else(|| AppError::Other("No models array in Gemini response".into()))?;
             let mut models: Vec<ModelInfo> = arr
                 .iter()
                 .filter_map(|m| {
@@ -374,7 +374,7 @@ async fn fetch_models_from_provider(
             models.sort_by(|a, b| a.name.cmp(&b.name));
             Ok(models)
         }
-        _ => Err(MindFlowError::Other(format!(
+        _ => Err(AppError::Other(format!(
             "Unknown provider: {provider}"
         ))),
     }
@@ -384,7 +384,7 @@ async fn fetch_models_from_provider(
 pub async fn list_models(
     state: State<'_, AppState>,
     api_key_id: String,
-) -> Result<Vec<ModelInfo>, MindFlowError> {
+) -> Result<Vec<ModelInfo>, AppError> {
     // 1. Look up provider + check cache (single lock)
     let (provider, cached) = {
         let db = state.db.lock().unwrap();
@@ -394,7 +394,7 @@ pub async fn list_models(
                 [&api_key_id],
                 |row| row.get(0),
             )
-            .map_err(|_| MindFlowError::Other("API key not found".into()))?;
+            .map_err(|_| AppError::Other("API key not found".into()))?;
 
         let cached = {
             let result: Result<(String, String), _> = db.query_row(
@@ -452,7 +452,7 @@ const MAX_SUBTREE_DEPTH: u32 = 30;
 fn build_subtree(
     db: &rusqlite::Connection,
     node_id: &str,
-) -> Result<TreeData, MindFlowError> {
+) -> Result<TreeData, AppError> {
     build_subtree_inner(db, node_id, 0)
 }
 
@@ -460,9 +460,9 @@ fn build_subtree_inner(
     db: &rusqlite::Connection,
     node_id: &str,
     depth: u32,
-) -> Result<TreeData, MindFlowError> {
+) -> Result<TreeData, AppError> {
     if depth > MAX_SUBTREE_DEPTH {
-        return Err(MindFlowError::Other(
+        return Err(AppError::Other(
             format!("子樹深度超過上限 ({MAX_SUBTREE_DEPTH})，請選擇較小的子樹。")
         ));
     }
@@ -504,13 +504,13 @@ fn build_subtree_inner(
 fn get_ancestor_path(
     db: &rusqlite::Connection,
     node_id: &str,
-) -> Result<Vec<String>, MindFlowError> {
+) -> Result<Vec<String>, AppError> {
     let mut path = Vec::new();
     let mut current_id = node_id.to_string();
     let mut visited = std::collections::HashSet::new();
     loop {
         if !visited.insert(current_id.clone()) {
-            return Err(MindFlowError::Other("Circular reference detected in tree".into()));
+            return Err(AppError::Other("Circular reference detected in tree".into()));
         }
         let result: Result<(Option<String>, String), _> = db.query_row(
             "SELECT parent_id, title FROM tree_nodes WHERE id = ?1",
@@ -526,7 +526,7 @@ fn get_ancestor_path(
                 path.push(title);
                 break;
             }
-            Err(e) => return Err(MindFlowError::Database(e)),
+            Err(e) => return Err(AppError::Database(e)),
         }
     }
     path.reverse();
@@ -621,7 +621,7 @@ async fn call_llm(
     api_key: &str,
     system_prompt: &str,
     user_prompt: &str,
-) -> Result<String, MindFlowError> {
+) -> Result<String, AppError> {
     debug_log!("[llm] ════════════════ REQUEST ════════════════");
     debug_log!("[llm] provider={provider}, model={model}");
     debug_log!("[llm] system_prompt length={}", system_prompt.len());
@@ -655,15 +655,15 @@ async fn call_llm(
             debug_log!("[llm] ════════════════════════════════════════");
             if !status.is_success() {
                 debug_log!("[llm] Anthropic error body: {text}");
-                return Err(MindFlowError::Other(format!(
+                return Err(AppError::Other(format!(
                     "Anthropic API error: HTTP {status}"
                 )));
             }
             let parsed: serde_json::Value = serde_json::from_str(&text)
-                .map_err(|e| MindFlowError::Other(format!("JSON parse error: {e}")))?;
+                .map_err(|e| AppError::Other(format!("JSON parse error: {e}")))?;
             let content_text = parsed["content"][0]["text"]
                 .as_str()
-                .ok_or_else(|| MindFlowError::Other("No text in Anthropic response".into()))?;
+                .ok_or_else(|| AppError::Other("No text in Anthropic response".into()))?;
             debug_log!("[llm] extracted content:\n{content_text}");
             Ok(content_text.to_string())
         }
@@ -695,15 +695,15 @@ async fn call_llm(
             debug_log!("[llm] ════════════════════════════════════════");
             if !status.is_success() {
                 debug_log!("[llm] OpenAI error body: {text}");
-                return Err(MindFlowError::Other(format!(
+                return Err(AppError::Other(format!(
                     "OpenAI API error: HTTP {status}"
                 )));
             }
             let parsed: serde_json::Value = serde_json::from_str(&text)
-                .map_err(|e| MindFlowError::Other(format!("JSON parse error: {e}")))?;
+                .map_err(|e| AppError::Other(format!("JSON parse error: {e}")))?;
             let content_text = parsed["choices"][0]["message"]["content"]
                 .as_str()
-                .ok_or_else(|| MindFlowError::Other("No content in OpenAI response".into()))?;
+                .ok_or_else(|| AppError::Other("No content in OpenAI response".into()))?;
             debug_log!("[llm] extracted content:\n{content_text}");
             Ok(content_text.to_string())
         }
@@ -738,25 +738,25 @@ async fn call_llm(
             debug_log!("[llm] ════════════════════════════════════════");
             if !status.is_success() {
                 debug_log!("[llm] Gemini error body: {text}");
-                return Err(MindFlowError::Other(format!(
+                return Err(AppError::Other(format!(
                     "Gemini API error: HTTP {status}"
                 )));
             }
             let parsed: serde_json::Value = serde_json::from_str(&text)
-                .map_err(|e| MindFlowError::Other(format!("JSON parse error: {e}")))?;
+                .map_err(|e| AppError::Other(format!("JSON parse error: {e}")))?;
             let content_text = parsed["candidates"][0]["content"]["parts"][0]["text"]
                 .as_str()
-                .ok_or_else(|| MindFlowError::Other("No text in Gemini response".into()))?;
+                .ok_or_else(|| AppError::Other("No text in Gemini response".into()))?;
             debug_log!("[llm] extracted content:\n{content_text}");
             Ok(content_text.to_string())
         }
-        _ => Err(MindFlowError::Other(format!(
+        _ => Err(AppError::Other(format!(
             "Unknown provider: {provider}"
         ))),
     }
 }
 
-fn parse_proposed_nodes(raw: &str) -> Result<Vec<ProposedNode>, MindFlowError> {
+fn parse_proposed_nodes(raw: &str) -> Result<Vec<ProposedNode>, AppError> {
     let trimmed = raw.trim();
     let json_str = if trimmed.starts_with("```") {
         trimmed
@@ -769,14 +769,14 @@ fn parse_proposed_nodes(raw: &str) -> Result<Vec<ProposedNode>, MindFlowError> {
     };
 
     let parsed: serde_json::Value = serde_json::from_str(json_str)
-        .map_err(|e| MindFlowError::Other(format!("LLM returned invalid JSON: {e}")))?;
+        .map_err(|e| AppError::Other(format!("LLM returned invalid JSON: {e}")))?;
 
     let nodes_value = parsed
         .get("nodes")
-        .ok_or_else(|| MindFlowError::Other("LLM JSON missing 'nodes' key".into()))?;
+        .ok_or_else(|| AppError::Other("LLM JSON missing 'nodes' key".into()))?;
 
     let nodes: Vec<ProposedNode> = serde_json::from_value(nodes_value.clone())
-        .map_err(|e| MindFlowError::Other(format!("Invalid nodes structure: {e}")))?;
+        .map_err(|e| AppError::Other(format!("Invalid nodes structure: {e}")))?;
 
     Ok(nodes)
 }
@@ -788,7 +788,7 @@ pub async fn compact_node(
     state: State<'_, AppState>,
     node_id: String,
     profile_id: String,
-) -> Result<CompactResult, MindFlowError> {
+) -> Result<CompactResult, AppError> {
     debug_log!("[compact] start — node_id={node_id}, profile_id={profile_id}");
 
     // 1. Read profile + tree from DB
@@ -798,7 +798,7 @@ pub async fn compact_node(
         let subtree = build_subtree(&db, &node_id)?;
         let node_count = count_nodes(&subtree);
         if node_count > MAX_SUBTREE_NODES {
-            return Err(MindFlowError::Other(format!(
+            return Err(AppError::Other(format!(
                 "子樹包含 {node_count} 個節點，超過上限 {MAX_SUBTREE_NODES}。請選擇較小的子樹重組。"
             )));
         }
@@ -815,7 +815,7 @@ pub async fn compact_node(
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .map_err(|_| {
-                MindFlowError::Other("AI profile not found. Create one in AI Settings.".into())
+                AppError::Other("AI profile not found. Create one in AI Settings.".into())
             })?;
 
         debug_log!("[compact] provider={provider}, model={model}, api_key_id={api_key_id:?}");
@@ -829,7 +829,7 @@ pub async fn compact_node(
         // Migration fallback: try old provider-level or profile-level keychain
         get_legacy_provider_secret(&provider)
             .or_else(|_| get_legacy_profile_secret(&profile_id))
-            .map_err(|_| MindFlowError::Other(
+            .map_err(|_| AppError::Other(
                 "No API key bound to this profile. Edit the profile in AI Settings.".into()
             ))?
     };

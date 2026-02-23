@@ -21,7 +21,7 @@ fn main() {
 
     let http_client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(60))
-        .user_agent("MindFlow/0.1.0")
+        .user_agent("vedrr/0.1.0")
         .build()
         .expect("Failed to build HTTP client");
 

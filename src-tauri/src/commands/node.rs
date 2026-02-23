@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::AppState;
-use crate::error::MindFlowError;
+use crate::error::AppError;
 use crate::models::{TreeData, TreeNode};
 
 fn row_to_node(row: &rusqlite::Row) -> rusqlite::Result<TreeNode> {
@@ -26,7 +26,7 @@ fn build_tree(
     context_id: &str,
     parent_id: Option<&str>,
     depth: u32,
-) -> Result<Vec<TreeData>, MindFlowError> {
+) -> Result<Vec<TreeData>, AppError> {
     if depth > MAX_TREE_DEPTH {
         return Ok(Vec::new());
     }
@@ -52,7 +52,7 @@ fn build_tree(
 pub fn get_tree(
     state: State<'_, AppState>,
     context_id: String,
-) -> Result<Option<TreeData>, MindFlowError> {
+) -> Result<Option<TreeData>, AppError> {
     let db = state.db.lock().unwrap();
 
     // Find root node
@@ -89,7 +89,7 @@ pub fn create_node(
     parent_id: String,
     node_type: String,
     title: String,
-) -> Result<TreeNode, MindFlowError> {
+) -> Result<TreeNode, AppError> {
     let db = state.db.lock().unwrap();
     let id = uuid::Uuid::new_v4().to_string();
 
@@ -131,7 +131,7 @@ pub fn update_node(
     content: Option<String>,
     node_type: Option<String>,
     file_path: Option<String>,
-) -> Result<(), MindFlowError> {
+) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     if let Some(t) = title {
         db.execute(
@@ -166,11 +166,11 @@ pub fn update_node(
 }
 
 #[tauri::command]
-pub fn delete_node(state: State<'_, AppState>, id: String) -> Result<(), MindFlowError> {
+pub fn delete_node(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
 
     // Recursively delete the whole subtree
-    fn delete_recursive(db: &rusqlite::Connection, node_id: &str) -> Result<(), MindFlowError> {
+    fn delete_recursive(db: &rusqlite::Connection, node_id: &str) -> Result<(), AppError> {
         let children: Vec<String> = {
             let mut stmt = db.prepare("SELECT id FROM tree_nodes WHERE parent_id = ?1")?;
             let rows = stmt
@@ -195,7 +195,7 @@ pub fn move_node(
     id: String,
     new_parent_id: String,
     position: i32,
-) -> Result<(), MindFlowError> {
+) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     // Shift existing siblings at target
     db.execute(
@@ -215,7 +215,7 @@ pub fn clone_subtree(
     source_id: String,
     target_parent_id: String,
     context_id: String,
-) -> Result<String, MindFlowError> {
+) -> Result<String, AppError> {
     let db = state.db.lock().unwrap();
 
     // Prevent cloning a node under itself or its descendants
@@ -232,7 +232,7 @@ pub fn clone_subtree(
         }
     }
     if is_descendant(&db, &target_parent_id, &source_id) {
-        return Err(MindFlowError::Other("Cannot paste a node under itself or its descendants".into()));
+        return Err(AppError::Other("Cannot paste a node under itself or its descendants".into()));
     }
 
     fn clone_recursive(
@@ -240,7 +240,7 @@ pub fn clone_subtree(
         source_id: &str,
         new_parent_id: &str,
         context_id: &str,
-    ) -> Result<String, MindFlowError> {
+    ) -> Result<String, AppError> {
         let src = db.query_row(
             "SELECT node_type, title, content, file_path FROM tree_nodes WHERE id = ?1",
             [source_id],
@@ -293,7 +293,7 @@ pub fn clone_subtree(
 pub fn restore_nodes(
     state: State<'_, AppState>,
     nodes: Vec<TreeNode>,
-) -> Result<(), MindFlowError> {
+) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     for node in &nodes {
         db.execute(

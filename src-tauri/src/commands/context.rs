@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::AppState;
-use crate::error::MindFlowError;
+use crate::error::AppError;
 use crate::models::{Context, ContextSummary};
 
 #[tauri::command]
@@ -9,7 +9,7 @@ pub fn create_context(
     state: State<'_, AppState>,
     name: String,
     tags: Vec<String>,
-) -> Result<Context, MindFlowError> {
+) -> Result<Context, AppError> {
     let db = state.db.lock().unwrap();
     let id = uuid::Uuid::new_v4().to_string();
     let root_id = uuid::Uuid::new_v4().to_string();
@@ -47,7 +47,7 @@ pub fn create_context(
 }
 
 #[tauri::command]
-pub fn list_contexts(state: State<'_, AppState>) -> Result<Vec<ContextSummary>, MindFlowError> {
+pub fn list_contexts(state: State<'_, AppState>) -> Result<Vec<ContextSummary>, AppError> {
     let db = state.db.lock().unwrap();
     let mut stmt = db.prepare(
         "SELECT c.id, c.name, c.state, c.tags, c.last_accessed_at,
@@ -74,20 +74,20 @@ pub fn list_contexts(state: State<'_, AppState>) -> Result<Vec<ContextSummary>, 
 }
 
 #[tauri::command]
-pub fn switch_context(state: State<'_, AppState>, id: String) -> Result<(), MindFlowError> {
+pub fn switch_context(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     let changed = db.execute(
         "UPDATE contexts SET last_accessed_at = datetime('now'), state = CASE WHEN state = 'archived' THEN 'active' ELSE state END WHERE id = ?1",
         [&id],
     )?;
     if changed == 0 {
-        return Err(MindFlowError::ContextNotFound(id));
+        return Err(AppError::ContextNotFound(id));
     }
     Ok(())
 }
 
 #[tauri::command]
-pub fn archive_context(state: State<'_, AppState>, id: String) -> Result<(), MindFlowError> {
+pub fn archive_context(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     db.execute(
         "UPDATE contexts SET state = 'archived', updated_at = datetime('now') WHERE id = ?1",
@@ -97,7 +97,7 @@ pub fn archive_context(state: State<'_, AppState>, id: String) -> Result<(), Min
 }
 
 #[tauri::command]
-pub fn activate_context(state: State<'_, AppState>, id: String) -> Result<(), MindFlowError> {
+pub fn activate_context(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     db.execute(
         "UPDATE contexts SET state = 'active', last_accessed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?1",
@@ -107,7 +107,7 @@ pub fn activate_context(state: State<'_, AppState>, id: String) -> Result<(), Mi
 }
 
 #[tauri::command]
-pub fn rename_context(state: State<'_, AppState>, id: String, name: String) -> Result<(), MindFlowError> {
+pub fn rename_context(state: State<'_, AppState>, id: String, name: String) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     // Update context name
     db.execute(
@@ -123,7 +123,7 @@ pub fn rename_context(state: State<'_, AppState>, id: String, name: String) -> R
 }
 
 #[tauri::command]
-pub fn delete_context(state: State<'_, AppState>, id: String) -> Result<(), MindFlowError> {
+pub fn delete_context(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     db.execute("DELETE FROM contexts WHERE id = ?1", [&id])?;
     Ok(())

@@ -92,7 +92,7 @@ export function useKeyboard() {
           && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
         e.preventDefault();
         useTreeStore.getState().copyNode(selectedNodeId);
-        navigator.clipboard.writeText("mindflow:node:" + selectedNodeId);
+        navigator.clipboard.writeText("vedrr:node:" + selectedNodeId);
         return;
       }
 
@@ -101,7 +101,7 @@ export function useKeyboard() {
           && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
         e.preventDefault();
         useTreeStore.getState().cutNode(selectedNodeId);
-        navigator.clipboard.writeText("mindflow:node:" + selectedNodeId);
+        navigator.clipboard.writeText("vedrr:node:" + selectedNodeId);
         return;
       }
 
@@ -327,9 +327,9 @@ export function useKeyboard() {
           if (item.type === "text/plain") {
             e.preventDefault();
             item.getAsString((text) => {
-              if (text.startsWith("mindflow:node:")) {
+              if (text.startsWith("vedrr:node:")) {
                 // Internal node copy → clone subtree
-                const sourceId = text.replace("mindflow:node:", "");
+                const sourceId = text.replace("vedrr:node:", "");
                 if (sourceId) {
                   useTreeStore.getState().pasteNodeUnder(selectedNodeId!, currentContextId!);
                 }

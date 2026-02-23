@@ -3,7 +3,7 @@ import { initReactI18next } from "react-i18next";
 import zhTW from "./zh-TW.json";
 import en from "./en.json";
 
-const saved = localStorage.getItem("mindflow-locale");
+const saved = localStorage.getItem("vedrr-locale");
 const defaultLng = saved || (navigator.language.startsWith("zh") ? "zh-TW" : "en");
 
 i18n.use(initReactI18next).init({

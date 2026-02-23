@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 #[derive(Debug, thiserror::Error)]
-pub enum MindFlowError {
+pub enum AppError {
     #[error("Context not found: {0}")]
     ContextNotFound(String),
     #[error("Node not found: {0}")]
@@ -16,7 +16,7 @@ pub enum MindFlowError {
     Other(String),
 }
 
-impl Serialize for MindFlowError {
+impl Serialize for AppError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

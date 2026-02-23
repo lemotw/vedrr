@@ -1,15 +1,15 @@
 use rusqlite::Connection;
 use std::path::PathBuf;
 
-use crate::error::MindFlowError;
+use crate::error::AppError;
 
 pub fn get_db_path() -> PathBuf {
-    let base = dirs::home_dir().unwrap().join("MindFlow").join("data");
+    let base = dirs::home_dir().unwrap().join("vedrr").join("data");
     std::fs::create_dir_all(&base).ok();
-    base.join("mindflow.db")
+    base.join("vedrr.db")
 }
 
-pub fn init_db(conn: &Connection) -> Result<(), MindFlowError> {
+pub fn init_db(conn: &Connection) -> Result<(), AppError> {
     conn.execute_batch(
         "
         PRAGMA journal_mode=WAL;
