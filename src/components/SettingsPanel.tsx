@@ -73,8 +73,8 @@ function AITab() {
   }, []);
 
   useEffect(() => {
-    loadApiKeys();
-  }, [loadApiKeys]);
+    ipc.listApiKeys().then(setApiKeys).catch((e) => console.error("[settings] load api keys failed:", e));
+  }, []);
 
   return (
     <div>
@@ -123,7 +123,10 @@ export function SettingsPanel() {
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="flex max-h-[80vh] w-[600px] flex-col rounded-xl border border-border bg-bg-elevated shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+        className="flex max-h-[80vh] w-[600px] flex-col rounded-xl border border-border bg-bg-elevated shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
@@ -135,7 +138,7 @@ export function SettingsPanel() {
         {/* Body: tab nav + content */}
         <div className="flex min-h-0 flex-1">
           {/* Left tab nav */}
-          <div className="flex w-[120px] shrink-0 flex-col border-r border-border bg-bg-card py-2">
+          <nav className="flex w-[120px] shrink-0 flex-col border-r border-border bg-bg-card py-2">
             {TABS.map((tab) => {
               const isActive = tab.id === activeTab;
               return (
@@ -153,7 +156,7 @@ export function SettingsPanel() {
                 </button>
               );
             })}
-          </div>
+          </nav>
 
           {/* Right content */}
           <div className="min-h-0 flex-1 overflow-y-auto">

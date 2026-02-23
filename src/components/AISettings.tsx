@@ -3,13 +3,13 @@ import { ipc } from "../lib/ipc";
 import { cn } from "../lib/cn";
 import type { AiProfile, ApiKey, ModelInfo } from "../lib/types";
 
-export const PROVIDERS = [
+const PROVIDERS = [
   { id: "anthropic", name: "Anthropic" },
   { id: "openai", name: "OpenAI" },
   { id: "gemini", name: "Gemini" },
 ];
 
-export function providerDisplayName(providerId: string): string {
+function providerDisplayName(providerId: string): string {
   return PROVIDERS.find((p) => p.id === providerId)?.name || providerId;
 }
 
