@@ -272,6 +272,7 @@ const TreeBranch = memo(function TreeBranch({
 });
 
 export function TreeCanvas() {
+  const { t } = useTranslation();
   const currentContextId = useContextStore(s => s.currentContextId);
   const tree = useTreeStore(s => s.tree);
   const loadTree = useTreeStore(s => s.loadTree);
@@ -412,7 +413,7 @@ export function TreeCanvas() {
   if (!currentContextId) {
     return (
       <div className="flex items-center justify-center h-full text-text-secondary text-sm">
-        Press {modSymbol}K to create or switch context
+        {t("treeCanvas.empty", { key: `${modSymbol}K` })}
       </div>
     );
   }
@@ -420,7 +421,7 @@ export function TreeCanvas() {
   if (!tree) {
     return (
       <div className="flex items-center justify-center h-full text-text-secondary text-sm">
-        Loading...
+        {t("common.loading")}
       </div>
     );
   }

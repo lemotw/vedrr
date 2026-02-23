@@ -1,13 +1,15 @@
+import { useTranslation } from "react-i18next";
 import { useUIStore } from "../stores/uiStore";
 import { useTreeStore } from "../stores/treeStore";
 import { CompactStates } from "../lib/constants";
 import type { TreeData } from "../lib/types";
 
-const CHANGE_LABEL: Record<string, { tag: string; color: string }> = {
-  added:          { tag: "新增", color: "#2DD4BF" },
-  edited:         { tag: "編輯", color: "#FBBF24" },
-  moved:          { tag: "移動", color: "#4FC3F7" },
-  "edited+moved": { tag: "編輯+移動", color: "#FBBF24" },
+const CHANGE_TYPE_KEYS: Record<string, { key: string; color: string }> = {
+  added:          { key: "compactBanner.change.added", color: "#2DD4BF" },
+  edited:         { key: "compactBanner.change.edited", color: "#FBBF24" },
+  moved:          { key: "compactBanner.change.moved", color: "#4FC3F7" },
+  "edited+moved": { key: "compactBanner.change.editedMoved", color: "#FBBF24" },
+  deleted:        { key: "compactBanner.change.deleted", color: "#FF6B6B" },
 };
 
 function findNode(td: TreeData, id: string): TreeData | null {
@@ -20,6 +22,7 @@ function findNode(td: TreeData, id: string): TreeData | null {
 }
 
 export function CompactBanner() {
+  const { t } = useTranslation();
   const compactState = useUIStore((s) => s.compactState);
   const summary = useUIStore((s) => s.compactSummary);
   const highlights = useUIStore((s) => s.compactHighlights);
@@ -31,10 +34,10 @@ export function CompactBanner() {
   if (compactState !== CompactStates.APPLIED || !summary) return null;
 
   const parts: string[] = [];
-  if (summary.added > 0) parts.push(`${summary.added} 新增`);
-  if (summary.edited > 0) parts.push(`${summary.edited} 編輯`);
-  if (summary.moved > 0) parts.push(`${summary.moved} 移動`);
-  if (summary.deleted > 0) parts.push(`${summary.deleted} 刪除`);
+  if (summary.added > 0) parts.push(`${summary.added} ${t("compactBanner.change.added")}`);
+  if (summary.edited > 0) parts.push(`${summary.edited} ${t("compactBanner.change.edited")}`);
+  if (summary.moved > 0) parts.push(`${summary.moved} ${t("compactBanner.change.moved")}`);
+  if (summary.deleted > 0) parts.push(`${summary.deleted} ${t("compactBanner.change.deleted")}`);
   const total = summary.added + summary.edited + summary.moved + summary.deleted;
 
   const handleUndo = () => {
@@ -50,22 +53,23 @@ export function CompactBanner() {
   const changeItems: { label: string; color: string; detail: string }[] = [];
   if (highlights && tree) {
     for (const [nodeId, info] of highlights) {
-      const cfg = CHANGE_LABEL[info.type];
+      const cfg = CHANGE_TYPE_KEYS[info.type];
       if (!cfg) continue;
       const node = findNode(tree, nodeId);
       const title = node?.node.title || nodeId;
-      let detail = `「${title}」`;
+      let detail = t("compactBanner.detail.title", { title });
       if (info.type === "edited" || info.type === "edited+moved") {
-        if (info.oldTitle) detail = `「${info.oldTitle}」→「${title}」`;
+        if (info.oldTitle) detail = t("compactBanner.detail.renamed", { old: info.oldTitle, new: title });
       }
       if (info.type === "moved" || info.type === "edited+moved") {
-        if (info.fromParent) detail += ` (從「${info.fromParent}」移出)`;
+        if (info.fromParent) detail += ` ${t("compactBanner.detail.movedFrom", { parent: info.fromParent })}`;
       }
-      changeItems.push({ label: cfg.tag, color: cfg.color, detail });
+      changeItems.push({ label: t(cfg.key), color: cfg.color, detail });
     }
   }
   for (const name of summary.deletedNames) {
-    changeItems.push({ label: "刪除", color: "#FF6B6B", detail: `「${name}」` });
+    const cfg = CHANGE_TYPE_KEYS.deleted;
+    changeItems.push({ label: t(cfg.key), color: cfg.color, detail: t("compactBanner.detail.title", { title: name }) });
   }
 
   return (
@@ -76,26 +80,26 @@ export function CompactBanner() {
       >
         <span className="text-accent-primary text-sm">✦</span>
         <span className="font-mono text-xs text-text-primary flex-1">
-          AI 重組了 {total} 個節點 — {parts.join(" · ")}
+          {t("compactBanner.summary", { total, details: parts.join(" · ") })}
         </span>
         <div className="flex items-center gap-2 text-[11px] font-mono">
           <button
             className="px-2 py-0.5 rounded border border-border text-text-secondary cursor-pointer hover:text-text-primary hover:border-text-secondary transition-colors"
             onClick={handleUndo}
           >
-            復原
+            {t("compactBanner.button.undo")}
           </button>
           <button
             className="cursor-pointer text-text-secondary hover:text-text-primary transition-colors"
             onClick={toggleCompactBannerExpanded}
           >
-            {expanded ? "收合 ▴" : "展開詳情 ▾"}
+            {expanded ? `${t("compactBanner.button.collapse")} ▴` : `${t("compactBanner.button.expand")} ▾`}
           </button>
           <button
             className="px-2 py-0.5 rounded bg-accent-primary text-bg-page font-bold cursor-pointer hover:opacity-80 transition-opacity"
             onClick={handleAccept}
           >
-            確認
+            {t("compactBanner.button.accept")}
           </button>
         </div>
       </div>

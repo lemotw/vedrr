@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { StatusBar } from "./components/StatusBar";
 import { TreeCanvas } from "./components/TreeCanvas";
 import { ContentPanel } from "./components/ContentPanel";
@@ -15,6 +16,7 @@ import { useUIStore } from "./stores/uiStore";
 import { ContextStates, CompactStates } from "./lib/constants";
 
 export default function App() {
+  const { t } = useTranslation();
   const { loadContexts, switchContext } = useContextStore();
   const { openQuickSwitcher } = useUIStore();
   const compactState = useUIStore((s) => s.compactState);
@@ -65,7 +67,7 @@ export default function App() {
           <div className="rounded-xl border border-border bg-bg-elevated px-8 py-6 shadow-2xl">
             <div className="flex items-center gap-3">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent-primary border-t-transparent" />
-              <span className="font-mono text-sm text-text-primary">AI 正在重組你的筆記...</span>
+              <span className="font-mono text-sm text-text-primary">{t("compactError.loading")}</span>
             </div>
           </div>
         </div>
@@ -79,7 +81,7 @@ export default function App() {
             className="max-w-[500px] rounded-xl border border-red-500/30 bg-bg-elevated px-6 py-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-2 font-heading text-sm text-red-400">AI Compact Error</h3>
+            <h3 className="mb-2 font-heading text-sm text-red-400">{t("compactError.title")}</h3>
             <p className="mb-4 max-h-[200px] overflow-auto whitespace-pre-wrap font-mono text-xs text-text-secondary">
               {compactError}
             </p>
@@ -87,7 +89,7 @@ export default function App() {
               className="rounded-lg bg-bg-card px-4 py-2 font-mono text-xs text-text-primary hover:bg-border"
               onClick={() => useUIStore.getState().setCompactError(null)}
             >
-              Close
+              {t("common.button.close")}
             </button>
           </div>
         </div>

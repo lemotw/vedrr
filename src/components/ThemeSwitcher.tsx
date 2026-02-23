@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useUIStore } from "../stores/uiStore";
 import { Themes, THEME_META, CUSTOM_COLOR_LABELS } from "../lib/constants";
 import type { ThemeId, CustomThemeColors } from "../lib/constants";
@@ -18,6 +19,7 @@ const PRESET_ORDER: ThemeId[] = [
 const COLOR_KEYS = Object.keys(CUSTOM_COLOR_LABELS) as (keyof CustomThemeColors)[];
 
 export function ThemeSection() {
+  const { t } = useTranslation();
   const { currentTheme, setTheme, customThemeColors, setCustomColor } = useUIStore();
   const [showEditor, setShowEditor] = useState(false);
 
@@ -82,7 +84,7 @@ export function ThemeSection() {
                 : "conic-gradient(#FF6B35, #4FC3F7, #4ADE80, #A78BFA, #F0A050, #FF6B35)",
             }}
           />
-          Custom
+          {t("theme.custom")}
           <span className="ml-auto text-[10px]">{showEditor ? "▾" : "▸"}</span>
         </button>
 

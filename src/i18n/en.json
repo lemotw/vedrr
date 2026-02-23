@@ -73,7 +73,21 @@
       "addChild": "Add child (Tab)",
       "addSibling": "Add sibling (Shift+Tab)",
       "expand": "Expand (z)"
+    },
+    "empty": "Press {{key}} to create or switch context"
+  },
+  "nodeTypePopover": {
+    "title": "CHANGE TYPE",
+    "hint": {
+      "switch": "switch",
+      "nav": "nav"
     }
+  },
+  "markdownEditor": {
+    "placeholder": "Start writing..."
+  },
+  "theme": {
+    "custom": "Custom"
   },
   "nodeSearch": {
     "placeholder": "Search nodes...",
@@ -95,6 +109,76 @@
       "apiKeys": "API Keys",
       "profiles": "Profiles",
       "systemPrompt": "System Prompt (Dev)"
+    }
+  },
+  "compactBanner": {
+    "summary": "AI reorganized {{total}} nodes — {{details}}",
+    "change": {
+      "added": "Added",
+      "edited": "Edited",
+      "moved": "Moved",
+      "editedMoved": "Edited+Moved",
+      "deleted": "Deleted"
+    },
+    "button": {
+      "undo": "Undo",
+      "expand": "Show details",
+      "collapse": "Hide details",
+      "accept": "Accept"
+    },
+    "detail": {
+      "title": "\"{{title}}\"",
+      "renamed": "\"{{old}}\" → \"{{new}}\"",
+      "movedFrom": "(moved from \"{{parent}}\")"
+    }
+  },
+  "compactError": {
+    "title": "AI Compact Error",
+    "loading": "AI is reorganizing your notes..."
+  },
+  "aiSettings": {
+    "footer": "Add API keys, then create profiles to use with AI Compact.",
+    "keys": {
+      "empty": "No API keys yet.",
+      "placeholder": {
+        "name": "Key name (e.g. Work Anthropic)",
+        "secret": "Paste API key"
+      },
+      "button": {
+        "add": "+ Add Key"
+      },
+      "tooltip": {
+        "delete": "Delete key"
+      }
+    },
+    "profiles": {
+      "empty": "No profiles yet.",
+      "placeholder": {
+        "name": "Profile name"
+      },
+      "select": {
+        "key": "Select API Key...",
+        "model": {
+          "placeholder": "Select a key first",
+          "loading": "Loading models...",
+          "empty": "No models found"
+        }
+      },
+      "noKey": "No key",
+      "active": "ACTIVE",
+      "button": {
+        "add": "+ Add Profile"
+      },
+      "tooltip": {
+        "delete": "Delete profile"
+      },
+      "error": {
+        "loadModels": "Failed to load models. Check your API key.",
+        "create": "Failed to create profile. Please try again."
+      }
+    },
+    "systemPrompt": {
+      "placeholder": "Loading..."
     }
   }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function MarkdownEditor({ content, onSave }: Props) {
+  const { t } = useTranslation();
   const { setContentPanelFocused, closeMarkdownEditor } = useUIStore();
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const latestContent = useRef(content);
@@ -40,7 +42,7 @@ export function MarkdownEditor({ content, onSave }: Props) {
         heading: { levels: [1, 2, 3] },
       }),
       Placeholder.configure({
-        placeholder: "Start writing...",
+        placeholder: t("markdownEditor.placeholder"),
       }),
     ],
     content: content || "",

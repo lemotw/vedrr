@@ -73,7 +73,21 @@
       "addChild": "新增子節點 (Tab)",
       "addSibling": "新增同層節點 (Shift+Tab)",
       "expand": "展開 (z)"
+    },
+    "empty": "按 {{key}} 建立或切換 Context"
+  },
+  "nodeTypePopover": {
+    "title": "變更類型",
+    "hint": {
+      "switch": "切換",
+      "nav": "導航"
     }
+  },
+  "markdownEditor": {
+    "placeholder": "開始寫作..."
+  },
+  "theme": {
+    "custom": "自訂"
   },
   "nodeSearch": {
     "placeholder": "搜尋節點...",
@@ -95,6 +109,76 @@
       "apiKeys": "API Keys",
       "profiles": "Profiles",
       "systemPrompt": "System Prompt (Dev)"
+    }
+  },
+  "compactBanner": {
+    "summary": "AI 重組了 {{total}} 個節點 — {{details}}",
+    "change": {
+      "added": "新增",
+      "edited": "編輯",
+      "moved": "移動",
+      "editedMoved": "編輯+移動",
+      "deleted": "刪除"
+    },
+    "button": {
+      "undo": "復原",
+      "expand": "展開詳情",
+      "collapse": "收合",
+      "accept": "確認"
+    },
+    "detail": {
+      "title": "「{{title}}」",
+      "renamed": "「{{old}}」→「{{new}}」",
+      "movedFrom": "(從「{{parent}}」移出)"
+    }
+  },
+  "compactError": {
+    "title": "AI Compact 錯誤",
+    "loading": "AI 正在重組你的筆記..."
+  },
+  "aiSettings": {
+    "footer": "先新增 API Key，再建立 Profile 搭配 AI Compact 使用。",
+    "keys": {
+      "empty": "尚無 API Key。",
+      "placeholder": {
+        "name": "Key 名稱 (例: Work Anthropic)",
+        "secret": "貼上 API key"
+      },
+      "button": {
+        "add": "+ Add Key"
+      },
+      "tooltip": {
+        "delete": "刪除 Key"
+      }
+    },
+    "profiles": {
+      "empty": "尚無 Profile。",
+      "placeholder": {
+        "name": "Profile 名稱"
+      },
+      "select": {
+        "key": "選擇 API Key...",
+        "model": {
+          "placeholder": "先選擇 Key",
+          "loading": "載入模型中...",
+          "empty": "找不到模型"
+        }
+      },
+      "noKey": "無 Key",
+      "active": "ACTIVE",
+      "button": {
+        "add": "+ Add Profile"
+      },
+      "tooltip": {
+        "delete": "刪除 Profile"
+      },
+      "error": {
+        "loadModels": "載入模型失敗，請確認 API key 是否正確。",
+        "create": "建立 Profile 失敗，請重試。"
+      }
+    },
+    "systemPrompt": {
+      "placeholder": "載入中..."
     }
   }
 }

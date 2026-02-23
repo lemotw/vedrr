@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { NodeType } from "../lib/types";
 import { NODE_TYPE_CONFIG } from "../lib/types";
 import { NODE_TYPE_LIST } from "../lib/constants";
@@ -22,6 +23,7 @@ export function NodeTypePopover() {
 }
 
 function NodeTypePopoverInner({ nodeId }: { nodeId: string }) {
+  const { t } = useTranslation();
   const { closeTypePopover } = useUIStore();
   const { tree, updateNodeType } = useTreeStore();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -95,7 +97,7 @@ function NodeTypePopoverInner({ nodeId }: { nodeId: string }) {
       >
         <div className="px-3 pt-2.5 pb-1">
           <span className="text-[9px] font-bold text-text-secondary tracking-[2px] font-mono">
-            CHANGE TYPE
+            {t("nodeTypePopover.title")}
           </span>
         </div>
         <div className="py-1">
@@ -131,10 +133,10 @@ function NodeTypePopoverInner({ nodeId }: { nodeId: string }) {
         </div>
         <div className="flex items-center gap-3 px-3 py-2 border-t border-border">
           <span className="text-[9px] text-text-secondary font-mono">
-            <kbd className="bg-bg-card px-1 py-0.5 rounded text-[8px]">1-4</kbd> switch
+            <kbd className="bg-bg-card px-1 py-0.5 rounded text-[8px]">1-4</kbd> {t("nodeTypePopover.hint.switch")}
           </span>
           <span className="text-[9px] text-text-secondary font-mono">
-            <kbd className="bg-bg-card px-1 py-0.5 rounded text-[8px]">j/k</kbd> nav
+            <kbd className="bg-bg-card px-1 py-0.5 rounded text-[8px]">j/k</kbd> {t("nodeTypePopover.hint.nav")}
           </span>
         </div>
       </div>

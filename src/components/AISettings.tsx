@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { ipc } from "../lib/ipc";
 import { cn } from "../lib/cn";
 import type { AiProfile, ApiKey, ModelInfo } from "../lib/types";
@@ -16,6 +17,7 @@ function providerDisplayName(providerId: string): string {
 // ── Section: API Keys ─────────────────────────────────────
 
 export function ApiKeysSection({ onKeysChange }: { onKeysChange?: () => void }) {
+  const { t } = useTranslation();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -73,7 +75,7 @@ export function ApiKeysSection({ onKeysChange }: { onKeysChange?: () => void }) 
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="mb-2.5 w-full rounded border border-border bg-bg-page px-2.5 py-1.5 font-mono text-xs text-text-primary placeholder:text-text-secondary"
-            placeholder="Key name (e.g. Work Anthropic)"
+            placeholder={t("aiSettings.keys.placeholder.name")}
             autoFocus
           />
 
@@ -100,7 +102,7 @@ export function ApiKeysSection({ onKeysChange }: { onKeysChange?: () => void }) 
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
             className="mb-2.5 w-full rounded border border-border bg-bg-page px-2.5 py-1.5 font-mono text-xs text-text-primary placeholder:text-text-secondary"
-            placeholder="Paste API key"
+            placeholder={t("aiSettings.keys.placeholder.secret")}
           />
 
           <div className="flex justify-end gap-2">
@@ -108,14 +110,14 @@ export function ApiKeysSection({ onKeysChange }: { onKeysChange?: () => void }) 
               className="rounded px-2.5 py-1 font-mono text-[11px] text-text-secondary hover:text-text-primary"
               onClick={() => setShowForm(false)}
             >
-              Cancel
+              {t("common.button.cancel")}
             </button>
             <button
               className="rounded bg-accent-primary px-3 py-1 font-mono text-[11px] text-white hover:brightness-110 disabled:opacity-50"
               onClick={handleAdd}
               disabled={saving || !name.trim() || !secret.trim()}
             >
-              {saving ? "..." : "Save"}
+              {saving ? "..." : t("common.button.save")}
             </button>
           </div>
         </div>
@@ -124,7 +126,7 @@ export function ApiKeysSection({ onKeysChange }: { onKeysChange?: () => void }) 
       {/* Key list */}
       {keys.length === 0 && !showForm && (
         <p className="py-4 text-center font-mono text-[11px] text-text-secondary">
-          No API keys yet.
+          {t("aiSettings.keys.empty")}
         </p>
       )}
       {keys.map((k) => (
@@ -142,7 +144,7 @@ export function ApiKeysSection({ onKeysChange }: { onKeysChange?: () => void }) 
           <button
             className="shrink-0 rounded p-1 font-mono text-xs text-text-secondary opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
             onClick={() => handleDelete(k.id)}
-            title="Delete key"
+            title={t("aiSettings.keys.tooltip.delete")}
           >
             ✕
           </button>
@@ -155,7 +157,7 @@ export function ApiKeysSection({ onKeysChange }: { onKeysChange?: () => void }) 
           className="rounded-lg border border-dashed border-border px-4 py-2 font-mono text-[11px] text-text-secondary hover:border-accent-primary/40 hover:text-accent-primary"
           onClick={() => setShowForm(true)}
         >
-          + Add Key
+          {t("aiSettings.keys.button.add")}
         </button>
       )}
     </div>
@@ -165,6 +167,7 @@ export function ApiKeysSection({ onKeysChange }: { onKeysChange?: () => void }) 
 // ── Section: Profiles ─────────────────────────────────────
 
 export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
+  const { t } = useTranslation();
   const [profiles, setProfiles] = useState<AiProfile[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -175,7 +178,7 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [activeProfileId, setActiveProfileId] = useState(
-    () => localStorage.getItem("mindflow-active-ai-profile"),
+    () => localStorage.getItem("vedrr-active-ai-profile"),
   );
   const fetchIdRef = useRef(0); // race condition guard
 
@@ -208,7 +211,7 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
     } catch (e) {
       if (fetchId !== fetchIdRef.current) return;
       console.error("[ai-settings] list models failed:", e);
-      setError("Failed to load models. Check your API key.");
+      setError(t("aiSettings.profiles.error.loadModels"));
     } finally {
       if (fetchId === fetchIdRef.current) setLoadingModels(false);
     }
@@ -227,7 +230,7 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
       setShowForm(false);
     } catch (e) {
       console.error("[ai-settings] create profile failed:", e);
-      setError("Failed to create profile. Please try again.");
+      setError(t("aiSettings.profiles.error.create"));
     } finally {
       setSaving(false);
     }
@@ -243,7 +246,7 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
   };
 
   const handleSelect = (profile: AiProfile) => {
-    localStorage.setItem("mindflow-active-ai-profile", profile.id);
+    localStorage.setItem("vedrr-active-ai-profile", profile.id);
     setActiveProfileId(profile.id);
   };
 
@@ -257,7 +260,7 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="mb-2.5 w-full rounded border border-border bg-bg-page px-2.5 py-1.5 font-mono text-xs text-text-primary placeholder:text-text-secondary"
-            placeholder="Profile name"
+            placeholder={t("aiSettings.profiles.placeholder.name")}
             autoFocus
           />
 
@@ -268,7 +271,7 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
             className="mb-2.5 w-full appearance-none rounded border border-border bg-bg-page px-2.5 py-1.5 font-mono text-xs text-text-primary"
           >
             <option value="" disabled>
-              Select API Key...
+              {t("aiSettings.profiles.select.key")}
             </option>
             {apiKeys.map((k) => (
               <option key={k.id} value={k.id}>
@@ -286,17 +289,17 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
           >
             {!selectedKeyId && (
               <option value="" disabled>
-                Select a key first
+                {t("aiSettings.profiles.select.model.placeholder")}
               </option>
             )}
             {loadingModels && (
               <option value="" disabled>
-                Loading models...
+                {t("aiSettings.profiles.select.model.loading")}
               </option>
             )}
             {!loadingModels && selectedKeyId && availableModels.length === 0 && (
               <option value="" disabled>
-                No models found
+                {t("aiSettings.profiles.select.model.empty")}
               </option>
             )}
             {availableModels.map((m) => (
@@ -315,14 +318,14 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
               className="rounded px-2.5 py-1 font-mono text-[11px] text-text-secondary hover:text-text-primary"
               onClick={() => setShowForm(false)}
             >
-              Cancel
+              {t("common.button.cancel")}
             </button>
             <button
               className="rounded bg-accent-primary px-3 py-1 font-mono text-[11px] text-white hover:brightness-110 disabled:opacity-50"
               onClick={handleAdd}
               disabled={saving || !name.trim() || !selectedKeyId || !model}
             >
-              {saving ? "..." : "Create"}
+              {saving ? "..." : t("common.button.create")}
             </button>
           </div>
         </div>
@@ -331,12 +334,12 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
       {/* Profile list */}
       {profiles.length === 0 && !showForm && (
         <p className="py-4 text-center font-mono text-[11px] text-text-secondary">
-          No profiles yet.
+          {t("aiSettings.profiles.empty")}
         </p>
       )}
       {profiles.map((p) => {
         const isActive = p.id === activeProfileId;
-        const keyLabel = p.api_key_name || "No key";
+        const keyLabel = p.api_key_name || t("aiSettings.profiles.noKey");
         return (
           <div
             key={p.id}
@@ -355,7 +358,7 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
                 </span>
                 {isActive && (
                   <span className="shrink-0 rounded bg-accent-primary/20 px-1.5 py-0.5 font-mono text-[9px] text-accent-primary">
-                    ACTIVE
+                    {t("aiSettings.profiles.active")}
                   </span>
                 )}
               </div>
@@ -371,7 +374,7 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
                 e.stopPropagation();
                 handleDelete(p.id);
               }}
-              title="Delete profile"
+              title={t("aiSettings.profiles.tooltip.delete")}
             >
               ✕
             </button>
@@ -385,7 +388,7 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
           className="rounded-lg border border-dashed border-border px-4 py-2 font-mono text-[11px] text-text-secondary hover:border-accent-primary/40 hover:text-accent-primary"
           onClick={() => setShowForm(true)}
         >
-          + Add Profile
+          {t("aiSettings.profiles.button.add")}
         </button>
       )}
     </div>
@@ -395,6 +398,7 @@ export function ProfilesSection({ apiKeys }: { apiKeys: ApiKey[] }) {
 // ── Section: System Prompt ────────────────────────────────
 
 export function SystemPromptSection() {
+  const { t } = useTranslation();
   const [prompt, setPrompt] = useState("");
   const [original, setOriginal] = useState("");
   const [saving, setSaving] = useState(false);
@@ -448,7 +452,7 @@ export function SystemPromptSection() {
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         className="min-h-[120px] w-full resize-y rounded-lg border border-border bg-bg-card px-3 py-2 font-mono text-[11px] leading-relaxed text-text-primary placeholder:text-text-secondary"
-        placeholder="Loading..."
+        placeholder={t("aiSettings.systemPrompt.placeholder")}
       />
       <div className="flex justify-end gap-2">
         <button
@@ -456,14 +460,14 @@ export function SystemPromptSection() {
           onClick={handleReset}
           disabled={saving}
         >
-          Reset
+          {t("common.button.reset")}
         </button>
         <button
           className="rounded bg-accent-primary px-3 py-1 font-mono text-[11px] text-white hover:brightness-110 disabled:opacity-40"
           onClick={handleSave}
           disabled={saving || !isDirty}
         >
-          {saving ? "..." : "Save"}
+          {saving ? "..." : t("common.button.save")}
         </button>
       </div>
     </div>
