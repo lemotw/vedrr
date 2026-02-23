@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useUIStore } from "../stores/uiStore";
 import { ipc } from "../lib/ipc";
 import { cn } from "../lib/cn";
@@ -28,11 +29,13 @@ function detectLocale(): string {
 // ── General Tab ──────────────────────────────────────────
 
 function GeneralTab() {
+  const { i18n } = useTranslation();
   const [locale, setLocale] = useState(detectLocale);
 
   const handleChange = (value: string) => {
     setLocale(value);
     localStorage.setItem("mindflow-locale", value);
+    i18n.changeLanguage(value);
   };
 
   return (
@@ -52,7 +55,7 @@ function GeneralTab() {
         </select>
       </label>
       <p className="mt-2 font-mono text-[10px] text-text-secondary">
-        i18n coming soon
+        Restart may be needed for full effect.
       </p>
     </div>
   );

@@ -1,0 +1,14 @@
+{
+  "common": {
+    "untitled": "未命名",
+    "button": {
+      "save": "儲存",
+      "cancel": "取消",
+      "create": "建立",
+      "delete": "刪除",
+      "close": "關閉",
+      "reset": "重設"
+    },
+    "loading": "載入中..."
+  }
+}

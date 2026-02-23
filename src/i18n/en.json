@@ -1,0 +1,14 @@
+{
+  "common": {
+    "untitled": "Untitled",
+    "button": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "create": "Create",
+      "delete": "Delete",
+      "close": "Close",
+      "reset": "Reset"
+    },
+    "loading": "Loading..."
+  }
+}
