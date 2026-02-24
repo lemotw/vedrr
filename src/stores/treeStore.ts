@@ -337,6 +337,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       return;
     }
     await get().loadTree(contextId);
+    set({ selectedNodeId: nodeId });
   },
 
   dragMoveNode: async (nodeId, newParentId, position, contextId) => {
@@ -358,6 +359,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     });
     await ipc.moveNode(nodeId, newParentId, position);
     await get().loadTree(contextId);
+    set({ selectedNodeId: nodeId });
   },
 
   triggerCompact: (nodeId: string) => {

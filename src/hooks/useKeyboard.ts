@@ -182,6 +182,16 @@ export function useKeyboard() {
       }
 
 
+      // No node selected — any navigation key selects root
+      if (!selectedNodeId) {
+        const navKeys = new Set(["j","k","h","l","ArrowDown","ArrowUp","ArrowLeft","ArrowRight"]);
+        if (navKeys.has(e.key)) {
+          e.preventDefault();
+          useTreeStore.getState().selectNode(tree.node.id);
+          return;
+        }
+      }
+
       switch (e.key) {
         // j/↓ k/↑ — move between nodes at the same depth level (across subtrees)
         case "j":
