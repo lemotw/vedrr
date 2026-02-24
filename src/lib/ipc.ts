@@ -26,6 +26,9 @@ export const ipc = {
   archiveContext: (id: string) =>
     safeInvoke<void>(IpcCmd.ARCHIVE_CONTEXT, { id }),
 
+  vaultContext: (id: string) =>
+    safeInvoke<void>(IpcCmd.VAULT_CONTEXT, { id }),
+
   activateContext: (id: string) =>
     safeInvoke<void>(IpcCmd.ACTIVATE_CONTEXT, { id }),
 

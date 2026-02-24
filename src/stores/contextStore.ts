@@ -13,6 +13,7 @@ interface ContextStore {
   switchContext: (id: string) => Promise<void>;
   renameContext: (id: string, name: string) => Promise<void>;
   archiveContext: (id: string) => Promise<void>;
+  vaultContext: (id: string) => Promise<void>;
   activateContext: (id: string) => Promise<void>;
   deleteContext: (id: string) => Promise<void>;
 }
@@ -46,6 +47,18 @@ export const useContextStore = create<ContextStore>((set, get) => ({
 
   archiveContext: async (id: string) => {
     await ipc.archiveContext(id);
+    const { currentContextId } = get();
+    if (currentContextId === id) {
+      const contexts = await ipc.listContexts();
+      const next = contexts.find(c => c.state === ContextStates.ACTIVE && c.id !== id);
+      set({ currentContextId: next?.id ?? null, contexts });
+    } else {
+      await get().loadContexts();
+    }
+  },
+
+  vaultContext: async (id: string) => {
+    await ipc.vaultContext(id);
     const { currentContextId } = get();
     if (currentContextId === id) {
       const contexts = await ipc.listContexts();

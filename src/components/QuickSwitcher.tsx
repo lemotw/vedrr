@@ -18,48 +18,157 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(diff / 86400)}d`;
 }
 
+function highlightMatch(text: string, query: string): React.ReactNode {
+  if (!query) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span className="text-accent-primary font-bold">{text.slice(idx, idx + query.length)}</span>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
+// ── SVG Icons ─────────────────────────────────────────────
+
+function IcoVault() {
+  return (
+    <svg className="w-[13px] h-[13px]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="12" height="7" rx="1.5" />
+      <path d="M5 7V5a3 3 0 0 1 6 0v2" />
+      <circle cx="8" cy="10.5" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function IcoArchive() {
+  return (
+    <svg className="w-[13px] h-[13px]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 4h12v2H2z" />
+      <path d="M3 6v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6" />
+      <path d="M8 8v4m0 0l-2-2m2 2l2-2" />
+    </svg>
+  );
+}
+
+function IcoRestore() {
+  return (
+    <svg className="w-[13px] h-[13px]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6" />
+      <path d="M8 11V3m0 0L5.5 5.5M8 3l2.5 2.5" />
+    </svg>
+  );
+}
+
+function IcoUndo() {
+  return (
+    <svg className="w-[13px] h-[13px]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3.5 5.5L1.5 3.5l2-2" />
+      <path d="M1.5 3.5H9a4.5 4.5 0 0 1 0 9H5" />
+    </svg>
+  );
+}
+
+function IcoDelete() {
+  return (
+    <svg className="w-[13px] h-[13px]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />
+    </svg>
+  );
+}
+
+// ── Component ─────────────────────────────────────────────
+
 export function QuickSwitcher() {
   const { t } = useTranslation();
   const { quickSwitcherOpen, closeQuickSwitcher } = useUIStore();
-  const { contexts, loadContexts, switchContext, createContext, archiveContext, activateContext, deleteContext, currentContextId } = useContextStore();
-  const [search, setSearch] = useState("");
+  const {
+    contexts, loadContexts, switchContext, createContext,
+    archiveContext, vaultContext, activateContext, deleteContext,
+    currentContextId,
+  } = useContextStore();
+
+  const [vaultSearch, setVaultSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [focusPane, setFocusPane] = useState<"left" | "vault">("left");
+
   const panelRef = useRef<HTMLDivElement>(null);
+  const vaultInputRef = useRef<HTMLInputElement>(null);
+  const activeScrollRef = useRef<HTMLDivElement>(null);
+  const archivedScrollRef = useRef<HTMLDivElement>(null);
+  const vaultScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (quickSwitcherOpen) {
       loadContexts();
-      setSearch("");
+      setVaultSearch("");
       setSelectedIndex(0);
+      setFocusPane("left");
       setTimeout(() => panelRef.current?.focus(), 50);
     }
   }, [quickSwitcherOpen, loadContexts]);
 
-  const filtered = useMemo(() => {
-    if (!search) return contexts;
-    const q = search.toLowerCase();
-    return contexts.filter((c) => c.name.toLowerCase().includes(q));
-  }, [contexts, search]);
+  const active = useMemo(() => contexts.filter(c => c.state === ContextStates.ACTIVE), [contexts]);
+  const archived = useMemo(() => contexts.filter(c => c.state === ContextStates.ARCHIVED), [contexts]);
+  const vault = useMemo(() => contexts.filter(c => c.state === ContextStates.VAULT), [contexts]);
 
-  const active = filtered.filter((c) => c.state === ContextStates.ACTIVE);
-  const archived = filtered.filter((c) => c.state === ContextStates.ARCHIVED);
-  const allItems: ContextSummary[] = [...active, ...archived];
+  const filteredVault = useMemo(() => {
+    if (!vaultSearch) return vault;
+    const q = vaultSearch.toLowerCase();
+    return vault.filter(c => c.name.toLowerCase().includes(q));
+  }, [vault, vaultSearch]);
+
+  const leftItems = useMemo(() => [...active, ...archived], [active, archived]);
+  const currentList = focusPane === "left" ? leftItems : filteredVault;
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [search]);
+  }, [vaultSearch]);
+
+  // Clamp selectedIndex when list shrinks (after vault/archive/delete)
+  useEffect(() => {
+    setSelectedIndex(i => Math.min(i, Math.max(currentList.length - 1, 0)));
+  }, [currentList.length]);
+
+  // Scroll selected item into view
+  useEffect(() => {
+    if (!quickSwitcherOpen) return;
+    let container: HTMLDivElement | null;
+    let adjustedIndex: number;
+    if (focusPane === "left") {
+      if (selectedIndex < active.length) {
+        container = activeScrollRef.current;
+        adjustedIndex = selectedIndex;
+      } else {
+        container = archivedScrollRef.current;
+        adjustedIndex = selectedIndex - active.length;
+      }
+    } else {
+      container = vaultScrollRef.current;
+      adjustedIndex = selectedIndex;
+    }
+    if (!container) return;
+    const items = container.querySelectorAll("[data-qs-row]");
+    const el = items[adjustedIndex];
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+  }, [selectedIndex, focusPane, quickSwitcherOpen, active.length]);
 
   if (!quickSwitcherOpen) return null;
 
+  const inVaultMode = focusPane === "vault";
+
+  // ── Handlers ──
+
+  // switch_context backend now handles vault→active and archived→active promotion
   const handleSelect = async (ctx: ContextSummary) => {
     await switchContext(ctx.id);
     closeQuickSwitcher();
   };
 
   const handleCreate = async () => {
-    const name = search.trim() || t("quickSwitcher.defaultName");
-    await createContext(name);
+    await createContext(t("quickSwitcher.defaultName"));
     closeQuickSwitcher();
   };
 
@@ -69,6 +178,16 @@ export function QuickSwitcher() {
   };
 
   const handleActivate = async (e: React.MouseEvent, ctx: ContextSummary) => {
+    e.stopPropagation();
+    await activateContext(ctx.id);
+  };
+
+  const handleVault = async (e: React.MouseEvent, ctx: ContextSummary) => {
+    e.stopPropagation();
+    await vaultContext(ctx.id);
+  };
+
+  const handleRestoreFromVault = async (e: React.MouseEvent, ctx: ContextSummary) => {
     e.stopPropagation();
     await activateContext(ctx.id);
   };
@@ -84,37 +203,55 @@ export function QuickSwitcher() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    const isInSearch = document.activeElement === inputRef.current;
+  const enterVaultSearch = () => {
+    setFocusPane("vault");
+    setSelectedIndex(0);
+    setTimeout(() => vaultInputRef.current?.focus(), 0);
+  };
 
-    // Move down: j / ↓ / Ctrl+j / Ctrl+n
+  const exitVaultSearch = () => {
+    setVaultSearch("");
+    setFocusPane("left");
+    setSelectedIndex(0);
+    vaultInputRef.current?.blur();
+    panelRef.current?.focus();
+  };
+
+  // ── Keyboard ──
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const isInVaultSearch = document.activeElement === vaultInputRef.current;
+
+    // Down: j / ↓ / Ctrl+j / Ctrl+n
     if (
       e.key === "ArrowDown" ||
       (e.ctrlKey && (e.key === "j" || e.key === "n")) ||
-      (!isInSearch && e.key === "j")
+      (!isInVaultSearch && e.key === "j")
     ) {
       e.preventDefault();
-      if (isInSearch) {
-        inputRef.current?.blur();
+      if (currentList.length === 0) return;
+      if (isInVaultSearch) {
+        vaultInputRef.current?.blur();
         panelRef.current?.focus();
       }
-      setSelectedIndex((i) => Math.min(i + 1, allItems.length - 1));
+      setSelectedIndex(i => Math.min(i + 1, currentList.length - 1));
       return;
     }
 
-    // Move up: k / ↑ / Ctrl+k / Ctrl+p
+    // Up: k / ↑ / Ctrl+k / Ctrl+p
     if (
       e.key === "ArrowUp" ||
       (e.ctrlKey && (e.key === "k" || e.key === "p")) ||
-      (!isInSearch && e.key === "k")
+      (!isInVaultSearch && e.key === "k")
     ) {
       e.preventDefault();
-      if (!isInSearch && selectedIndex === 0) {
-        inputRef.current?.focus();
+      if (currentList.length === 0) return;
+      if (isInVaultSearch) return;
+      if (inVaultMode && selectedIndex === 0) {
+        vaultInputRef.current?.focus();
         return;
       }
-      if (isInSearch) return;
-      setSelectedIndex((i) => Math.max(i - 1, 0));
+      setSelectedIndex(i => Math.max(i - 1, 0));
       return;
     }
 
@@ -125,46 +262,165 @@ export function QuickSwitcher() {
       return;
     }
 
-    // Enter — select or create
+    // Enter — select or restore
     if (e.key === "Enter") {
       e.preventDefault();
       if (e.nativeEvent.isComposing) return;
-      if (allItems[selectedIndex]) {
-        handleSelect(allItems[selectedIndex]);
-      } else {
-        handleCreate();
+      if (currentList[selectedIndex]) {
+        handleSelect(currentList[selectedIndex]);
       }
       return;
     }
 
-    // Escape — clear search or close
+    // Escape
     if (e.key === "Escape") {
       e.preventDefault();
-      if (isInSearch && search) {
-        setSearch("");
-        inputRef.current?.blur();
-        panelRef.current?.focus();
+      if (inVaultMode) {
+        exitVaultSearch();
         return;
       }
       closeQuickSwitcher();
       return;
     }
 
-    // "/" — vim search key
-    if (!isInSearch && e.key === "/") {
+    // "/" — focus vault search
+    if (!isInVaultSearch && e.key === "/") {
       e.preventDefault();
-      inputRef.current?.focus();
+      enterVaultSearch();
       return;
     }
 
-    // Any printable char when not in search → jump to search and type
-    if (!isInSearch && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    // Tab — toggle pane
+    if (e.key === "Tab") {
       e.preventDefault();
-      setSearch(e.key);
-      inputRef.current?.focus();
+      if (focusPane === "left") {
+        enterVaultSearch();
+      } else {
+        exitVaultSearch();
+      }
       return;
     }
   };
+
+  // ── Row renderers ──
+
+  const renderLeftRow = (ctx: ContextSummary, globalIdx: number) => {
+    const isActive = ctx.state === ContextStates.ACTIVE;
+    const isCurrent = ctx.id === currentContextId;
+    const isSelected = !inVaultMode && globalIdx === selectedIndex;
+
+    return (
+      <div
+        key={ctx.id}
+        data-qs-row
+        className={cn(
+          "group/row flex items-center px-3 py-[7px] cursor-pointer transition-colors",
+          isSelected && "bg-[var(--color-hover)]",
+          isCurrent && "bg-accent-primary/8",
+        )}
+        onClick={() => handleSelect(ctx)}
+        onMouseEnter={() => { if (!inVaultMode) setSelectedIndex(globalIdx); }}
+      >
+        <span className={cn(
+          "text-[8px] w-[14px] shrink-0 text-center",
+          isCurrent ? "text-accent-primary" : isActive ? "text-accent-primary" : "text-text-secondary",
+        )}>
+          {isCurrent ? "\u25B8" : isActive ? "\u25CF" : "\u25CB"}
+        </span>
+        <span className="text-[9px] text-text-secondary shrink-0 ml-1 mr-1.5 opacity-45 w-6">
+          {timeAgo(ctx.last_accessed_at)}
+        </span>
+        <span className={cn(
+          "text-[12px] font-mono truncate flex-1 min-w-0",
+          isActive ? "text-text-primary" : "text-text-secondary",
+        )}>
+          {ctx.name}
+        </span>
+        <div className={cn(
+          "flex items-center gap-0.5 shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity ml-1",
+          isSelected && "opacity-100",
+        )}>
+          <button
+            className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-secondary transition-all cursor-pointer"
+            onClick={(e) => handleVault(e, ctx)}
+            title={t("quickSwitcher.button.vault")}
+            aria-label={t("quickSwitcher.button.vault")}
+          >
+            <IcoVault />
+          </button>
+          {isActive ? (
+            <button
+              className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer"
+              onClick={(e) => handleArchive(e, ctx)}
+              title={t("quickSwitcher.button.archive")}
+              aria-label={t("quickSwitcher.button.archive")}
+            >
+              <IcoArchive />
+            </button>
+          ) : (
+            <button
+              className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer"
+              onClick={(e) => handleActivate(e, ctx)}
+              title={t("quickSwitcher.button.restore")}
+              aria-label={t("quickSwitcher.button.restore")}
+            >
+              <IcoRestore />
+            </button>
+          )}
+          <button
+            className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-[#FF4444] transition-all cursor-pointer"
+            onClick={(e) => handleDelete(e, ctx)}
+            title={t("quickSwitcher.button.delete")}
+            aria-label={t("quickSwitcher.button.delete")}
+          >
+            <IcoDelete />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderVaultRow = (ctx: ContextSummary, idx: number) => {
+    const isSelected = inVaultMode && idx === selectedIndex;
+
+    return (
+      <div
+        key={ctx.id}
+        data-qs-row
+        className={cn(
+          "group/row flex items-center px-3 py-[7px] cursor-pointer transition-colors",
+          isSelected && "bg-[var(--color-hover)]",
+        )}
+        onClick={() => handleSelect(ctx)}
+        onMouseEnter={() => { if (inVaultMode) setSelectedIndex(idx); }}
+      >
+        <span className="text-[8px] w-[14px] shrink-0 text-center text-text-secondary opacity-50">
+          {"\u25C6"}
+        </span>
+        <span className="text-[9px] text-text-secondary shrink-0 ml-1 mr-1.5 opacity-45 w-6">
+          {timeAgo(ctx.last_accessed_at)}
+        </span>
+        <span className="text-[11px] font-mono truncate flex-1 min-w-0 text-text-secondary">
+          {vaultSearch ? highlightMatch(ctx.name, vaultSearch) : ctx.name}
+        </span>
+        <div className={cn(
+          "flex items-center gap-0.5 shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity ml-1",
+          isSelected && "opacity-100",
+        )}>
+          <button
+            className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer"
+            onClick={(e) => handleRestoreFromVault(e, ctx)}
+            title={t("quickSwitcher.button.restore")}
+            aria-label={t("quickSwitcher.button.restore")}
+          >
+            <IcoUndo />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Render ──
 
   return (
     <div
@@ -178,156 +434,176 @@ export function QuickSwitcher() {
         role="dialog"
         aria-modal="true"
         aria-label={t("quickSwitcher.ariaLabel")}
-        className="relative w-[480px] bg-bg-elevated rounded-2xl overflow-hidden flex flex-col max-h-[520px] outline-none"
+        className="relative w-[560px] bg-bg-elevated rounded-2xl overflow-hidden flex flex-col max-h-[520px] outline-none shadow-[0_24px_80px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.04)]"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        {/* Search */}
-        <div className="flex items-center px-4 h-12 bg-bg-card">
-          <input
-            ref={inputRef}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("quickSwitcher.placeholder")}
-            aria-autocomplete="list"
-            aria-controls="qs-list"
-            aria-activedescendant={allItems[selectedIndex] ? `qs-item-${selectedIndex}` : undefined}
-            className="flex-1 bg-transparent text-[13px] text-text-primary placeholder:text-text-secondary outline-none font-mono"
-          />
-          <span className="text-[10px] text-text-secondary bg-bg-elevated px-2 py-1 rounded">
-            {modSymbol}K
-          </span>
-        </div>
-
-        {/* List */}
-        <div className="flex-1 overflow-auto" role="listbox" id="qs-list">
-          {active.length > 0 && (
-            <>
-              <div className="px-4 pt-3 pb-1.5">
+        {/* Body: left + right panes */}
+        <div className="flex min-h-0 h-[420px]">
+          {/* ── Left pane: Active + Archived ── */}
+          <div className={cn(
+            "w-[70%] flex flex-col min-h-0 border-r border-border transition-opacity",
+            inVaultMode && "opacity-20 pointer-events-none",
+          )}>
+            {/* Active area (flex 7) */}
+            <div className="flex-[7] flex flex-col min-h-0 overflow-hidden">
+              <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
                 <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
                   {t("quickSwitcher.section.active")}
                 </span>
+                <span className="text-[10px] text-text-secondary opacity-50">{active.length}</span>
               </div>
-              {active.map((ctx) => {
-                const idx = allItems.indexOf(ctx);
-                const isCurrent = ctx.id === currentContextId;
-                return (
-                  <div
-                    key={ctx.id}
-                    role="option"
-                    id={`qs-item-${idx}`}
-                    aria-selected={idx === selectedIndex}
-                    className={cn(
-                      "group/row flex items-center px-4 py-2.5 cursor-pointer",
-                      idx === selectedIndex && "bg-[var(--color-hover)]",
-                      isCurrent && "bg-accent-primary/8",
-                    )}
-                    onClick={() => handleSelect(ctx)}
-                    onMouseEnter={() => setSelectedIndex(idx)}
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className={cn("text-[10px] shrink-0", isCurrent ? "text-accent-primary" : "text-text-secondary")}>
-                        {isCurrent ? "▸" : "●"}
-                      </span>
-                      <span className="text-[13px] text-text-primary font-mono truncate">{ctx.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0 mx-2">
-                      <button
-                        className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
-                          text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)] transition-all cursor-pointer"
-                        onClick={(e) => handleArchive(e, ctx)}
-                        title={t("quickSwitcher.button.archive")}
-                      >
-                        {t("quickSwitcher.button.archive")}
-                      </button>
-                      <button
-                        className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
-                          text-text-secondary hover:text-[#FF4444] hover:bg-[var(--color-hover)] transition-all cursor-pointer"
-                        onClick={(e) => handleDelete(e, ctx)}
-                        title={t("quickSwitcher.button.delete")}
-                      >
-                        {t("quickSwitcher.button.delete")}
-                      </button>
-                    </div>
-                    <span className="text-[10px] text-text-secondary font-mono shrink-0">
-                      {ctx.node_count}n · {timeAgo(ctx.last_accessed_at)}
-                    </span>
+              <div ref={activeScrollRef} className="flex-1 overflow-y-auto">
+                {active.map((ctx, i) => renderLeftRow(ctx, i))}
+                {active.length === 0 && archived.length === 0 && (
+                  <div className="px-3 py-6 text-center text-text-secondary text-[11px]">
+                    {t("quickSwitcher.empty")}
                   </div>
-                );
-              })}
-            </>
-          )}
+                )}
+              </div>
+            </div>
 
-          {archived.length > 0 && (
-            <>
-              {active.length > 0 && <div className="h-px bg-border mx-0" />}
-              <div className="px-4 pt-3 pb-1.5">
+            {/* Archived area (flex 3) */}
+            <div className="flex-[3] flex flex-col min-h-0 overflow-hidden border-t border-border">
+              <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
                 <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
                   {t("quickSwitcher.section.archived")}
                 </span>
+                <span className="text-[10px] text-text-secondary opacity-50">{archived.length}</span>
               </div>
-              {archived.map((ctx) => {
-                const idx = allItems.indexOf(ctx);
-                return (
-                  <div
-                    key={ctx.id}
-                    role="option"
-                    id={`qs-item-${idx}`}
-                    aria-selected={idx === selectedIndex}
-                    className={cn(
-                      "group/row flex items-center px-4 py-2.5 cursor-pointer",
-                      idx === selectedIndex && "bg-[var(--color-hover)]",
-                    )}
-                    onClick={() => handleSelect(ctx)}
-                    onMouseEnter={() => setSelectedIndex(idx)}
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="text-[10px] text-text-secondary shrink-0">○</span>
-                      <span className="text-[13px] text-text-secondary font-mono truncate">{ctx.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0 mx-2">
-                      <button
-                        className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
-                          text-text-secondary hover:text-text-primary hover:bg-[var(--color-hover)] transition-all cursor-pointer"
-                        onClick={(e) => handleActivate(e, ctx)}
-                        title={t("quickSwitcher.button.restore")}
-                      >
-                        {t("quickSwitcher.button.restore")}
-                      </button>
-                      <button
-                        className="opacity-0 group-hover/row:opacity-100 px-1.5 py-0.5 rounded text-[10px] font-mono
-                          text-text-secondary hover:text-[#FF4444] hover:bg-[var(--color-hover)] transition-all cursor-pointer"
-                        onClick={(e) => handleDelete(e, ctx)}
-                        title={t("quickSwitcher.button.delete")}
-                      >
-                        {t("quickSwitcher.button.delete")}
-                      </button>
-                    </div>
-                    <span className="text-[10px] text-text-secondary font-mono shrink-0">
-                      {ctx.node_count}n · {timeAgo(ctx.last_accessed_at)}
-                    </span>
-                  </div>
-                );
-              })}
-            </>
-          )}
-
-          {allItems.length === 0 && (
-            <div className="px-4 py-8 text-center text-text-secondary text-[13px]">
-              {search ? t("quickSwitcher.noMatch") : t("quickSwitcher.empty")}
+              <div ref={archivedScrollRef} className="flex-1 overflow-y-auto">
+                {archived.map((ctx, i) => renderLeftRow(ctx, active.length + i))}
+              </div>
             </div>
-          )}
+          </div>
+
+          {/* ── Right pane: Vault ── */}
+          <div className="w-[30%] flex flex-col min-h-0">
+            <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
+              <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
+                {t("quickSwitcher.section.vault")}
+              </span>
+              <span className="text-[10px] text-text-secondary opacity-50">
+                {vaultSearch ? `${filteredVault.length} / ${vault.length}` : vault.length}
+              </span>
+            </div>
+
+            {/* Vault search */}
+            <div className={cn(
+              "flex items-center mx-2 mb-1.5 bg-bg-card rounded-md px-2 h-7 border border-transparent transition-colors shrink-0",
+              inVaultMode && "border-text-secondary/30",
+            )}>
+              <span className="text-[10px] text-text-secondary opacity-40 mr-1.5 shrink-0">{"\u2315"}</span>
+              <input
+                ref={vaultInputRef}
+                value={vaultSearch}
+                onChange={(e) => setVaultSearch(e.target.value)}
+                placeholder={t("quickSwitcher.vaultSearch")}
+                className="flex-1 bg-transparent text-[10px] text-text-primary placeholder:text-text-secondary/35 outline-none font-mono min-w-0"
+              />
+              <span className="text-[8px] text-text-secondary opacity-30 bg-bg-elevated px-1 py-0.5 rounded-sm shrink-0">
+                {inVaultMode ? "esc" : "/"}
+              </span>
+            </div>
+
+            {/* Vault list */}
+            <div ref={vaultScrollRef} className="flex-1 overflow-y-auto">
+              {filteredVault.map((ctx, i) => renderVaultRow(ctx, i))}
+              {filteredVault.length === 0 && vault.length > 0 && (
+                <div className="px-3 py-4 text-center text-text-secondary text-[11px]">
+                  {t("quickSwitcher.noMatch")}
+                </div>
+              )}
+              {vault.length === 0 && (
+                <div className="px-3 py-4 text-center text-text-secondary/50 text-[10px]">
+                  {t("quickSwitcher.vaultEmpty")}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-4 h-12 bg-bg-card">
+        {/* ── Footer ── */}
+        <div className="flex items-center justify-between px-3 h-12 bg-bg-card shrink-0">
           <button
             onClick={handleCreate}
-            className="px-3 py-1.5 text-[12px] font-bold text-white bg-accent-primary rounded-md font-mono cursor-pointer flex items-center gap-2"
+            className="px-3 py-1.5 text-[11px] font-bold text-white bg-accent-primary rounded-md font-mono cursor-pointer flex items-center gap-1.5"
           >
             {t("quickSwitcher.button.new")}
-            <span className="text-[10px] opacity-70">{modSymbol}N</span>
+            <span className="text-[9px] opacity-70">{modSymbol}N</span>
           </button>
+
+          <div className="flex items-center gap-2.5">
+            {inVaultMode ? (
+              <>
+                <span className="text-[9px] text-text-secondary opacity-40">
+                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-0.5">j</kbd>
+                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">k</kbd>
+                  {t("quickSwitcher.hint.results")}
+                </span>
+                <span className="text-[9px] text-text-secondary opacity-40">
+                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">enter</kbd>
+                  {t("quickSwitcher.hint.restoreAction")}
+                </span>
+                <span className="text-[9px] text-text-secondary opacity-40">
+                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">esc</kbd>
+                  {t("quickSwitcher.hint.clear")}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-[9px] text-text-secondary opacity-40">
+                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-0.5">j</kbd>
+                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">k</kbd>
+                  {t("quickSwitcher.hint.nav")}
+                </span>
+                <span className="text-[9px] text-text-secondary opacity-40">
+                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">/</kbd>
+                  {t("quickSwitcher.hint.vaultSearch")}
+                </span>
+                <span className="text-[9px] text-text-secondary opacity-40">
+                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">esc</kbd>
+                  {t("quickSwitcher.hint.close")}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Help button */}
+          <div className="group/help relative shrink-0">
+            <button className="w-5 h-5 rounded-full border border-border text-text-secondary text-[10px] font-bold flex items-center justify-center opacity-40 hover:opacity-100 hover:border-text-secondary transition-all cursor-pointer">
+              ?
+            </button>
+            <div className="hidden group-hover/help:block absolute bottom-[calc(100%+8px)] right-0 w-[260px] bg-bg-card border border-border rounded-xl p-3 shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-10">
+              <div className="mb-2.5">
+                <div className="text-[9px] font-bold tracking-[1.5px] text-text-secondary mb-0.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent-primary mr-1.5 align-middle relative -top-px" />
+                  ACTIVE
+                </div>
+                <div className="text-[10px] leading-relaxed text-text-secondary/80">
+                  {t("quickSwitcher.help.active")}
+                </div>
+              </div>
+              <div className="mb-2.5">
+                <div className="text-[9px] font-bold tracking-[1.5px] text-text-secondary mb-0.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-text-secondary mr-1.5 align-middle relative -top-px" />
+                  ARCHIVED
+                </div>
+                <div className="text-[10px] leading-relaxed text-text-secondary/80">
+                  {t("quickSwitcher.help.archived")}
+                </div>
+              </div>
+              <div>
+                <div className="text-[9px] font-bold tracking-[1.5px] text-text-secondary mb-0.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-text-secondary/50 mr-1.5 align-middle relative -top-px" />
+                  VAULT
+                </div>
+                <div className="text-[10px] leading-relaxed text-text-secondary/80">
+                  {t("quickSwitcher.help.vault")}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

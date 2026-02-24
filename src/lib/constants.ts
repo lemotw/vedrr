@@ -23,6 +23,7 @@ export const IpcCmd = {
   LIST_CONTEXTS: "list_contexts",
   SWITCH_CONTEXT: "switch_context",
   ARCHIVE_CONTEXT: "archive_context",
+  VAULT_CONTEXT: "vault_context",
   ACTIVATE_CONTEXT: "activate_context",
   RENAME_CONTEXT: "rename_context",
   DELETE_CONTEXT: "delete_context",

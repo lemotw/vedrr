@@ -37,6 +37,7 @@ fn main() {
             commands::context::list_contexts,
             commands::context::switch_context,
             commands::context::archive_context,
+            commands::context::vault_context,
             commands::context::activate_context,
             commands::context::rename_context,
             commands::context::delete_context,

@@ -191,9 +191,12 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     // Snapshot subtree before delete
     const nodes = flattenNodes(target);
     set({ undoStack: pushUndo(undoStack, { type: "delete", nodes, contextId, prevSelectedId: selectedNodeId }) });
+    // Find parent before deletion so we can select it after
+    const parent = findParent(tree, nodeId);
     await ipc.deleteNode(nodeId);
     await get().loadTree(contextId);
-    set({ selectedNodeId: null });
+    const newTree = get().tree;
+    set({ selectedNodeId: parent?.node.id ?? newTree?.node.id ?? null });
   },
 
   updateNodeTitle: async (nodeId, title) => {

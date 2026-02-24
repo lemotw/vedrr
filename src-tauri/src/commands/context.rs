@@ -77,7 +77,7 @@ pub fn list_contexts(state: State<'_, AppState>) -> Result<Vec<ContextSummary>, 
 pub fn switch_context(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     let changed = db.execute(
-        "UPDATE contexts SET last_accessed_at = datetime('now'), state = CASE WHEN state = 'archived' THEN 'active' ELSE state END WHERE id = ?1",
+        "UPDATE contexts SET last_accessed_at = datetime('now'), state = CASE WHEN state IN ('archived', 'vault') THEN 'active' ELSE state END WHERE id = ?1",
         [&id],
     )?;
     if changed == 0 {
@@ -93,6 +93,19 @@ pub fn archive_context(state: State<'_, AppState>, id: String) -> Result<(), App
         "UPDATE contexts SET state = 'archived', updated_at = datetime('now') WHERE id = ?1",
         [&id],
     )?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn vault_context(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
+    let db = state.db.lock().unwrap();
+    let changed = db.execute(
+        "UPDATE contexts SET state = 'vault', updated_at = datetime('now') WHERE id = ?1",
+        [&id],
+    )?;
+    if changed == 0 {
+        return Err(AppError::ContextNotFound(id));
+    }
     Ok(())
 }
 

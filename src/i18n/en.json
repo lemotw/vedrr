@@ -20,20 +20,36 @@
   },
   "quickSwitcher": {
     "ariaLabel": "Quick Switcher",
-    "placeholder": "Search...",
     "section": {
       "active": "ACTIVE",
-      "archived": "ARCHIVED"
+      "archived": "ARCHIVED",
+      "vault": "VAULT"
     },
     "button": {
       "new": "+ New",
       "archive": "Archive",
       "delete": "Delete",
-      "restore": "Restore"
+      "restore": "Restore",
+      "vault": "Vault"
     },
     "empty": "No contexts yet",
     "noMatch": "No matches",
+    "vaultEmpty": "No vault items",
+    "vaultSearch": "Search...",
     "defaultName": "New Context",
+    "hint": {
+      "nav": "nav",
+      "vaultSearch": "vault search",
+      "close": "close",
+      "results": "results",
+      "restoreAction": "restore",
+      "clear": "clear"
+    },
+    "help": {
+      "active": "Active mind maps you can switch to anytime. Sorted by last accessed.",
+      "archived": "Inactive mind maps. Hidden from main view but can be restored to Active.",
+      "vault": "Long-term archived mind maps. Data preserved, searchable, restorable."
+    },
     "confirm": {
       "deleteTitle": "Delete Confirmation",
       "deleteMessage": "Permanently delete \"{{name}}\"? This cannot be undone."

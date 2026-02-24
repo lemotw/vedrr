@@ -20,20 +20,36 @@
   },
   "quickSwitcher": {
     "ariaLabel": "快速切換",
-    "placeholder": "搜尋...",
     "section": {
       "active": "ACTIVE",
-      "archived": "ARCHIVED"
+      "archived": "ARCHIVED",
+      "vault": "VAULT"
     },
     "button": {
       "new": "+ New",
       "archive": "Archive",
       "delete": "Delete",
-      "restore": "Restore"
+      "restore": "Restore",
+      "vault": "Vault"
     },
     "empty": "還沒有 Context",
     "noMatch": "找不到",
+    "vaultEmpty": "沒有封存項目",
+    "vaultSearch": "搜尋...",
     "defaultName": "新 Context",
+    "hint": {
+      "nav": "導航",
+      "vaultSearch": "vault 搜尋",
+      "close": "關閉",
+      "results": "結果",
+      "restoreAction": "還原",
+      "clear": "清除"
+    },
+    "help": {
+      "active": "使用中的心智圖，可隨時切換編輯。依最近存取時間排序。",
+      "archived": "暫時不用的心智圖。不會出現在主畫面，但可以隨時 restore 回 Active。",
+      "vault": "長期封存的心智圖。資料完整保留，不佔用 Active 空間。需要時可搜尋並 restore。"
+    },
     "confirm": {
       "deleteTitle": "刪除確認",
       "deleteMessage": "確定要永久刪除「{{name}}」？此操作無法復原。"
