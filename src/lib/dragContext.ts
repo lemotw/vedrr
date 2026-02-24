@@ -1,11 +1,13 @@
 import { createContext, useContext } from "react";
 
+export type DropIntent = "reorder" | "into" | null;
+
 interface DragState {
   activeId: string | null;
   activeParentId: string | null;
   overId: string | null;
   overParentId: string | null;
-  reparentIntent: boolean;
+  dropIntent: DropIntent;
 }
 
 export const DragStateContext = createContext<DragState>({
@@ -13,7 +15,7 @@ export const DragStateContext = createContext<DragState>({
   activeParentId: null,
   overId: null,
   overParentId: null,
-  reparentIntent: false,
+  dropIntent: null,
 });
 
 export function useDragState() {

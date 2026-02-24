@@ -21,6 +21,7 @@ interface Props {
   isSelected?: boolean;
   isCutNode?: boolean;
   isDropTarget?: boolean;
+  showReorderHint?: boolean;
   compactHighlight?: CompactHighlightInfo | null;
   compactFading?: boolean;
   dimmed?: boolean;
@@ -128,7 +129,7 @@ function RootNodeHeading({ node, isSelected, isCutNode, isDropTarget, dimmed, on
   );
 }
 
-function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, compactHighlight, compactFading, dimmed, onClick, dragHandleListeners }: Props) {
+function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, showReorderHint, compactHighlight, compactFading, dimmed, onClick, dragHandleListeners }: Props) {
   const { t } = useTranslation();
   const { letter, color } = NODE_TYPE_CONFIG[node.node_type as NodeType];
   const updateNodeTitle = useTreeStore(s => s.updateNodeTitle);
@@ -184,11 +185,12 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, compactHighli
       <div
         ref={cardRef}
         className={cn(
-          "flex items-center gap-2 rounded-md bg-bg-card cursor-pointer overflow-hidden",
+          "relative flex items-center gap-2 rounded-md bg-bg-card cursor-pointer overflow-hidden",
           "transition-[background-color,border-color] duration-700",
           isDropTarget && "ring-2 ring-accent-primary bg-accent-primary/10",
-          !isDropTarget && isSelected && "ring-1 ring-accent-primary",
-          !isDropTarget && !isSelected && "hover:ring-1 hover:ring-border",
+          !isDropTarget && showReorderHint && "bg-bg-elevated",
+          !isDropTarget && !showReorderHint && isSelected && "ring-1 ring-accent-primary",
+          !isDropTarget && !showReorderHint && !isSelected && "hover:ring-1 hover:ring-border",
           isCutNode && "opacity-40",
           dimmed && "opacity-40 pointer-events-none",
         )}
@@ -276,6 +278,9 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, compactHighli
             </button>
           )}
         </div>
+        {showReorderHint && !isDropTarget && (
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-accent-primary/35 pointer-events-none" />
+        )}
       </div>
 
       {showLightbox && imageSrc && (

@@ -3,10 +3,10 @@ import { useTranslation } from "react-i18next";
 import type { TreeData } from "../lib/types";
 import { NODE_TYPE_CONFIG } from "../lib/types";
 import { useContextStore } from "../stores/contextStore";
-import { useTreeStore, findNode, findParent } from "../stores/treeStore";
+import { useTreeStore, findNode } from "../stores/treeStore";
 import { useUIStore } from "../stores/uiStore";
 import { CompactStates } from "../lib/constants";
-import { DragStateContext, useDragState } from "../lib/dragContext";
+import { DragStateContext, useDragState, type DropIntent } from "../lib/dragContext";
 import { NodeCard } from "./NodeCard";
 import {
   DndContext,
@@ -82,17 +82,32 @@ const SortableChildRow = memo(function SortableChildRow({
       id: data.node.id,
       data: { parentId },
     });
+  const dragState = useDragState();
+  // Show reorder hint on the hovered sibling during reorder intent
+  const isOverThis = dragState.overId === data.node.id && dragState.activeId !== null;
+  const showReorderHint = isOverThis && dragState.dropIntent === "reorder";
+
+  // Suppress dnd-kit's sort preview shift when intent is reparent —
+  // otherwise sortable strategy slides siblings down even though
+  // we're not inserting between them.
+  // Scoped to siblings sharing the same parent as the over node.
+  const suppressTransform =
+    dragState.activeId !== null &&
+    dragState.dropIntent === "into" &&
+    dragState.overParentId === parentId;
 
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(
-      transform ? { ...transform, scaleX: 1, scaleY: 1 } : null,
-    ),
-    transition,
+    transform: suppressTransform
+      ? undefined
+      : CSS.Transform.toString(
+          transform ? { ...transform, scaleX: 1, scaleY: 1 } : null,
+        ),
+    transition: suppressTransform ? undefined : transition,
     opacity: isDragging ? 0.4 : undefined,
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} className="flex items-stretch">
+    <div ref={setNodeRef} style={style} {...attributes} className="flex items-stretch relative">
       <div className="shrink-0 flex flex-col" style={{ width: 20 }}>
         <div
           style={{
@@ -119,6 +134,7 @@ const SortableChildRow = memo(function SortableChildRow({
           ancestorCut={ancestorCut}
           compactNodeIds={compactNodeIds}
           dragHandleListeners={listeners}
+          showReorderHint={showReorderHint}
         />
       </div>
     </div>
@@ -139,12 +155,14 @@ const TreeBranch = memo(function TreeBranch({
   ancestorCut,
   compactNodeIds,
   dragHandleListeners,
+  showReorderHint,
 }: {
   data: TreeData;
   isRoot?: boolean;
   ancestorCut?: boolean;
   compactNodeIds?: Set<string> | null;
   dragHandleListeners?: ReturnType<typeof useSortable>["listeners"];
+  showReorderHint?: boolean;
 }) {
   const { t } = useTranslation();
   const selectedNodeId = useTreeStore(s => s.selectedNodeId);
@@ -170,7 +188,7 @@ const TreeBranch = memo(function TreeBranch({
     dragState.activeId !== null &&
     dragState.overId === data.node.id &&
     dragState.activeId !== data.node.id &&
-    dragState.reparentIntent;
+    dragState.dropIntent === "into";
 
   const highlight = compactHighlights?.get(data.node.id) ?? null;
 
@@ -181,6 +199,7 @@ const TreeBranch = memo(function TreeBranch({
       isSelected={isSelected}
       isCutNode={inCutSubtree}
       isDropTarget={isReparentTarget}
+      showReorderHint={showReorderHint}
       compactHighlight={highlight}
       compactFading={compactFading}
       dimmed={isOutsideCompact}
@@ -198,8 +217,8 @@ const TreeBranch = memo(function TreeBranch({
         ) : (
           nodeCard
         )}
-        {/* Add child button — visible on hover or when selected; hidden outside compact subtree */}
-        {currentContextId && !isOutsideCompact && (
+        {/* Add child button — visible on hover or when selected; hidden during drag hint */}
+        {currentContextId && !isOutsideCompact && !showReorderHint && (
           <AddButton
             className={isSelected
               ? "opacity-100 mx-1"
@@ -293,7 +312,7 @@ export function TreeCanvas() {
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [overParentId, setOverParentId] = useState<string | null>(null);
-  const [reparentIntent, setReparentIntent] = useState(false);
+  const [dropIntent, setDropIntent] = useState<DropIntent>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -322,38 +341,46 @@ export function TreeCanvas() {
     const oParentId = event.over?.data.current?.parentId as string ?? null;
     setOverParentId(oParentId);
 
-    // Compute reparent intent: reparent is default, reorder only in edge gap zone
     if (event.over && event.active.id !== event.over.id) {
       const aParentId = event.active.data.current?.parentId as string ?? null;
-      if (aParentId !== oParentId) {
-        // Different parent → always reparent
-        setReparentIntent(true);
+      if (aParentId !== oParentId || !oParentId) {
+        // Different parent or drop on root → always reparent
+        setDropIntent("into");
       } else {
-        // Same parent → reparent unless pointer is in the gap zone (edges)
+        // Same parent → use X axis: left = reorder, right = reparent
+        // Cap width to card area (~240px: 20px connector + ~200px card + padding)
+        // so threshold doesn't land in children subtree zone
         const rect = event.over.rect;
         const initEvent = event.activatorEvent as PointerEvent;
-        const pointerY = initEvent.clientY + event.delta.y;
-        const GAP_ZONE = 8;
-        setReparentIntent(pointerY > rect.top + GAP_ZONE && pointerY < rect.bottom - GAP_ZONE);
+        const pointerX = initEvent.clientX + event.delta.x;
+        const cardAreaWidth = Math.min(rect.width, 240);
+        const REPARENT_X_RATIO = 0.65;
+
+        if (pointerX > rect.left + cardAreaWidth * REPARENT_X_RATIO) {
+          setDropIntent("into");
+        } else {
+          setDropIntent("reorder");
+        }
       }
     } else {
-      setReparentIntent(false);
+      setDropIntent(null);
     }
   }, []);
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event;
+    // Capture intent BEFORE resetting state so action matches visual feedback
+    const finalIntent = dropIntent;
     setActiveId(null);
     setActiveParentId(null);
     setOverId(null);
     setOverParentId(null);
-    setReparentIntent(false);
+    setDropIntent(null);
     if (!over || !currentContextId || !tree || active.id === over.id) return;
 
     const activeNodeId = active.id as string;
     const overNodeId = over.id as string;
     const aParentId = active.data.current?.parentId as string;
-    const oParentId = over.data.current?.parentId as string | undefined;
 
     if (!aParentId) return; // can't drag root
 
@@ -366,48 +393,32 @@ export function TreeCanvas() {
       await dragMoveNode(activeNodeId, targetId, lastPos, currentContextId);
     };
 
-    if (!oParentId) {
-      // Dropped on root → reparent as last child of root
+    if (finalIntent === "into") {
       await reparentInto(overNodeId);
-      return;
+    } else if (finalIntent === "reorder") {
+      // Reorder within same parent
+      // Backend move_node shifts siblings first then sets position, so:
+      //   drag down (activeIdx < overIdx) → position = over.position + 1
+      //   drag up   (activeIdx > overIdx) → position = over.position
+      const parentNode = findNode(tree, aParentId);
+      const overNode = findNode(tree, overNodeId);
+      if (!parentNode || !overNode) return;
+      const activeIdx = parentNode.children.findIndex(c => c.node.id === activeNodeId);
+      const overIdx = parentNode.children.findIndex(c => c.node.id === overNodeId);
+      if (activeIdx === overIdx) return;
+
+      const position = activeIdx < overIdx
+        ? overNode.node.position + 1
+        : overNode.node.position;
+
+      await dragMoveNode(activeNodeId, aParentId, position, currentContextId);
     }
-
-    if (aParentId === oParentId) {
-      // Same parent: check pointer position to decide reparent vs reorder
-      const rect = over.rect;
-      const initEvent = event.activatorEvent as PointerEvent;
-      const pointerY = initEvent.clientY + event.delta.y;
-      const GAP_ZONE = 8;
-
-      if (pointerY > rect.top + GAP_ZONE && pointerY < rect.bottom - GAP_ZONE) {
-        // Pointer within node bounds → reparent (append as last child of over node)
-        await reparentInto(overNodeId);
-      } else {
-        // Pointer in gap zone → reorder within same parent
-        const parent = findParent(tree, activeNodeId);
-        if (!parent) return;
-        const siblings = parent.children;
-        const activeIdx = siblings.findIndex((c) => c.node.id === activeNodeId);
-        const overIdx = siblings.findIndex((c) => c.node.id === overNodeId);
-        const overNode = siblings[overIdx];
-        if (!overNode || activeIdx === overIdx) return;
-
-        const position =
-          activeIdx < overIdx
-            ? overNode.node.position + 1
-            : overNode.node.position;
-
-        await dragMoveNode(activeNodeId, aParentId, position, currentContextId);
-      }
-    } else {
-      // Different parent → reparent as last child of over node
-      await reparentInto(overNodeId);
-    }
-  }, [tree, currentContextId, dragMoveNode]);
+    // finalIntent === null → no-op (dropped on self or invalid)
+  }, [tree, currentContextId, dragMoveNode, dropIntent]);
 
   const dragContextValue = useMemo(
-    () => ({ activeId, activeParentId, overId, overParentId, reparentIntent }),
-    [activeId, activeParentId, overId, overParentId, reparentIntent],
+    () => ({ activeId, activeParentId, overId, overParentId, dropIntent }),
+    [activeId, activeParentId, overId, overParentId, dropIntent],
   );
 
   if (!currentContextId) {
