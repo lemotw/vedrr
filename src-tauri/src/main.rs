@@ -3,6 +3,7 @@
 
 mod commands;
 mod db;
+mod embedding;
 mod error;
 mod models;
 
