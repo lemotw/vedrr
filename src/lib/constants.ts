@@ -48,6 +48,9 @@ export const IpcCmd = {
   GET_SYSTEM_PROMPT: "get_system_prompt",
   SET_SYSTEM_PROMPT: "set_system_prompt",
   LIST_MODELS: "list_models",
+  SEMANTIC_SEARCH: "semantic_search",
+  EMBED_CONTEXT_NODES: "embed_context_nodes",
+  EMBED_SINGLE_NODE: "embed_single_node",
 } as const;
 
 // ── Themes ─────────────────────────────────────────────────

@@ -89,6 +89,16 @@ export interface AiProfile {
   created_at: string;
 }
 
+export interface SearchResult {
+  node_id: string;
+  node_title: string;
+  node_type: string;
+  context_id: string;
+  context_name: string;
+  ancestor_path: string;
+  score: number;
+}
+
 import { NodeTypes } from "./constants";
 
 export const NODE_TYPE_CONFIG: Record<NodeType, { letter: string; color: string }> = {

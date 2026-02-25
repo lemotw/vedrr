@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Context, ContextSummary, TreeData, TreeNode, CompactResult, AiProfile, ApiKey, ModelInfo } from "./types";
+import type { Context, ContextSummary, TreeData, TreeNode, CompactResult, AiProfile, ApiKey, ModelInfo, SearchResult } from "./types";
 import { IpcCmd } from "./constants";
 
 async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -113,4 +113,13 @@ export const ipc = {
 
   listModels: (apiKeyId: string) =>
     safeInvoke<ModelInfo[]>(IpcCmd.LIST_MODELS, { apiKeyId }),
+
+  semanticSearch: (query: string, topK: number = 10) =>
+    safeInvoke<SearchResult[]>(IpcCmd.SEMANTIC_SEARCH, { query, topK }),
+
+  embedContextNodes: (contextId: string) =>
+    safeInvoke<number>(IpcCmd.EMBED_CONTEXT_NODES, { contextId }),
+
+  embedSingleNode: (nodeId: string) =>
+    safeInvoke<void>(IpcCmd.EMBED_SINGLE_NODE, { nodeId }),
 };
