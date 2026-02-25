@@ -63,6 +63,9 @@ fn main() {
             commands::ai::get_system_prompt,
             commands::ai::set_system_prompt,
             commands::ai::list_models,
+            commands::search::semantic_search,
+            commands::search::embed_context_nodes,
+            commands::search::embed_single_node,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
