@@ -260,6 +260,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       set({ undoStack: pushUndo(undoStack, { type: "add", nodeId: node.id, contextId, prevSelectedId: selectedNodeId }) });
       await get().loadTree(contextId);
       set({ selectedNodeId: node.id });
+      ipc.embedSingleNode(node.id).catch(console.error);
     } else {
       const title = data.text.trim().split("\n")[0].slice(0, 200);
       if (!title) return;
@@ -271,6 +272,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       await get().loadTree(contextId);
       set({ selectedNodeId: node.id });
       useUIStore.getState().setEditingNode(node.id);
+      ipc.embedSingleNode(node.id).catch(console.error);
     }
   },
 

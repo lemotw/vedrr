@@ -44,7 +44,7 @@ export const useContextStore = create<ContextStore>((set, get) => ({
   renameContext: async (id: string, name: string) => {
     await ipc.renameContext(id, name);
     await get().loadContexts();
-    ipc.embedContextNodes(id).catch(console.error);
+    ipc.embedContextNodes(id, true).catch(console.error);
   },
 
   archiveContext: async (id: string) => {

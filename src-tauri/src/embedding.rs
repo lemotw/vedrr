@@ -23,6 +23,9 @@ pub fn get_model() -> Result<&'static TextEmbedding, AppError> {
 
 /// Embed passages (node texts). Adds "passage: " prefix per e5 convention.
 pub fn embed_passages(texts: &[String]) -> Result<Vec<Vec<f32>>, AppError> {
+    if texts.is_empty() {
+        return Ok(vec![]);
+    }
     let model = get_model()?;
     let prefixed: Vec<String> = texts
         .iter()

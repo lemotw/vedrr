@@ -117,8 +117,8 @@ export const ipc = {
   semanticSearch: (query: string, topK: number = 10) =>
     safeInvoke<SearchResult[]>(IpcCmd.SEMANTIC_SEARCH, { query, topK }),
 
-  embedContextNodes: (contextId: string) =>
-    safeInvoke<number>(IpcCmd.EMBED_CONTEXT_NODES, { contextId }),
+  embedContextNodes: (contextId: string, force: boolean = false) =>
+    safeInvoke<number>(IpcCmd.EMBED_CONTEXT_NODES, { contextId, force }),
 
   embedSingleNode: (nodeId: string) =>
     safeInvoke<void>(IpcCmd.EMBED_SINGLE_NODE, { nodeId }),
