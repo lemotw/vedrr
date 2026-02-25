@@ -106,8 +106,10 @@
     "custom": "自訂"
   },
   "nodeSearch": {
-    "placeholder": "搜尋節點...",
+    "placeholder": "語意搜尋所有 context...",
     "empty": "找不到符合的節點",
+    "loading": "搜尋中...",
+    "modelLoading": "正在準備搜尋引擎...",
     "footer": "↑↓ 選擇  Enter 跳轉  Esc 關閉"
   },
   "settings": {

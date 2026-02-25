@@ -106,8 +106,10 @@
     "custom": "Custom"
   },
   "nodeSearch": {
-    "placeholder": "Search nodes...",
+    "placeholder": "Semantic search across all contexts...",
     "empty": "No matching nodes",
+    "loading": "Searching...",
+    "modelLoading": "Preparing search engine...",
     "footer": "↑↓ Select  Enter Go  Esc Close"
   },
   "settings": {

@@ -1,54 +1,68 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useUIStore } from "../stores/uiStore";
 import { useTreeStore } from "../stores/treeStore";
-import type { TreeData, TreeNode } from "../lib/types";
+import { useContextStore } from "../stores/contextStore";
 import { NODE_TYPE_CONFIG } from "../lib/types";
+import type { SearchResult } from "../lib/types";
+import { ipc } from "../lib/ipc";
 import { cn } from "../lib/cn";
 import { modSymbol } from "../lib/platform";
-
-interface FlatNode {
-  node: TreeNode;
-  path: string; // breadcrumb path (excluding root)
-}
-
-function flattenTree(tree: TreeData, untitledLabel: string, ancestors: string[] = []): FlatNode[] {
-  const result: FlatNode[] = [];
-  const path = ancestors.length > 0 ? ancestors.join(" › ") : "";
-  result.push({ node: tree.node, path });
-  for (const child of tree.children) {
-    result.push(...flattenTree(child, untitledLabel, [...ancestors, tree.node.title || untitledLabel]));
-  }
-  return result;
-}
 
 export function NodeSearch() {
   const { t } = useTranslation();
   const { nodeSearchOpen, closeNodeSearch } = useUIStore();
-  const { tree, selectNode } = useTreeStore();
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Flatten tree once
-  const allNodes = useMemo(() => {
-    if (!tree) return [];
-    return flattenTree(tree, t("common.untitled"));
-  }, [tree, t]);
+  // Debounce query (200ms)
+  useEffect(() => {
+    if (!query.trim()) {
+      setDebouncedQuery("");
+      return;
+    }
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 200);
+    return () => clearTimeout(timer);
+  }, [query]);
 
-  // Filter by query
-  const results = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    return allNodes.filter(n => n.node.title.toLowerCase().includes(q));
-  }, [query, allNodes]);
+  // Fetch results on debounced query change
+  useEffect(() => {
+    if (!debouncedQuery) {
+      setResults([]);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    ipc
+      .semanticSearch(debouncedQuery, 10)
+      .then((res) => {
+        if (!cancelled) setResults(res);
+      })
+      .catch((err) => {
+        console.error("[semantic-search]", err);
+        if (!cancelled) setResults([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQuery]);
 
   // Reset state on open
   useEffect(() => {
     if (nodeSearchOpen) {
       setQuery("");
+      setDebouncedQuery("");
+      setResults([]);
       setSelectedIdx(0);
+      setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [nodeSearchOpen]);
@@ -67,9 +81,14 @@ export function NodeSearch() {
 
   if (!nodeSearchOpen) return null;
 
-  function handleSelect(nodeId: string) {
-    selectNode(nodeId);
+  async function handleSelect(result: SearchResult) {
+    const currentContextId = useContextStore.getState().currentContextId;
     closeNodeSearch();
+    if (result.context_id !== currentContextId) {
+      await useContextStore.getState().switchContext(result.context_id);
+      await useTreeStore.getState().loadTree(result.context_id);
+    }
+    useTreeStore.getState().selectNode(result.node_id);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -77,15 +96,15 @@ export function NodeSearch() {
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setSelectedIdx(i => Math.min(i + 1, results.length - 1));
+        setSelectedIdx((i) => Math.min(i + 1, results.length - 1));
         break;
       case "ArrowUp":
         e.preventDefault();
-        setSelectedIdx(i => Math.max(i - 1, 0));
+        setSelectedIdx((i) => Math.max(i - 1, 0));
         break;
       case "Enter":
         e.preventDefault();
-        if (results[selectedIdx]) handleSelect(results[selectedIdx].node.id);
+        if (results[selectedIdx]) handleSelect(results[selectedIdx]);
         break;
       case "Escape":
         e.preventDefault();
@@ -95,10 +114,13 @@ export function NodeSearch() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={closeNodeSearch}>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
+      onClick={closeNodeSearch}
+    >
       <div
-        className="w-[480px] max-h-[420px] bg-bg-elevated rounded-2xl flex flex-col overflow-hidden shadow-2xl"
-        onClick={e => e.stopPropagation()}
+        className="w-[520px] max-h-[460px] bg-bg-elevated rounded-2xl flex flex-col overflow-hidden shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Search bar */}
         <div className="flex items-center h-12 px-4 bg-bg-card shrink-0">
@@ -108,43 +130,76 @@ export function NodeSearch() {
             className="flex-1 bg-transparent text-text-primary font-mono text-[13px] outline-none placeholder:text-text-secondary"
             placeholder={t("nodeSearch.placeholder")}
             value={query}
-            onChange={e => { setQuery(e.target.value); setSelectedIdx(0); }}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedIdx(0);
+            }}
             onKeyDown={handleKeyDown}
           />
-          <kbd className="text-text-secondary font-mono text-[11px] bg-bg-elevated rounded px-2 py-1">{modSymbol}F</kbd>
+          <kbd className="text-text-secondary font-mono text-[11px] bg-bg-elevated rounded px-2 py-1">
+            {modSymbol}F
+          </kbd>
         </div>
 
         {/* Results */}
         <div ref={listRef} className="flex-1 overflow-y-auto">
-          {query.trim() && results.length === 0 && (
-            <div className="px-4 py-8 text-center text-text-secondary font-mono text-xs">{t("nodeSearch.empty")}</div>
+          {/* Loading */}
+          {loading && results.length === 0 && debouncedQuery && (
+            <div className="px-4 py-8 text-center text-text-secondary font-mono text-xs">
+              {t("nodeSearch.loading")}
+            </div>
           )}
+
+          {/* Empty */}
+          {!loading && debouncedQuery && results.length === 0 && (
+            <div className="px-4 py-8 text-center text-text-secondary font-mono text-xs">
+              {t("nodeSearch.empty")}
+            </div>
+          )}
+
+          {/* Results list */}
           {results.map((item, idx) => {
-            const cfg = NODE_TYPE_CONFIG[item.node.node_type];
+            const cfg = NODE_TYPE_CONFIG[item.node_type as keyof typeof NODE_TYPE_CONFIG];
             return (
               <div
-                key={item.node.id}
+                key={item.node_id}
                 className={cn(
-                  "flex flex-col gap-1 px-4 py-2 cursor-pointer",
-                  idx === selectedIdx ? "bg-accent-primary/10" : "hover:bg-bg-card/50",
+                  "flex items-center gap-3 px-4 py-2.5 cursor-pointer",
+                  idx === selectedIdx
+                    ? "bg-accent-primary/10"
+                    : "hover:bg-bg-card/50",
                 )}
-                onClick={() => handleSelect(item.node.id)}
+                onClick={() => handleSelect(item)}
                 onMouseEnter={() => setSelectedIdx(idx)}
               >
-                <div className="flex items-center gap-2">
+                {/* Type badge */}
+                <span
+                  className="w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center bg-bg-elevated shrink-0"
+                  style={{ color: cfg?.color }}
+                >
+                  {cfg?.letter}
+                </span>
+
+                {/* Title + path */}
+                <div className="flex flex-col flex-1 min-w-0">
                   <span
-                    className="w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center bg-bg-elevated shrink-0"
-                    style={{ color: cfg?.color }}
+                    className={cn(
+                      "font-mono text-[13px] text-text-primary truncate",
+                      idx === selectedIdx && "font-semibold",
+                    )}
                   >
-                    {cfg?.letter}
+                    {item.node_title || t("common.untitled")}
                   </span>
-                  <span className={cn("font-mono text-[13px] text-text-primary", idx === selectedIdx && "font-semibold")}>
-                    {item.node.title || t("common.untitled")}
+                  <span className="font-mono text-[10px] text-text-secondary truncate">
+                    {item.context_name}
+                    {item.ancestor_path && ` › ${item.ancestor_path}`}
                   </span>
                 </div>
-                {item.path && (
-                  <span className="font-mono text-[10px] text-text-secondary ml-7">{item.path}</span>
-                )}
+
+                {/* Score */}
+                <span className="font-mono text-[10px] text-text-secondary shrink-0">
+                  {item.score.toFixed(2)}
+                </span>
               </div>
             );
           })}
@@ -152,7 +207,9 @@ export function NodeSearch() {
 
         {/* Footer */}
         <div className="flex items-center h-10 px-4 bg-bg-card shrink-0">
-          <span className="font-mono text-[10px] text-text-secondary">{t("nodeSearch.footer")}</span>
+          <span className="font-mono text-[10px] text-text-secondary">
+            {t("nodeSearch.footer")}
+          </span>
         </div>
       </div>
     </div>
