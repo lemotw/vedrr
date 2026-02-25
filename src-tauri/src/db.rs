@@ -69,6 +69,16 @@ pub fn init_db(conn: &Connection) -> Result<(), AppError> {
             models_json TEXT NOT NULL,
             cached_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS node_embeddings (
+            node_id    TEXT PRIMARY KEY REFERENCES tree_nodes(id) ON DELETE CASCADE,
+            context_id TEXT NOT NULL REFERENCES contexts(id) ON DELETE CASCADE,
+            embedding  BLOB NOT NULL,
+            input_text TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_embeddings_context ON node_embeddings(context_id);
     ",
     )?;
 
