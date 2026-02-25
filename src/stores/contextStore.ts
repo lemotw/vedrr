@@ -38,11 +38,13 @@ export const useContextStore = create<ContextStore>((set, get) => ({
     await ipc.switchContext(id);
     set({ currentContextId: id });
     await get().loadContexts();
+    ipc.embedContextNodes(id).catch(console.error);
   },
 
   renameContext: async (id: string, name: string) => {
     await ipc.renameContext(id, name);
     await get().loadContexts();
+    ipc.embedContextNodes(id).catch(console.error);
   },
 
   archiveContext: async (id: string) => {

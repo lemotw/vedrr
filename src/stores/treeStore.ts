@@ -156,6 +156,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     await get().loadTree(contextId);
     set({ selectedNodeId: node.id });
     useUIStore.getState().setEditingNode(node.id);
+    ipc.embedSingleNode(node.id).catch(console.error);
   },
 
   addSibling: async (nodeId, contextId) => {
@@ -170,6 +171,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     await get().loadTree(contextId);
     set({ selectedNodeId: node.id });
     useUIStore.getState().setEditingNode(node.id);
+    ipc.embedSingleNode(node.id).catch(console.error);
   },
 
   deleteNode: async (nodeId, contextId) => {
@@ -212,6 +214,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     if (tree) {
       set({ tree: patchNode(get().tree!, nodeId, { title }) });
     }
+    ipc.embedSingleNode(nodeId).catch(console.error);
   },
 
   updateNodeContent: async (nodeId, content) => {
@@ -363,6 +366,7 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
     await ipc.moveNode(nodeId, newParentId, position);
     await get().loadTree(contextId);
     set({ selectedNodeId: nodeId });
+    ipc.embedSingleNode(nodeId).catch(console.error);
   },
 
   triggerCompact: (nodeId: string) => {
