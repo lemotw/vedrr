@@ -99,6 +99,11 @@ export interface SearchResult {
   score: number;
 }
 
+export interface ModelStatus {
+  status: "not_ready" | "downloading" | "ready" | "error";
+  progress: number;
+}
+
 import { NodeTypes } from "./constants";
 
 export const NODE_TYPE_CONFIG: Record<NodeType, { letter: string; color: string }> = {

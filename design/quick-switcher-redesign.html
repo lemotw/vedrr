@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickSwitcher Redesign — vedrr</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Oswald:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-page: #1A1410;
+    --bg-card: #26201A;
+    --bg-elevated: #332B22;
+    --accent: #F0A050;
+    --text-primary: #EDE4D8;
+    --text-secondary: #8A7560;
+    --border: #3A3028;
+    --overlay: rgba(0,0,0,0.5);
+    --hover: rgba(255,255,255,0.05);
+    --red: #FF4444;
+    --vault-accent: #8A7560;
+    --panel-w: 560px;
+    --left-pct: 70%;
+    --right-pct: 30%;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 6vh 20px 80px;
+    gap: 60px;
+  }
+
+  .page-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 2px;
+  }
+  .page-subtitle { font-size: 11px; color: var(--text-secondary); margin-top: 6px; }
+  .page-header { text-align: center; }
+
+  .state-label {
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  /* ── Panel ── */
+  .panel {
+    width: var(--panel-w);
+    background: var(--bg-elevated);
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+  }
+
+  .panel-body { display: flex; min-height: 0; height: 420px; }
+
+  /* ── Left pane ── */
+  .pane-left {
+    width: var(--left-pct);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid var(--border);
+  }
+  .active-area {
+    flex: 7;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .active-area .scroll-inner { flex: 1; overflow-y: auto; }
+  .archived-area {
+    flex: 3;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    border-top: 1px solid var(--border);
+  }
+  .archived-area .scroll-inner { flex: 1; overflow-y: auto; }
+
+  /* ── Right pane ── */
+  .pane-right {
+    width: var(--right-pct);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .vault-list { flex: 1; overflow-y: auto; }
+
+  /* ── Scrollbar ── */
+  .scroll-inner::-webkit-scrollbar,
+  .vault-list::-webkit-scrollbar { width: 3px; }
+  .scroll-inner::-webkit-scrollbar-track,
+  .vault-list::-webkit-scrollbar-track { background: transparent; }
+  .scroll-inner::-webkit-scrollbar-thumb,
+  .vault-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Section header ── */
+  .section-header {
+    padding: 10px 12px 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .section-label { font-size: 10px; font-weight: 700; color: var(--text-secondary); letter-spacing: 2px; }
+  .section-count { font-size: 10px; color: var(--text-secondary); opacity: 0.5; }
+
+  /* ── Row ── */
+  .row {
+    display: flex;
+    align-items: center;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: background 0.1s;
+    position: relative;
+  }
+  .row:hover { background: var(--hover); }
+  .row.selected { background: var(--hover); }
+  .row.current { background: rgba(240, 160, 80, 0.06); }
+
+  .row-icon { font-size: 8px; width: 14px; flex-shrink: 0; text-align: center; }
+  .row-icon.active { color: var(--accent); }
+  .row-icon.current { color: var(--accent); }
+  .row-icon.archived { color: var(--text-secondary); }
+  .row-icon.vault { color: var(--vault-accent); opacity: 0.5; }
+
+  .row-name {
+    font-size: 12px; flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    margin-left: 6px;
+  }
+  .row-name.archived { color: var(--text-secondary); }
+  .row-name.vault { color: var(--text-secondary); font-size: 11px; }
+
+  /* ── Icon buttons ── */
+  .row-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.15s;
+    margin-left: 4px;
+  }
+  .row:hover .row-actions { opacity: 1; }
+  .row.show-actions .row-actions { opacity: 1; }
+
+  .icon-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    position: relative;
+    color: var(--text-secondary);
+  }
+  .icon-btn:hover { background: var(--hover); color: var(--text-primary); }
+  .icon-btn.danger:hover { color: var(--red); }
+  .icon-btn.vault-action:hover { color: var(--vault-accent); }
+
+  .icon-btn svg { width: 13px; height: 13px; }
+
+  /* Tooltip */
+  .icon-btn::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-primary);
+    background: var(--bg-card);
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .icon-btn:hover::after { opacity: 1; }
+
+  .row-meta {
+    font-size: 9px; color: var(--text-secondary); flex-shrink: 0;
+    white-space: nowrap; margin-left: 2px; margin-right: 6px; opacity: 0.45;
+  }
+
+  /* ── Vault search ── */
+  .vault-search-wrapper {
+    display: flex; align-items: center;
+    margin: 0 8px 6px;
+    background: var(--bg-card);
+    border-radius: 6px;
+    padding: 0 8px;
+    height: 28px;
+    border: 1px solid transparent;
+    transition: border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .vault-search-wrapper.focused { border-color: rgba(138, 117, 96, 0.3); }
+  .vault-search-icon { font-size: 10px; color: var(--text-secondary); opacity: 0.4; margin-right: 6px; flex-shrink: 0; }
+  .vault-search {
+    flex: 1; background: none; border: none;
+    font-family: inherit; font-size: 10px;
+    color: var(--text-primary); outline: none; min-width: 0;
+  }
+  .vault-search::placeholder { color: var(--text-secondary); opacity: 0.35; }
+  .vault-search-hint {
+    font-size: 8px; color: var(--text-secondary); opacity: 0.3; flex-shrink: 0;
+    background: var(--bg-elevated); padding: 1px 4px; border-radius: 2px;
+  }
+
+  /* ── Help button ── */
+  .help-btn {
+    position: relative;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.4;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .help-btn:hover {
+    opacity: 1;
+    border-color: var(--text-secondary);
+  }
+
+  .help-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    width: 260px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    z-index: 10;
+  }
+  .help-btn:hover .help-tooltip { display: block; }
+
+  .help-section { margin-bottom: 10px; }
+  .help-section:last-child { margin-bottom: 0; }
+
+  .help-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--text-secondary);
+    margin-bottom: 3px;
+  }
+  .help-label .help-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+    position: relative;
+    top: -0.5px;
+  }
+  .help-text {
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    opacity: 0.8;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; background: var(--bg-card); flex-shrink: 0;
+  }
+  .new-btn {
+    font-family: inherit; font-size: 11px; font-weight: 700; color: white;
+    background: var(--accent); border: none; padding: 5px 12px; border-radius: 6px;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+  }
+  .new-btn .shortcut { font-size: 9px; opacity: 0.7; }
+  .footer-hints { display: flex; gap: 10px; }
+  .hint { font-size: 9px; color: var(--text-secondary); opacity: 0.4; }
+  .hint kbd {
+    display: inline-block; background: var(--bg-elevated);
+    padding: 1px 4px; border-radius: 2px;
+    font-family: inherit; font-size: 8px; margin-right: 2px;
+  }
+
+  /* ── Notes ── */
+  .notes-container { width: var(--panel-w); display: flex; flex-direction: column; gap: 32px; }
+  .note-title {
+    font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 700;
+    color: var(--accent); letter-spacing: 1px; margin-bottom: 10px;
+  }
+  .note-list { display: flex; flex-direction: column; gap: 6px; }
+  .note-item { display: flex; gap: 8px; font-size: 11px; line-height: 1.6; color: var(--text-secondary); }
+  .note-bullet { color: var(--accent); flex-shrink: 0; opacity: 0.6; }
+  .note-key {
+    color: var(--text-primary); background: var(--bg-elevated);
+    padding: 0 4px; border-radius: 3px; font-size: 10px;
+  }
+  .badge {
+    font-size: 8px; padding: 2px 5px; border-radius: 3px; font-weight: 700;
+    letter-spacing: 0.5px; flex-shrink: 0; align-self: flex-start; margin-top: 2px;
+  }
+  .badge.new { background: rgba(240,160,80,0.15); color: var(--accent); }
+  .badge.changed { background: rgba(0,212,170,0.12); color: #00D4AA; }
+  .badge.removed { background: rgba(255,68,68,0.12); color: var(--red); }
+
+  .dimmed { opacity: 0.2; pointer-events: none; }
+
+  /* ── Icon ref legend ── */
+  .legend {
+    display: flex; gap: 20px; align-items: center; justify-content: center;
+    padding: 12px; flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; color: var(--text-secondary);
+  }
+  .legend-item svg { width: 14px; height: 14px; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-title">QUICKSWITCHER v2</div>
+  <div class="page-subtitle">Left/Right split &mdash; 70:30 &mdash; 560px &mdash; icon buttons</div>
+</div>
+
+<!-- ═══════ SVG icon templates (hidden) ═══════ -->
+<svg style="display:none">
+  <!-- vault: lock/safe -->
+  <symbol id="ico-vault" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="7" width="12" height="7" rx="1.5"/>
+    <path d="M5 7V5a3 3 0 0 1 6 0v2"/>
+    <circle cx="8" cy="10.5" r="1" fill="currentColor" stroke="none"/>
+  </symbol>
+  <!-- archive: box with down arrow -->
+  <symbol id="ico-archive" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 4h12v2H2z"/>
+    <path d="M3 6v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6"/>
+    <path d="M8 8v4m0 0l-2-2m2 2l2-2"/>
+  </symbol>
+  <!-- restore: arrow up out of box (active/archived) -->
+  <symbol id="ico-restore" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 6v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6"/>
+    <path d="M8 11V3m0 0L5.5 5.5M8 3l2.5 2.5"/>
+  </symbol>
+  <!-- undo/rotate: circular arrow (vault restore) -->
+  <symbol id="ico-undo" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3.5 5.5L1.5 3.5l2-2"/>
+    <path d="M1.5 3.5H9a4.5 4.5 0 0 1 0 9H5"/>
+  </symbol>
+  <!-- delete: X -->
+  <symbol id="ico-delete" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+    <path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>
+  </symbol>
+</svg>
+
+<!-- ═══════════════════════════════════════════════════════
+     STATE 1: DEFAULT
+     ═══════════════════════════════════════════════════════ -->
+<div class="state-label">STATE 1 &mdash; DEFAULT</div>
+<div class="panel">
+  <div class="panel-body">
+    <div class="pane-left">
+      <div class="active-area">
+        <div class="section-header">
+          <span class="section-label">ACTIVE</span>
+          <span class="section-count">7</span>
+        </div>
+        <div class="scroll-inner">
+          <div class="row current">
+            <span class="row-icon current">&#9656;</span>
+            <span class="row-meta">now</span>
+            <span class="row-name">vedrr product roadmap</span>
+            <div class="row-actions">
+              <button class="icon-btn vault-action" data-tip="vault"><svg><use href="#ico-vault"/></svg></button>
+              <button class="icon-btn" data-tip="archive"><svg><use href="#ico-archive"/></svg></button>
+              <button class="icon-btn danger" data-tip="delete"><svg><use href="#ico-delete"/></svg></button>
+            </div>
+          </div>
+          <div class="row show-actions">
+            <span class="row-icon active">&#9679;</span>
+            <span class="row-meta">2h</span>
+            <span class="row-name">weekly standup notes</span>
+            <div class="row-actions">
+              <button class="icon-btn vault-action" data-tip="vault"><svg><use href="#ico-vault"/></svg></button>
+              <button class="icon-btn" data-tip="archive"><svg><use href="#ico-archive"/></svg></button>
+              <button class="icon-btn danger" data-tip="delete"><svg><use href="#ico-delete"/></svg></button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-icon active">&#9679;</span>
+            <span class="row-meta">1d</span>
+            <span class="row-name">sqlite perf analysis</span>
+            <div class="row-actions">
+              <button class="icon-btn vault-action" data-tip="vault"><svg><use href="#ico-vault"/></svg></button>
+              <button class="icon-btn" data-tip="archive"><svg><use href="#ico-archive"/></svg></button>
+              <button class="icon-btn danger" data-tip="delete"><svg><use href="#ico-delete"/></svg></button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-icon active">&#9679;</span>
+            <span class="row-meta">2d</span>
+            <span class="row-name">design system tokens</span>
+            <div class="row-actions">
+              <button class="icon-btn vault-action" data-tip="vault"><svg><use href="#ico-vault"/></svg></button>
+              <button class="icon-btn" data-tip="archive"><svg><use href="#ico-archive"/></svg></button>
+              <button class="icon-btn danger" data-tip="delete"><svg><use href="#ico-delete"/></svg></button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-icon active">&#9679;</span>
+            <span class="row-meta">3d</span>
+            <span class="row-name">react 19 migration</span>
+            <div class="row-actions">
+              <button class="icon-btn vault-action" data-tip="vault"><svg><use href="#ico-vault"/></svg></button>
+              <button class="icon-btn" data-tip="archive"><svg><use href="#ico-archive"/></svg></button>
+              <button class="icon-btn danger" data-tip="delete"><svg><use href="#ico-delete"/></svg></button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-icon active">&#9679;</span>
+            <span class="row-meta">5d</span>
+            <span class="row-name">undo system rework</span>
+            <div class="row-actions">
+              <button class="icon-btn vault-action" data-tip="vault"><svg><use href="#ico-vault"/></svg></button>
+              <button class="icon-btn" data-tip="archive"><svg><use href="#ico-archive"/></svg></button>
+              <button class="icon-btn danger" data-tip="delete"><svg><use href="#ico-delete"/></svg></button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-icon active">&#9679;</span>
+            <span class="row-meta">7d</span>
+            <span class="row-name">context export spec</span>
+            <div class="row-actions">
+              <button class="icon-btn vault-action" data-tip="vault"><svg><use href="#ico-vault"/></svg></button>
+              <button class="icon-btn" data-tip="archive"><svg><use href="#ico-archive"/></svg></button>
+              <button class="icon-btn danger" data-tip="delete"><svg><use href="#ico-delete"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="archived-area">
+        <div class="section-header">
+          <span class="section-label">ARCHIVED</span>
+          <span class="section-count">2</span>
+        </div>
+        <div class="scroll-inner">
+          <div class="row">
+            <span class="row-icon archived">&#9675;</span>
+            <span class="row-meta">12d</span>
+            <span class="row-name archived">tauri 2 migration</span>
+            <div class="row-actions">
+              <button class="icon-btn vault-action" data-tip="vault"><svg><use href="#ico-vault"/></svg></button>
+              <button class="icon-btn" data-tip="restore"><svg><use href="#ico-restore"/></svg></button>
+              <button class="icon-btn danger" data-tip="delete"><svg><use href="#ico-delete"/></svg></button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-icon archived">&#9675;</span>
+            <span class="row-meta">20d</span>
+            <span class="row-name archived">i18n translation plan</span>
+            <div class="row-actions">
+              <button class="icon-btn vault-action" data-tip="vault"><svg><use href="#ico-vault"/></svg></button>
+              <button class="icon-btn" data-tip="restore"><svg><use href="#ico-restore"/></svg></button>
+              <button class="icon-btn danger" data-tip="delete"><svg><use href="#ico-delete"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane-right">
+      <div class="section-header">
+        <span class="section-label">VAULT</span>
+        <span class="section-count">47</span>
+      </div>
+      <div class="vault-search-wrapper">
+        <span class="vault-search-icon">&#9906;</span>
+        <input class="vault-search" type="text" placeholder="Search..." readonly>
+        <span class="vault-search-hint">/</span>
+      </div>
+      <div class="vault-list">
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">34d</span>
+          <span class="row-name vault">2024 Q3 retro</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">41d</span>
+          <span class="row-name vault">kbd research</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">60d</span>
+          <span class="row-name vault">zustand comp</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">68d</span>
+          <span class="row-name vault">drag-drop poc</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">75d</span>
+          <span class="row-name vault">theme sys v1</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">82d</span>
+          <span class="row-name vault">rust errors</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">90d</span>
+          <span class="row-name vault">vite config</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">95d</span>
+          <span class="row-name vault">ci pipeline</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">110d</span>
+          <span class="row-name vault">wkwebview</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">120d</span>
+          <span class="row-name vault">old branding</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">135d</span>
+          <span class="row-name vault">api key mgmt</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">150d</span>
+          <span class="row-name vault">compact v0</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="new-btn">+ New <span class="shortcut">&#8984;N</span></button>
+    <div class="footer-hints">
+      <span class="hint"><kbd>j</kbd><kbd>k</kbd> nav</span>
+      <span class="hint"><kbd>/</kbd> vault search</span>
+      <span class="hint"><kbd>esc</kbd> close</span>
+    </div>
+    <button class="help-btn">?
+      <div class="help-tooltip">
+        <div class="help-section">
+          <div class="help-label"><span class="help-dot" style="background:var(--accent)"></span>ACTIVE</div>
+          <div class="help-text">使用中的心智圖，可隨時切換編輯。依最近存取時間排序。</div>
+        </div>
+        <div class="help-section">
+          <div class="help-label"><span class="help-dot" style="background:var(--text-secondary)"></span>ARCHIVED</div>
+          <div class="help-text">暫時不用的心智圖。不會出現在主畫面，但可以隨時 restore 回 Active。</div>
+        </div>
+        <div class="help-section">
+          <div class="help-label"><span class="help-dot" style="background:var(--vault-accent);opacity:0.5"></span>VAULT</div>
+          <div class="help-text">長期封存的心智圖。資料完整保留，不佔用 Active 空間。需要時可搜尋並 restore。</div>
+        </div>
+      </div>
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     STATE 2: VAULT SEARCH ACTIVE
+     ═══════════════════════════════════════════════════════ -->
+<div class="state-label">STATE 2 &mdash; VAULT SEARCH ACTIVE</div>
+<div class="panel">
+  <div class="panel-body">
+    <div class="pane-left dimmed">
+      <div class="active-area">
+        <div class="section-header"><span class="section-label">ACTIVE</span><span class="section-count">7</span></div>
+        <div class="scroll-inner">
+          <div class="row current"><span class="row-icon current">&#9656;</span><span class="row-meta">now</span><span class="row-name">vedrr product roadmap</span></div>
+          <div class="row"><span class="row-icon active">&#9679;</span><span class="row-meta">2h</span><span class="row-name">weekly standup notes</span></div>
+          <div class="row"><span class="row-icon active">&#9679;</span><span class="row-meta">1d</span><span class="row-name">sqlite perf analysis</span></div>
+          <div class="row"><span class="row-icon active">&#9679;</span><span class="row-meta">2d</span><span class="row-name">design system tokens</span></div>
+          <div class="row"><span class="row-icon active">&#9679;</span><span class="row-meta">3d</span><span class="row-name">react 19 migration</span></div>
+          <div class="row"><span class="row-icon active">&#9679;</span><span class="row-meta">5d</span><span class="row-name">undo system rework</span></div>
+          <div class="row"><span class="row-icon active">&#9679;</span><span class="row-meta">7d</span><span class="row-name">context export spec</span></div>
+        </div>
+      </div>
+      <div class="archived-area">
+        <div class="section-header"><span class="section-label">ARCHIVED</span><span class="section-count">2</span></div>
+        <div class="scroll-inner">
+          <div class="row"><span class="row-icon archived">&#9675;</span><span class="row-meta">12d</span><span class="row-name archived">tauri 2 migration</span></div>
+          <div class="row"><span class="row-icon archived">&#9675;</span><span class="row-meta">20d</span><span class="row-name archived">i18n translation plan</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane-right">
+      <div class="section-header">
+        <span class="section-label">VAULT</span>
+        <span class="section-count">2 / 47</span>
+      </div>
+      <div class="vault-search-wrapper focused">
+        <span class="vault-search-icon">&#9906;</span>
+        <input class="vault-search" type="text" value="sprint" readonly>
+        <span class="vault-search-hint">esc</span>
+      </div>
+      <div class="vault-list">
+        <div class="row selected">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">34d</span>
+          <span class="row-name vault">Q3 <strong style="color:var(--accent)">sprint</strong> retro</span>
+          <div class="row-actions" style="opacity:1"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+        <div class="row">
+          <span class="row-icon vault">&#9670;</span>
+          <span class="row-meta">90d</span>
+          <span class="row-name vault">Q2 <strong style="color:var(--accent)">sprint</strong> plan</span>
+          <div class="row-actions"><button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="new-btn">+ New <span class="shortcut">&#8984;N</span></button>
+    <div class="footer-hints">
+      <span class="hint"><kbd>j</kbd><kbd>k</kbd> results</span>
+      <span class="hint"><kbd>enter</kbd> restore</span>
+      <span class="hint"><kbd>esc</kbd> clear</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     ICON LEGEND + HOVER REF
+     ═══════════════════════════════════════════════════════ -->
+<div class="state-label">ICON LEGEND &amp; HOVER REFERENCE</div>
+<div class="panel" style="height:auto;">
+  <div class="legend">
+    <div class="legend-item"><svg style="color:var(--vault-accent)"><use href="#ico-vault"/></svg><span>vault</span></div>
+    <div class="legend-item"><svg style="color:var(--text-primary)"><use href="#ico-archive"/></svg><span>archive</span></div>
+    <div class="legend-item"><svg style="color:var(--text-primary)"><use href="#ico-restore"/></svg><span>restore</span></div>
+    <div class="legend-item"><svg style="color:var(--text-primary)"><use href="#ico-undo"/></svg><span>undo (vault)</span></div>
+    <div class="legend-item"><svg style="color:var(--red)"><use href="#ico-delete"/></svg><span>delete</span></div>
+  </div>
+
+  <div style="padding: 0 12px 12px;">
+    <div style="font-size:10px; color:var(--text-secondary); padding:0 0 6px 12px; letter-spacing:1px;">ACTIVE ROW HOVER</div>
+    <div class="row show-actions" style="background:var(--hover); border-radius:6px;">
+      <span class="row-icon active">&#9679;</span>
+      <span class="row-meta">2h</span>
+      <span class="row-name">some active context</span>
+      <div class="row-actions">
+        <button class="icon-btn vault-action" data-tip="vault"><svg><use href="#ico-vault"/></svg></button>
+        <button class="icon-btn" data-tip="archive"><svg><use href="#ico-archive"/></svg></button>
+        <button class="icon-btn danger" data-tip="delete"><svg><use href="#ico-delete"/></svg></button>
+      </div>
+    </div>
+
+    <div style="height:10px"></div>
+
+    <div style="font-size:10px; color:var(--text-secondary); padding:0 0 6px 12px; letter-spacing:1px;">ARCHIVED ROW HOVER</div>
+    <div class="row show-actions" style="background:var(--hover); border-radius:6px;">
+      <span class="row-icon archived">&#9675;</span>
+      <span class="row-meta">12d</span>
+      <span class="row-name archived">some archived context</span>
+      <div class="row-actions">
+        <button class="icon-btn vault-action" data-tip="vault"><svg><use href="#ico-vault"/></svg></button>
+        <button class="icon-btn" data-tip="restore"><svg><use href="#ico-restore"/></svg></button>
+        <button class="icon-btn danger" data-tip="delete"><svg><use href="#ico-delete"/></svg></button>
+      </div>
+    </div>
+
+    <div style="height:10px"></div>
+
+    <div style="font-size:10px; color:var(--text-secondary); padding:0 0 6px 12px; letter-spacing:1px;">VAULT ROW HOVER</div>
+    <div class="row show-actions" style="background:var(--hover); border-radius:6px;">
+      <span class="row-icon vault">&#9670;</span>
+      <span class="row-meta">60d</span>
+      <span class="row-name vault">some vault context</span>
+      <div class="row-actions">
+        <button class="icon-btn" data-tip="restore"><svg><use href="#ico-undo"/></svg></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     NOTES
+     ═══════════════════════════════════════════════════════ -->
+<div class="notes-container">
+  <div class="note-group">
+    <div class="note-title">ICON MAPPING</div>
+    <div class="note-list">
+      <div class="note-item">
+        <span class="note-bullet">&#8226;</span>
+        <span><strong>Active</strong>: lock (vault) &middot; box-down (archive) &middot; X (delete)</span>
+      </div>
+      <div class="note-item">
+        <span class="note-bullet">&#8226;</span>
+        <span><strong>Archived</strong>: lock (vault) &middot; arrow-up (restore) &middot; X (delete)</span>
+      </div>
+      <div class="note-item">
+        <span class="note-bullet">&#8226;</span>
+        <span><strong>Vault</strong>: rotate-arrow (undo/restore) only</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note-group">
+    <div class="note-title">ROW LAYOUT</div>
+    <div class="note-list">
+      <div class="note-item">
+        <span class="note-bullet">&#8226;</span>
+        <span>Order: <span class="note-key">icon</span> <span class="note-key">time</span> <span class="note-key">name</span> ... <span class="note-key">actions</span></span>
+      </div>
+      <div class="note-item">
+        <span class="note-bullet">&#8226;</span>
+        <span>Time before name &mdash; scannable column of temporal info on the left edge</span>
+      </div>
+      <div class="note-item">
+        <span class="note-bullet">&#8226;</span>
+        <span>Vault uses undo-style rotate arrow &mdash; "bring back" semantics vs archived restore "lift out"</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

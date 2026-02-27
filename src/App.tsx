@@ -13,6 +13,7 @@ import { useContextStore } from "./stores/contextStore";
 import { useTreeStore } from "./stores/treeStore";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useUIStore } from "./stores/uiStore";
+import { ipc } from "./lib/ipc";
 import { ContextStates, CompactStates } from "./lib/constants";
 
 export default function App() {
@@ -27,6 +28,9 @@ export default function App() {
     // Apply saved theme on startup
     const { currentTheme, setTheme } = useUIStore.getState();
     setTheme(currentTheme);
+    // Pre-download embedding model in background
+    ipc.ensureEmbeddingModel().catch(console.error);
+
     loadContexts().then(() => {
       const active = useContextStore.getState().contexts.find(c => c.state === ContextStates.ACTIVE);
       if (active) switchContext(active.id);

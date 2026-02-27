@@ -25,6 +25,11 @@
       "csp": null
     }
   },
+  "bundle": {
+    "resources": {
+      "resources/models/**/*": "models/"
+    }
+  },
   "plugins": {
     "opener": {}
   }
