@@ -68,8 +68,13 @@ pub fn semantic_search(
     let query_vec = embedding::embed_query(query)?;
 
     // 2. Load all dual embeddings for ACTIVE + ARCHIVED contexts (lock only for read)
-    let rows_data: Vec<(String, Vec<u8>, Vec<u8>, String, String, String, String, String)> = {
+    let (rows_data, vault_rows): (
+        Vec<(String, Vec<u8>, Vec<u8>, String, String, String, String, String)>,
+        Vec<(String, Vec<u8>, Vec<u8>, String, String, String, String, String)>,
+    ) = {
         let db = state.db.lock().unwrap();
+
+        // Active/archived context embeddings
         let mut stmt = db.prepare(
             "SELECT ne.node_id, ne.embedding_content, ne.embedding_path, ne.input_path,
                     tn.title, tn.node_type,
@@ -79,7 +84,7 @@ pub fn semantic_search(
              JOIN contexts c ON ne.context_id = c.id
              WHERE c.state IN ('active', 'archived')",
         )?;
-        let collected = stmt
+        let active_rows = stmt
             .query_map([], |row| {
                 Ok((
                     row.get(0)?,
@@ -93,11 +98,36 @@ pub fn semantic_search(
                 ))
             })?
             .collect::<Result<Vec<_>, _>>()?;
-        collected
+
+        // Vault embeddings
+        let mut vault_stmt = db.prepare(
+            "SELECT ve.id, ve.embedding_content, ve.embedding_path, ve.ancestor_path,
+                    ve.node_title, ve.node_type, vl.id, vl.name
+             FROM vault_embeddings ve
+             JOIN vault_list vl ON ve.vault_id = vl.id",
+        )?;
+        let vault_collected = vault_stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        (active_rows, vault_collected)
     }; // lock released
 
     // 3. Compute fused cosine similarity: alpha * content_score + (1-alpha) * path_score
     let mut scored: Vec<SearchResult> = Vec::new();
+
+    // Score active/archived embeddings
     for (node_id, content_blob, path_blob, display_path, title, node_type, context_id, context_name) in rows_data {
         let content_vec = embedding::blob_to_vec(&content_blob);
         let path_vec = embedding::blob_to_vec(&path_blob);
@@ -118,6 +148,27 @@ pub fn semantic_search(
         }
     }
 
+    // Score vault embeddings
+    for (node_id, content_blob, path_blob, ancestor_path, title, node_type, context_id, context_name) in vault_rows {
+        let content_vec = embedding::blob_to_vec(&content_blob);
+        let path_vec = embedding::blob_to_vec(&path_blob);
+        let content_score = embedding::cosine_similarity(&query_vec, &content_vec);
+        let path_score = embedding::cosine_similarity(&query_vec, &path_vec);
+        let score = alpha * content_score + (1.0 - alpha) * path_score;
+
+        if score >= min_score {
+            scored.push(SearchResult {
+                node_id,
+                node_title: title,
+                node_type,
+                context_id,
+                context_name,
+                ancestor_path,
+                score,
+            });
+        }
+    }
+
     // 4. Sort by score descending, take top_k
     scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
     scored.truncate(top_k);
@@ -125,7 +176,7 @@ pub fn semantic_search(
     Ok(scored)
 }
 
-/// Plain text search: LIKE match on node titles across active/archived contexts.
+/// Plain text search: LIKE match on node titles across active/archived contexts + vault embeddings.
 #[tauri::command]
 pub fn text_search(
     query: String,
@@ -141,6 +192,8 @@ pub fn text_search(
     // Escape LIKE metacharacters so user input is treated literally
     let escaped = query.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
     let pattern = format!("%{escaped}%");
+
+    // Active/archived contexts
     let mut stmt = db.prepare(
         "SELECT tn.id, tn.title, tn.node_type, c.id, c.name
          FROM tree_nodes tn
@@ -151,7 +204,7 @@ pub fn text_search(
          LIMIT ?2",
     )?;
 
-    let results = stmt
+    let mut results: Vec<SearchResult> = stmt
         .query_map(rusqlite::params![pattern, top_k], |row| {
             Ok(SearchResult {
                 node_id: row.get(0)?,
@@ -164,6 +217,34 @@ pub fn text_search(
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
+
+    // Vault embeddings (search by node_title)
+    let remaining = top_k.saturating_sub(results.len());
+    if remaining > 0 {
+        let mut vault_stmt = db.prepare(
+            "SELECT ve.id, ve.node_title, ve.node_type, vl.id, vl.name
+             FROM vault_embeddings ve
+             JOIN vault_list vl ON ve.vault_id = vl.id
+             WHERE ve.node_title LIKE ?1 ESCAPE '\\'
+             LIMIT ?2",
+        )?;
+
+        let vault_results: Vec<SearchResult> = vault_stmt
+            .query_map(rusqlite::params![pattern, remaining], |row| {
+                Ok(SearchResult {
+                    node_id: row.get(0)?,
+                    node_title: row.get(1)?,
+                    node_type: row.get(2)?,
+                    context_id: row.get(3)?,
+                    context_name: row.get(4)?,
+                    ancestor_path: String::new(),
+                    score: 1.0,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        results.extend(vault_results);
+    }
 
     Ok(results)
 }

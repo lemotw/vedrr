@@ -1,5 +1,5 @@
 export type NodeType = "text" | "markdown" | "image" | "file";
-export type ContextState = "active" | "archived" | "vault";
+export type ContextState = "active" | "archived";
 
 export interface Context {
   id: string;
@@ -102,6 +102,15 @@ export interface SearchResult {
 export interface ModelStatus {
   status: "not_ready" | "downloading" | "ready" | "error";
   progress: number;
+}
+
+export interface VaultEntry {
+  id: string;
+  name: string;
+  tags: string[];
+  node_count: number;
+  original_created_at: string;
+  vaulted_at: string;
 }
 
 import { NodeTypes } from "./constants";

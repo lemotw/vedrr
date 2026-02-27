@@ -39,6 +39,7 @@ fn main() {
             if let Ok(resource_dir) = app.path().resource_dir() {
                 embedding::bootstrap_bundled_model(&resource_dir);
             }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -50,6 +51,10 @@ fn main() {
             commands::context::activate_context,
             commands::context::rename_context,
             commands::context::delete_context,
+            commands::context::list_vault,
+            commands::context::restore_from_vault,
+            commands::context::auto_vault_archived,
+            commands::context::delete_vault_entry,
             commands::node::get_tree,
             commands::node::create_node,
             commands::node::update_node,

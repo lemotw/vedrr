@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Context, ContextSummary, TreeData, TreeNode, CompactResult, AiProfile, ApiKey, ModelInfo, SearchResult, ModelStatus } from "./types";
+import type { Context, ContextSummary, TreeData, TreeNode, CompactResult, AiProfile, ApiKey, ModelInfo, SearchResult, ModelStatus, VaultEntry } from "./types";
 import { IpcCmd } from "./constants";
 
 async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -131,4 +131,16 @@ export const ipc = {
 
   ensureEmbeddingModel: () =>
     safeInvoke<void>(IpcCmd.ENSURE_EMBEDDING_MODEL),
+
+  listVault: () =>
+    safeInvoke<VaultEntry[]>(IpcCmd.LIST_VAULT),
+
+  restoreFromVault: (id: string) =>
+    safeInvoke<void>(IpcCmd.RESTORE_FROM_VAULT, { id }),
+
+  autoVaultArchived: () =>
+    safeInvoke<string[]>(IpcCmd.AUTO_VAULT_ARCHIVED),
+
+  deleteVaultEntry: (id: string) =>
+    safeInvoke<void>(IpcCmd.DELETE_VAULT_ENTRY, { id }),
 };

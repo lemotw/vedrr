@@ -20,6 +20,17 @@ fn row_to_node(row: &rusqlite::Row) -> rusqlite::Result<TreeNode> {
     })
 }
 
+/// Touch context timestamps on any content change; also promote archived → active.
+fn touch_and_promote_context(db: &rusqlite::Connection, context_id: &str) -> Result<(), AppError> {
+    db.execute(
+        "UPDATE contexts SET updated_at = datetime('now'), last_accessed_at = datetime('now'),
+         state = CASE WHEN state = 'archived' THEN 'active' ELSE state END
+         WHERE id = ?1",
+        [context_id],
+    )?;
+    Ok(())
+}
+
 const MAX_TREE_DEPTH: u32 = 50;
 
 fn build_tree(
@@ -127,11 +138,8 @@ pub fn create_node(
         }
     }
 
-    // Touch context
-    db.execute(
-        "UPDATE contexts SET updated_at = datetime('now'), last_accessed_at = datetime('now') WHERE id = ?1",
-        [&context_id],
-    )?;
+    // Auto-promote archived → active on content modification
+    touch_and_promote_context(&db, &context_id)?;
 
     let node = db.query_row(
         "SELECT id, context_id, parent_id, position, node_type, title, content, file_path, created_at, updated_at
@@ -219,12 +227,32 @@ pub fn update_node(
             rusqlite::params![fp, id],
         )?;
     }
+
+    // Auto-promote archived → active on content modification
+    let ctx_id: String = db
+        .query_row(
+            "SELECT context_id FROM tree_nodes WHERE id = ?1",
+            [&id],
+            |row| row.get(0),
+        )
+        .map_err(|_| AppError::NodeNotFound(id.clone()))?;
+    touch_and_promote_context(&db, &ctx_id)?;
+
     Ok(())
 }
 
 #[tauri::command]
 pub fn delete_node(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
+
+    // Read context_id before deletion
+    let ctx_id: String = db
+        .query_row(
+            "SELECT context_id FROM tree_nodes WHERE id = ?1",
+            [&id],
+            |row| row.get(0),
+        )
+        .map_err(|_| AppError::NodeNotFound(id.clone()))?;
 
     // Recursively delete the whole subtree
     fn delete_recursive(db: &rusqlite::Connection, node_id: &str) -> Result<(), AppError> {
@@ -245,6 +273,10 @@ pub fn delete_node(state: State<'_, AppState>, id: String) -> Result<(), AppErro
     }
 
     delete_recursive(&db, &id)?;
+
+    // Auto-promote archived → active on content modification
+    touch_and_promote_context(&db, &ctx_id)?;
+
     Ok(())
 }
 
@@ -265,6 +297,17 @@ pub fn move_node(
         "UPDATE tree_nodes SET parent_id = ?1, position = ?2, updated_at = datetime('now') WHERE id = ?3",
         rusqlite::params![new_parent_id, position, id],
     )?;
+
+    // Auto-promote archived → active on content modification
+    let ctx_id: String = db
+        .query_row(
+            "SELECT context_id FROM tree_nodes WHERE id = ?1",
+            [&id],
+            |row| row.get(0),
+        )
+        .map_err(|_| AppError::NodeNotFound(id.clone()))?;
+    touch_and_promote_context(&db, &ctx_id)?;
+
     Ok(())
 }
 
@@ -373,6 +416,10 @@ pub fn clone_subtree(
     }
 
     let new_root_id = clone_recursive(&db, &source_id, &target_parent_id, &context_id)?;
+
+    // Auto-promote archived → active on content modification
+    touch_and_promote_context(&db, &context_id)?;
+
     Ok(new_root_id)
 }
 
@@ -392,6 +439,9 @@ pub fn restore_nodes(
                 node.created_at, node.updated_at,
             ],
         )?;
+    }
+    if let Some(first) = nodes.first() {
+        touch_and_promote_context(&db, &first.context_id)?;
     }
     Ok(())
 }

@@ -3,9 +3,10 @@ import { useTranslation } from "react-i18next";
 import { useUIStore } from "../stores/uiStore";
 import { useContextStore } from "../stores/contextStore";
 import { ask } from "@tauri-apps/plugin-dialog";
-import type { ContextSummary } from "../lib/types";
+import type { ContextSummary, VaultEntry } from "../lib/types";
 import { ContextStates } from "../lib/constants";
 import { cn } from "../lib/cn";
+import { ipc } from "../lib/ipc";
 import { isModKey, modSymbol } from "../lib/platform";
 
 function timeAgo(dateStr: string): string {
@@ -32,16 +33,6 @@ function highlightMatch(text: string, query: string): React.ReactNode {
 }
 
 // ── SVG Icons ─────────────────────────────────────────────
-
-function IcoVault() {
-  return (
-    <svg className="w-[13px] h-[13px]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="7" width="12" height="7" rx="1.5" />
-      <path d="M5 7V5a3 3 0 0 1 6 0v2" />
-      <circle cx="8" cy="10.5" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
 
 function IcoArchive() {
   return (
@@ -85,8 +76,10 @@ export function QuickSwitcher() {
   const { t } = useTranslation();
   const { quickSwitcherOpen, closeQuickSwitcher } = useUIStore();
   const {
-    contexts, loadContexts, switchContext, createContext,
-    archiveContext, vaultContext, activateContext, deleteContext,
+    contexts, vaultEntries, loadContexts, loadVaultEntries,
+    switchContext, createContext,
+    archiveContext, activateContext, deleteContext,
+    restoreFromVault,
     currentContextId,
   } = useContextStore();
 
@@ -102,26 +95,27 @@ export function QuickSwitcher() {
 
   useEffect(() => {
     if (quickSwitcherOpen) {
-      loadContexts();
+      ipc.autoVaultArchived()
+        .then(() => Promise.all([loadContexts(), loadVaultEntries()]))
+        .catch(() => Promise.all([loadContexts(), loadVaultEntries()]));
       setVaultSearch("");
       setSelectedIndex(0);
       setFocusPane("left");
       setTimeout(() => panelRef.current?.focus(), 50);
     }
-  }, [quickSwitcherOpen, loadContexts]);
+  }, [quickSwitcherOpen, loadContexts, loadVaultEntries]);
 
   const active = useMemo(() => contexts.filter(c => c.state === ContextStates.ACTIVE), [contexts]);
   const archived = useMemo(() => contexts.filter(c => c.state === ContextStates.ARCHIVED), [contexts]);
-  const vault = useMemo(() => contexts.filter(c => c.state === ContextStates.VAULT), [contexts]);
 
   const filteredVault = useMemo(() => {
-    if (!vaultSearch) return vault;
+    if (!vaultSearch) return vaultEntries;
     const q = vaultSearch.toLowerCase();
-    return vault.filter(c => c.name.toLowerCase().includes(q));
-  }, [vault, vaultSearch]);
+    return vaultEntries.filter(v => v.name.toLowerCase().includes(q));
+  }, [vaultEntries, vaultSearch]);
 
   const leftItems = useMemo(() => [...active, ...archived], [active, archived]);
-  const currentList = focusPane === "left" ? leftItems : filteredVault;
+  const currentListLength = focusPane === "left" ? leftItems.length : filteredVault.length;
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -129,8 +123,8 @@ export function QuickSwitcher() {
 
   // Clamp selectedIndex when list shrinks (after vault/archive/delete)
   useEffect(() => {
-    setSelectedIndex(i => Math.min(i, Math.max(currentList.length - 1, 0)));
-  }, [currentList.length]);
+    setSelectedIndex(i => Math.min(i, Math.max(currentListLength - 1, 0)));
+  }, [currentListLength]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -161,7 +155,6 @@ export function QuickSwitcher() {
 
   // ── Handlers ──
 
-  // switch_context backend now handles vault→active and archived→active promotion
   const handleSelect = async (ctx: ContextSummary) => {
     await switchContext(ctx.id);
     closeQuickSwitcher();
@@ -182,14 +175,9 @@ export function QuickSwitcher() {
     await activateContext(ctx.id);
   };
 
-  const handleVault = async (e: React.MouseEvent, ctx: ContextSummary) => {
+  const handleRestoreFromVault = async (e: React.MouseEvent, entry: VaultEntry) => {
     e.stopPropagation();
-    await vaultContext(ctx.id);
-  };
-
-  const handleRestoreFromVault = async (e: React.MouseEvent, ctx: ContextSummary) => {
-    e.stopPropagation();
-    await activateContext(ctx.id);
+    await restoreFromVault(entry.id);
   };
 
   const handleDelete = async (e: React.MouseEvent, ctx: ContextSummary) => {
@@ -229,12 +217,12 @@ export function QuickSwitcher() {
       (!isInVaultSearch && e.key === "j")
     ) {
       e.preventDefault();
-      if (currentList.length === 0) return;
+      if (currentListLength === 0) return;
       if (isInVaultSearch) {
         vaultInputRef.current?.blur();
         panelRef.current?.focus();
       }
-      setSelectedIndex(i => Math.min(i + 1, currentList.length - 1));
+      setSelectedIndex(i => Math.min(i + 1, currentListLength - 1));
       return;
     }
 
@@ -245,7 +233,7 @@ export function QuickSwitcher() {
       (!isInVaultSearch && e.key === "k")
     ) {
       e.preventDefault();
-      if (currentList.length === 0) return;
+      if (currentListLength === 0) return;
       if (isInVaultSearch) return;
       if (inVaultMode && selectedIndex === 0) {
         vaultInputRef.current?.focus();
@@ -262,12 +250,12 @@ export function QuickSwitcher() {
       return;
     }
 
-    // Enter — select or restore
+    // Enter — select (left pane only; vault items use button clicks)
     if (e.key === "Enter") {
       e.preventDefault();
       if (e.nativeEvent.isComposing) return;
-      if (currentList[selectedIndex]) {
-        handleSelect(currentList[selectedIndex]);
+      if (focusPane === "left" && leftItems[selectedIndex]) {
+        handleSelect(leftItems[selectedIndex]);
       }
       return;
     }
@@ -340,14 +328,6 @@ export function QuickSwitcher() {
           "flex items-center gap-0.5 shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity ml-1",
           isSelected && "opacity-100",
         )}>
-          <button
-            className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-secondary transition-all cursor-pointer"
-            onClick={(e) => handleVault(e, ctx)}
-            title={t("quickSwitcher.button.vault")}
-            aria-label={t("quickSwitcher.button.vault")}
-          >
-            <IcoVault />
-          </button>
           {isActive ? (
             <button
               className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer"
@@ -380,36 +360,26 @@ export function QuickSwitcher() {
     );
   };
 
-  const renderVaultRow = (ctx: ContextSummary, idx: number) => {
-    const isSelected = inVaultMode && idx === selectedIndex;
-
+  const renderVaultRow = (entry: VaultEntry) => {
     return (
       <div
-        key={ctx.id}
+        key={entry.id}
         data-qs-row
-        className={cn(
-          "group/row flex items-center px-3 py-[7px] cursor-pointer transition-colors",
-          isSelected && "bg-[var(--color-hover)]",
-        )}
-        onClick={() => handleSelect(ctx)}
-        onMouseEnter={() => { if (inVaultMode) setSelectedIndex(idx); }}
+        className="group/row flex items-center px-3 py-[7px] transition-colors"
       >
         <span className="text-[8px] w-[14px] shrink-0 text-center text-text-secondary opacity-50">
           {"\u25C6"}
         </span>
         <span className="text-[9px] text-text-secondary shrink-0 ml-1 mr-1.5 opacity-45 w-6">
-          {timeAgo(ctx.last_accessed_at)}
+          {timeAgo(entry.vaulted_at)}
         </span>
         <span className="text-[11px] font-mono truncate flex-1 min-w-0 text-text-secondary">
-          {vaultSearch ? highlightMatch(ctx.name, vaultSearch) : ctx.name}
+          {vaultSearch ? highlightMatch(entry.name, vaultSearch) : entry.name}
         </span>
-        <div className={cn(
-          "flex items-center gap-0.5 shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity ml-1",
-          isSelected && "opacity-100",
-        )}>
+        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity ml-1">
           <button
             className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer"
-            onClick={(e) => handleRestoreFromVault(e, ctx)}
+            onClick={(e) => handleRestoreFromVault(e, entry)}
             title={t("quickSwitcher.button.restore")}
             aria-label={t("quickSwitcher.button.restore")}
           >
@@ -484,7 +454,7 @@ export function QuickSwitcher() {
                 {t("quickSwitcher.section.vault")}
               </span>
               <span className="text-[10px] text-text-secondary opacity-50">
-                {vaultSearch ? `${filteredVault.length} / ${vault.length}` : vault.length}
+                {vaultSearch ? `${filteredVault.length} / ${vaultEntries.length}` : vaultEntries.length}
               </span>
             </div>
 
@@ -498,6 +468,12 @@ export function QuickSwitcher() {
                 ref={vaultInputRef}
                 value={vaultSearch}
                 onChange={(e) => setVaultSearch(e.target.value)}
+                onFocus={() => {
+                  if (focusPane !== "vault") {
+                    setFocusPane("vault");
+                    setSelectedIndex(0);
+                  }
+                }}
                 placeholder={t("quickSwitcher.vaultSearch")}
                 className="flex-1 bg-transparent text-[10px] text-text-primary placeholder:text-text-secondary/35 outline-none font-mono min-w-0"
               />
@@ -508,13 +484,13 @@ export function QuickSwitcher() {
 
             {/* Vault list */}
             <div ref={vaultScrollRef} className="flex-1 overflow-y-auto">
-              {filteredVault.map((ctx, i) => renderVaultRow(ctx, i))}
-              {filteredVault.length === 0 && vault.length > 0 && (
+              {filteredVault.map((entry) => renderVaultRow(entry))}
+              {filteredVault.length === 0 && vaultEntries.length > 0 && (
                 <div className="px-3 py-4 text-center text-text-secondary text-[11px]">
                   {t("quickSwitcher.noMatch")}
                 </div>
               )}
-              {vault.length === 0 && (
+              {vaultEntries.length === 0 && (
                 <div className="px-3 py-4 text-center text-text-secondary/50 text-[10px]">
                   {t("quickSwitcher.vaultEmpty")}
                 </div>
@@ -535,21 +511,10 @@ export function QuickSwitcher() {
 
           <div className="flex items-center gap-2.5">
             {inVaultMode ? (
-              <>
-                <span className="text-[9px] text-text-secondary opacity-40">
-                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-0.5">j</kbd>
-                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">k</kbd>
-                  {t("quickSwitcher.hint.results")}
-                </span>
-                <span className="text-[9px] text-text-secondary opacity-40">
-                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">enter</kbd>
-                  {t("quickSwitcher.hint.restoreAction")}
-                </span>
-                <span className="text-[9px] text-text-secondary opacity-40">
-                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">esc</kbd>
-                  {t("quickSwitcher.hint.clear")}
-                </span>
-              </>
+              <span className="text-[9px] text-text-secondary opacity-40">
+                <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">esc</kbd>
+                {t("quickSwitcher.hint.clear")}
+              </span>
             ) : (
               <>
                 <span className="text-[9px] text-text-secondary opacity-40">

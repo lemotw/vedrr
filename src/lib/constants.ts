@@ -14,7 +14,6 @@ export const NODE_TYPE_LIST: NodeType[] = [NodeTypes.TEXT, NodeTypes.MARKDOWN, N
 export const ContextStates = {
   ACTIVE: "active" as const,
   ARCHIVED: "archived" as const,
-  VAULT: "vault" as const,
 } satisfies Record<string, ContextState>;
 
 // ── IPC Commands (Tauri invoke names) ───────────────────────
@@ -54,6 +53,10 @@ export const IpcCmd = {
   GET_MODEL_STATUS: "get_model_status",
   ENSURE_EMBEDDING_MODEL: "ensure_embedding_model",
   TEXT_SEARCH: "text_search",
+  LIST_VAULT: "list_vault",
+  RESTORE_FROM_VAULT: "restore_from_vault",
+  AUTO_VAULT_ARCHIVED: "auto_vault_archived",
+  DELETE_VAULT_ENTRY: "delete_vault_entry",
 } as const;
 
 // ── Search Settings Defaults ─────────────────────────────

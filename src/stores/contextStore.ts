@@ -1,14 +1,16 @@
 import { create } from "zustand";
-import type { ContextSummary } from "../lib/types";
+import type { ContextSummary, VaultEntry } from "../lib/types";
 import { ipc } from "../lib/ipc";
 import { ContextStates } from "../lib/constants";
 
 interface ContextStore {
   contexts: ContextSummary[];
+  vaultEntries: VaultEntry[];
   currentContextId: string | null;
   loading: boolean;
 
   loadContexts: () => Promise<void>;
+  loadVaultEntries: () => Promise<void>;
   createContext: (name: string) => Promise<void>;
   switchContext: (id: string) => Promise<void>;
   renameContext: (id: string, name: string) => Promise<void>;
@@ -16,16 +18,24 @@ interface ContextStore {
   vaultContext: (id: string) => Promise<void>;
   activateContext: (id: string) => Promise<void>;
   deleteContext: (id: string) => Promise<void>;
+  restoreFromVault: (id: string) => Promise<void>;
+  deleteVaultEntry: (id: string) => Promise<void>;
 }
 
 export const useContextStore = create<ContextStore>((set, get) => ({
   contexts: [],
+  vaultEntries: [],
   currentContextId: null,
   loading: false,
 
   loadContexts: async () => {
     const contexts = await ipc.listContexts();
     set({ contexts });
+  },
+
+  loadVaultEntries: async () => {
+    const vaultEntries = await ipc.listVault();
+    set({ vaultEntries });
   },
 
   createContext: async (name: string) => {
@@ -69,6 +79,7 @@ export const useContextStore = create<ContextStore>((set, get) => ({
     } else {
       await get().loadContexts();
     }
+    await get().loadVaultEntries();
   },
 
   activateContext: async (id: string) => {
@@ -81,5 +92,16 @@ export const useContextStore = create<ContextStore>((set, get) => ({
     const { currentContextId } = get();
     if (currentContextId === id) set({ currentContextId: null });
     await get().loadContexts();
+  },
+
+  restoreFromVault: async (id: string) => {
+    await ipc.restoreFromVault(id);
+    await get().loadContexts();
+    await get().loadVaultEntries();
+  },
+
+  deleteVaultEntry: async (id: string) => {
+    await ipc.deleteVaultEntry(id);
+    await get().loadVaultEntries();
   },
 }));

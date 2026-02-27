@@ -9,6 +9,12 @@ pub fn get_db_path() -> PathBuf {
     base.join("vedrr.db")
 }
 
+pub fn get_vault_dir() -> PathBuf {
+    let dir = dirs::home_dir().unwrap().join("vedrr").join("vault");
+    std::fs::create_dir_all(&dir).ok();
+    dir
+}
+
 pub fn init_db(conn: &Connection) -> Result<(), AppError> {
     conn.execute_batch(
         "
@@ -19,7 +25,7 @@ pub fn init_db(conn: &Connection) -> Result<(), AppError> {
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             state TEXT NOT NULL DEFAULT 'active'
-                CHECK (state IN ('active', 'archived', 'vault')),
+                CHECK (state IN ('active', 'archived')),
             tags TEXT NOT NULL DEFAULT '[]',
             root_node_id TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -81,6 +87,28 @@ pub fn init_db(conn: &Connection) -> Result<(), AppError> {
         );
 
         CREATE INDEX IF NOT EXISTS idx_embeddings_context ON node_embeddings(context_id);
+
+        CREATE TABLE IF NOT EXISTS vault_list (
+            id                  TEXT PRIMARY KEY,
+            name                TEXT NOT NULL,
+            tags                TEXT NOT NULL DEFAULT '[]',
+            node_count          INTEGER NOT NULL DEFAULT 0,
+            original_created_at TEXT NOT NULL,
+            vaulted_at          TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS vault_embeddings (
+            id                TEXT PRIMARY KEY,
+            vault_id          TEXT NOT NULL REFERENCES vault_list(id) ON DELETE CASCADE,
+            node_title        TEXT NOT NULL,
+            node_type         TEXT NOT NULL,
+            ancestor_path     TEXT NOT NULL,
+            embedding_content BLOB NOT NULL,
+            embedding_path    BLOB NOT NULL,
+            created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_vault_emb_vault ON vault_embeddings(vault_id);
     ",
     )?;
 
@@ -111,6 +139,13 @@ pub fn init_db(conn: &Connection) -> Result<(), AppError> {
             CREATE INDEX IF NOT EXISTS idx_embeddings_context ON node_embeddings(context_id);",
         )?;
     }
+
+    // Migration: old vault contexts → archived (they still have tree_nodes).
+    // The CHECK constraint now only allows 'active'/'archived', so clear 'vault' first.
+    // This runs via execute (not execute_batch) to avoid CHECK constraint errors on
+    // databases where the contexts table was already created with the old CHECK.
+    // On fresh DBs where no vault rows exist, this is a no-op.
+    let _ = conn.execute("UPDATE contexts SET state = 'archived' WHERE state = 'vault'", []);
 
     Ok(())
 }
