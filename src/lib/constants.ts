@@ -51,7 +51,59 @@ export const IpcCmd = {
   SEMANTIC_SEARCH: "semantic_search",
   EMBED_CONTEXT_NODES: "embed_context_nodes",
   EMBED_SINGLE_NODE: "embed_single_node",
+  GET_MODEL_STATUS: "get_model_status",
+  ENSURE_EMBEDDING_MODEL: "ensure_embedding_model",
+  TEXT_SEARCH: "text_search",
 } as const;
+
+// ── Search Settings Defaults ─────────────────────────────
+export type SearchMode = "semantic" | "text";
+
+export const SearchDefaults = {
+  MODE: "semantic" as SearchMode,
+  ALPHA: 0.7,
+  MIN_SCORE: 0.1,
+  DISPLAY_THRESHOLD: 0.86,
+} as const;
+
+const SEARCH_STORAGE_KEY = "vedrr-search-settings";
+
+export interface SearchSettings {
+  mode: SearchMode;
+  alpha: number;
+  minScore: number;
+  displayThreshold: number;
+}
+
+function clamp01(v: unknown, fallback: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : fallback;
+}
+
+export function loadSearchSettings(): SearchSettings {
+  try {
+    const raw = localStorage.getItem(SEARCH_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        mode: parsed.mode === "text" ? "text" : SearchDefaults.MODE,
+        alpha: clamp01(parsed.alpha, SearchDefaults.ALPHA),
+        minScore: clamp01(parsed.minScore, SearchDefaults.MIN_SCORE),
+        displayThreshold: clamp01(parsed.displayThreshold, SearchDefaults.DISPLAY_THRESHOLD),
+      };
+    }
+  } catch { /* ignore */ }
+  return {
+    mode: SearchDefaults.MODE,
+    alpha: SearchDefaults.ALPHA,
+    minScore: SearchDefaults.MIN_SCORE,
+    displayThreshold: SearchDefaults.DISPLAY_THRESHOLD,
+  };
+}
+
+export function saveSearchSettings(settings: SearchSettings) {
+  localStorage.setItem(SEARCH_STORAGE_KEY, JSON.stringify(settings));
+}
 
 // ── Themes ─────────────────────────────────────────────────
 export const Themes = {

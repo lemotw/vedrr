@@ -9,6 +9,7 @@ mod models;
 
 use rusqlite::Connection;
 use std::sync::Mutex;
+use tauri::Manager;
 
 pub struct AppState {
     pub db: Mutex<Connection>,
@@ -32,6 +33,13 @@ fn main() {
         .manage(AppState {
             db: Mutex::new(conn),
             http_client,
+        })
+        .setup(|app| {
+            // Copy bundled embedding model to ~/vedrr/models/ if not already cached
+            if let Ok(resource_dir) = app.path().resource_dir() {
+                embedding::bootstrap_bundled_model(&resource_dir);
+            }
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::context::create_context,
@@ -64,8 +72,11 @@ fn main() {
             commands::ai::set_system_prompt,
             commands::ai::list_models,
             commands::search::semantic_search,
+            commands::search::text_search,
             commands::search::embed_context_nodes,
             commands::search::embed_single_node,
+            commands::search::get_model_status,
+            commands::search::ensure_embedding_model,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

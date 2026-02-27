@@ -71,11 +71,13 @@ pub fn init_db(conn: &Connection) -> Result<(), AppError> {
         );
 
         CREATE TABLE IF NOT EXISTS node_embeddings (
-            node_id    TEXT PRIMARY KEY REFERENCES tree_nodes(id) ON DELETE CASCADE,
-            context_id TEXT NOT NULL REFERENCES contexts(id) ON DELETE CASCADE,
-            embedding  BLOB NOT NULL,
-            input_text TEXT NOT NULL,
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            node_id           TEXT PRIMARY KEY REFERENCES tree_nodes(id) ON DELETE CASCADE,
+            context_id        TEXT NOT NULL REFERENCES contexts(id) ON DELETE CASCADE,
+            embedding_content BLOB NOT NULL,
+            embedding_path    BLOB NOT NULL,
+            input_content     TEXT NOT NULL,
+            input_path        TEXT NOT NULL,
+            updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
         CREATE INDEX IF NOT EXISTS idx_embeddings_context ON node_embeddings(context_id);
@@ -87,6 +89,28 @@ pub fn init_db(conn: &Connection) -> Result<(), AppError> {
         "ALTER TABLE ai_profiles ADD COLUMN api_key_id TEXT REFERENCES api_keys(id) ON DELETE SET NULL",
         [],
     );
+
+    // Migration: single-vector → dual-vector embeddings
+    // Detect old schema (single `embedding` column) and recreate with dual blobs.
+    // Existing embeddings are cleared; next switchContext triggers re-embed.
+    let has_old_schema = conn
+        .prepare("SELECT embedding FROM node_embeddings LIMIT 0")
+        .is_ok();
+    if has_old_schema {
+        conn.execute_batch("DROP TABLE IF EXISTS node_embeddings;")?;
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS node_embeddings (
+                node_id           TEXT PRIMARY KEY REFERENCES tree_nodes(id) ON DELETE CASCADE,
+                context_id        TEXT NOT NULL REFERENCES contexts(id) ON DELETE CASCADE,
+                embedding_content BLOB NOT NULL,
+                embedding_path    BLOB NOT NULL,
+                input_content     TEXT NOT NULL,
+                input_path        TEXT NOT NULL,
+                updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_embeddings_context ON node_embeddings(context_id);",
+        )?;
+    }
 
     Ok(())
 }

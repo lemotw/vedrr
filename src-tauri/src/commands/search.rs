@@ -5,7 +5,37 @@ use crate::embedding;
 use crate::error::AppError;
 use crate::AppState;
 
-const MIN_SCORE: f32 = 0.5;
+#[derive(Debug, Clone, Serialize)]
+pub struct ModelStatus {
+    /// "not_ready" | "downloading" | "ready" | "error"
+    pub status: String,
+    /// 0–100
+    pub progress: u8,
+}
+
+#[tauri::command]
+pub fn get_model_status() -> ModelStatus {
+    let (code, progress) = embedding::get_status();
+    let status = match code {
+        embedding::STATUS_NOT_READY => "not_ready",
+        embedding::STATUS_DOWNLOADING => "downloading",
+        embedding::STATUS_READY => "ready",
+        embedding::STATUS_ERROR => "error",
+        _ => "not_ready",
+    };
+    ModelStatus {
+        status: status.to_string(),
+        progress,
+    }
+}
+
+#[tauri::command]
+pub async fn ensure_embedding_model() -> Result<(), AppError> {
+    // Run model init on a blocking thread to avoid blocking the async runtime
+    tokio::task::spawn_blocking(|| embedding::ensure_model())
+        .await
+        .map_err(|e| AppError::Other(format!("spawn_blocking failed: {e}")))?
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SearchResult {
@@ -22,6 +52,8 @@ pub struct SearchResult {
 pub fn semantic_search(
     query: String,
     top_k: usize,
+    alpha: f32,
+    min_score: f32,
     state: State<'_, AppState>,
 ) -> Result<Vec<SearchResult>, AppError> {
     let query = query.trim();
@@ -29,14 +61,17 @@ pub fn semantic_search(
         return Ok(vec![]);
     }
 
+    // Clamp alpha to [0, 1]
+    let alpha = alpha.clamp(0.0, 1.0);
+
     // 1. Embed query (no DB lock needed)
     let query_vec = embedding::embed_query(query)?;
 
-    // 2. Load all embeddings for ACTIVE + ARCHIVED contexts (lock only for read)
-    let rows_data: Vec<(String, Vec<u8>, String, String, String, String, String)> = {
+    // 2. Load all dual embeddings for ACTIVE + ARCHIVED contexts (lock only for read)
+    let rows_data: Vec<(String, Vec<u8>, Vec<u8>, String, String, String, String, String)> = {
         let db = state.db.lock().unwrap();
         let mut stmt = db.prepare(
-            "SELECT ne.node_id, ne.embedding, ne.input_text,
+            "SELECT ne.node_id, ne.embedding_content, ne.embedding_path, ne.input_path,
                     tn.title, tn.node_type,
                     c.id as context_id, c.name as context_name
              FROM node_embeddings ne
@@ -54,26 +89,30 @@ pub fn semantic_search(
                     row.get(4)?,
                     row.get(5)?,
                     row.get(6)?,
+                    row.get(7)?,
                 ))
             })?
             .collect::<Result<Vec<_>, _>>()?;
         collected
     }; // lock released
 
-    // 3. Compute cosine similarity (no lock)
+    // 3. Compute fused cosine similarity: alpha * content_score + (1-alpha) * path_score
     let mut scored: Vec<SearchResult> = Vec::new();
-    for (node_id, blob, input_text, title, node_type, context_id, context_name) in rows_data {
-        let node_vec = embedding::blob_to_vec(&blob);
-        let score = embedding::cosine_similarity(&query_vec, &node_vec);
+    for (node_id, content_blob, path_blob, display_path, title, node_type, context_id, context_name) in rows_data {
+        let content_vec = embedding::blob_to_vec(&content_blob);
+        let path_vec = embedding::blob_to_vec(&path_blob);
+        let content_score = embedding::cosine_similarity(&query_vec, &content_vec);
+        let path_score = embedding::cosine_similarity(&query_vec, &path_vec);
+        let score = alpha * content_score + (1.0 - alpha) * path_score;
 
-        if score >= MIN_SCORE {
+        if score >= min_score {
             scored.push(SearchResult {
                 node_id,
                 node_title: title,
                 node_type,
                 context_id,
                 context_name,
-                ancestor_path: input_text,
+                ancestor_path: display_path,
                 score,
             });
         }
@@ -86,6 +125,49 @@ pub fn semantic_search(
     Ok(scored)
 }
 
+/// Plain text search: LIKE match on node titles across active/archived contexts.
+#[tauri::command]
+pub fn text_search(
+    query: String,
+    top_k: usize,
+    state: State<'_, AppState>,
+) -> Result<Vec<SearchResult>, AppError> {
+    let query = query.trim();
+    if query.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let db = state.db.lock().unwrap();
+    // Escape LIKE metacharacters so user input is treated literally
+    let escaped = query.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+    let pattern = format!("%{escaped}%");
+    let mut stmt = db.prepare(
+        "SELECT tn.id, tn.title, tn.node_type, c.id, c.name
+         FROM tree_nodes tn
+         JOIN contexts c ON tn.context_id = c.id
+         WHERE c.state IN ('active', 'archived')
+           AND (tn.title LIKE ?1 ESCAPE '\\' OR tn.content LIKE ?1 ESCAPE '\\')
+         ORDER BY tn.updated_at DESC
+         LIMIT ?2",
+    )?;
+
+    let results = stmt
+        .query_map(rusqlite::params![pattern, top_k], |row| {
+            Ok(SearchResult {
+                node_id: row.get(0)?,
+                node_title: row.get(1)?,
+                node_type: row.get(2)?,
+                context_id: row.get(3)?,
+                context_name: row.get(4)?,
+                ancestor_path: String::new(),
+                score: 1.0,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(results)
+}
+
 /// Batch-embed nodes in a context.
 /// - `force = false`: only embed nodes missing from node_embeddings
 /// - `force = true`: delete existing embeddings first, re-embed all nodes
@@ -95,8 +177,8 @@ pub fn embed_context_nodes(
     force: bool,
     state: State<'_, AppState>,
 ) -> Result<usize, AppError> {
-    // Phase 1: Read — collect node IDs + ancestor paths (lock held briefly)
-    let texts: Vec<(String, String, String)> = {
+    // Phase 1: Read — collect node IDs + dual texts (lock held briefly)
+    let texts: Vec<(String, String, String, String)> = {
         let db = state.db.lock().unwrap();
 
         if force {
@@ -119,11 +201,12 @@ pub fn embed_context_nodes(
             return Ok(0);
         }
 
-        let mut result: Vec<(String, String, String)> = Vec::new();
+        // (node_id, content_text, path_text, display_path)
+        let mut result: Vec<(String, String, String, String)> = Vec::new();
         for node_id in &missing_ids {
-            match embedding::build_ancestor_path(&db, node_id) {
-                Ok((embed_text, display_path)) => {
-                    result.push((node_id.clone(), embed_text, display_path));
+            match embedding::build_node_texts(&db, node_id) {
+                Ok((content_text, path_text, display_path)) => {
+                    result.push((node_id.clone(), content_text, path_text, display_path));
                 }
                 Err(e) => {
                     eprintln!("[embed] skip node {node_id}: {e}");
@@ -138,21 +221,28 @@ pub fn embed_context_nodes(
     }
 
     // Phase 2: Embed — CPU heavy, no lock
-    let embed_inputs: Vec<String> = texts.iter().map(|(_, t, _)| t.clone()).collect();
-    let embeddings = embedding::embed_passages(&embed_inputs)?;
+    // Two separate embed_passages calls: one for content texts, one for path texts
+    let content_inputs: Vec<String> = texts.iter().map(|(_, c, _, _)| c.clone()).collect();
+    let path_inputs: Vec<String> = texts.iter().map(|(_, _, p, _)| p.clone()).collect();
+    let content_embeddings = embedding::embed_passages(&content_inputs)?;
+    let path_embeddings = embedding::embed_passages(&path_inputs)?;
 
     // Phase 3: Write — re-acquire lock, insert results
     let db = state.db.lock().unwrap();
     let mut insert_stmt = db.prepare(
-        "INSERT OR REPLACE INTO node_embeddings (node_id, context_id, embedding, input_text, updated_at)
-         VALUES (?1, ?2, ?3, ?4, datetime('now'))",
+        "INSERT OR REPLACE INTO node_embeddings
+         (node_id, context_id, embedding_content, embedding_path, input_content, input_path, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))",
     )?;
 
     let mut count = 0;
-    for (i, (node_id, _embed_text, display_path)) in texts.iter().enumerate() {
-        if let Some(vec) = embeddings.get(i) {
-            let blob = embedding::vec_to_blob(vec);
-            insert_stmt.execute(rusqlite::params![node_id, context_id, blob, display_path])?;
+    for (i, (node_id, content_text, _path_text, display_path)) in texts.iter().enumerate() {
+        if let (Some(cvec), Some(pvec)) = (content_embeddings.get(i), path_embeddings.get(i)) {
+            let content_blob = embedding::vec_to_blob(cvec);
+            let path_blob = embedding::vec_to_blob(pvec);
+            insert_stmt.execute(rusqlite::params![
+                node_id, context_id, content_blob, path_blob, content_text, display_path
+            ])?;
             count += 1;
         }
     }
@@ -165,8 +255,8 @@ pub fn embed_single_node(
     node_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), AppError> {
-    // Phase 1: Read — get context_id + ancestor path
-    let (context_id, embed_text, display_path) = {
+    // Phase 1: Read — get context_id + dual texts
+    let (context_id, content_text, path_text, display_path) = {
         let db = state.db.lock().unwrap();
         let context_id: String = db
             .query_row(
@@ -175,24 +265,31 @@ pub fn embed_single_node(
                 |row| row.get(0),
             )
             .map_err(|_| AppError::NodeNotFound(node_id.clone()))?;
-        let (embed_text, display_path) = embedding::build_ancestor_path(&db, &node_id)?;
-        (context_id, embed_text, display_path)
+        let (content_text, path_text, display_path) = embedding::build_node_texts(&db, &node_id)?;
+        (context_id, content_text, path_text, display_path)
     }; // lock released
 
     // Phase 2: Embed — CPU heavy, no lock
-    let embeddings = embedding::embed_passages(&[embed_text])?;
-    let vec = embeddings
+    let content_embeddings = embedding::embed_passages(&[content_text.clone()])?;
+    let path_embeddings = embedding::embed_passages(&[path_text])?;
+    let content_vec = content_embeddings
         .into_iter()
         .next()
-        .ok_or_else(|| AppError::Other("Empty embedding result".into()))?;
-    let blob = embedding::vec_to_blob(&vec);
+        .ok_or_else(|| AppError::Other("Empty content embedding result".into()))?;
+    let path_vec = path_embeddings
+        .into_iter()
+        .next()
+        .ok_or_else(|| AppError::Other("Empty path embedding result".into()))?;
+    let content_blob = embedding::vec_to_blob(&content_vec);
+    let path_blob = embedding::vec_to_blob(&path_vec);
 
     // Phase 3: Write — re-acquire lock, upsert
     let db = state.db.lock().unwrap();
     db.execute(
-        "INSERT OR REPLACE INTO node_embeddings (node_id, context_id, embedding, input_text, updated_at)
-         VALUES (?1, ?2, ?3, ?4, datetime('now'))",
-        rusqlite::params![node_id, context_id, blob, display_path],
+        "INSERT OR REPLACE INTO node_embeddings
+         (node_id, context_id, embedding_content, embedding_path, input_content, input_path, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))",
+        rusqlite::params![node_id, context_id, content_blob, path_blob, content_text, display_path],
     )?;
 
     Ok(())

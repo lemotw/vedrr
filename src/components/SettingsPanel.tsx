@@ -6,12 +6,14 @@ import { cn } from "../lib/cn";
 import type { ApiKey } from "../lib/types";
 import { ApiKeysSection, ProfilesSection, SystemPromptSection, Section } from "./AISettings";
 import { ThemeSection } from "./ThemeSwitcher";
+import { SearchSettingsTab } from "./SearchSettings";
 
-type SettingsTab = "general" | "ai" | "theme";
+type SettingsTab = "general" | "ai" | "search" | "theme";
 
 const TABS: { id: SettingsTab; labelKey: string }[] = [
   { id: "general", labelKey: "settings.tab.general" },
   { id: "ai", labelKey: "settings.tab.ai" },
+  { id: "search", labelKey: "settings.tab.search" },
   { id: "theme", labelKey: "settings.tab.theme" },
 ];
 
@@ -165,6 +167,7 @@ export function SettingsPanel() {
           <div className="min-h-0 flex-1 overflow-y-auto">
             {activeTab === "general" && <GeneralTab />}
             {activeTab === "ai" && <AITab />}
+            {activeTab === "search" && <SearchSettingsTab />}
             {activeTab === "theme" && (
               <div className="px-6 py-4">
                 <ThemeSection />

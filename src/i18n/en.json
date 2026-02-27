@@ -109,8 +109,7 @@
     "placeholder": "Semantic search across all contexts...",
     "empty": "No matching nodes",
     "loading": "Searching...",
-    "modelLoading": "Preparing search engine...",
-    "footer": "↑↓ Select  Enter Go  Esc Close"
+    "modelLoading": "Preparing search engine..."
   },
   "settings": {
     "title": "Settings",
@@ -126,7 +125,28 @@
     "ai": {
       "apiKeys": "API Keys",
       "profiles": "Profiles",
-      "systemPrompt": "System Prompt (Dev)"
+      "systemPrompt": "System Prompt (Dev)",
+      "search": "Search"
+    },
+    "searchSettings": {
+      "modeTitle": "Search Mode",
+      "modeText": "Text Search",
+      "modeSemantic": "Semantic Search",
+      "modeDescText": "Matches exact keywords, fast.",
+      "modeDescSemantic": "Finds related concepts by meaning.",
+      "semanticTitle": "Semantic Search Settings",
+      "formulaTitle": "Score Formula",
+      "formulaLine1": "final = \u03b1 \u00d7 content + (1-\u03b1) \u00d7 path",
+      "formulaLine2": "content = cosine(query, node title)",
+      "formulaLine3": "path = cosine(query, ancestor chain)",
+      "alphaLabel": "Content Weight (\u03b1)",
+      "alphaHintLeft": "\u2190 more structure",
+      "alphaHintRight": "more title \u2192",
+      "minScoreLabel": "Min Score Threshold",
+      "minScoreDesc": "Results below this score are not returned.",
+      "displayLabel": "Display Threshold",
+      "displayDesc": "Results below this score appear dimmed.",
+      "reset": "Reset to defaults"
     }
   },
   "compactBanner": {

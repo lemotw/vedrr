@@ -109,8 +109,7 @@
     "placeholder": "語意搜尋所有 context...",
     "empty": "找不到符合的節點",
     "loading": "搜尋中...",
-    "modelLoading": "正在準備搜尋引擎...",
-    "footer": "↑↓ 選擇  Enter 跳轉  Esc 關閉"
+    "modelLoading": "正在準備搜尋引擎..."
   },
   "settings": {
     "title": "設定",
@@ -126,7 +125,28 @@
     "ai": {
       "apiKeys": "API Keys",
       "profiles": "Profiles",
-      "systemPrompt": "System Prompt (Dev)"
+      "systemPrompt": "System Prompt (Dev)",
+      "search": "搜尋"
+    },
+    "searchSettings": {
+      "modeTitle": "搜尋模式",
+      "modeText": "純文字搜尋",
+      "modeSemantic": "語意搜尋",
+      "modeDescText": "比對關鍵字，速度快。",
+      "modeDescSemantic": "理解概念語意，找到相關節點。",
+      "semanticTitle": "語意搜尋設定",
+      "formulaTitle": "分數公式",
+      "formulaLine1": "final = \u03b1 \u00d7 content + (1-\u03b1) \u00d7 path",
+      "formulaLine2": "content = cosine(query, node title)",
+      "formulaLine3": "path = cosine(query, ancestor chain)",
+      "alphaLabel": "Content 權重 (\u03b1)",
+      "alphaHintLeft": "\u2190 偏重結構",
+      "alphaHintRight": "偏重標題 \u2192",
+      "minScoreLabel": "最低分數門檻",
+      "minScoreDesc": "低於此分數的結果不會回傳。",
+      "displayLabel": "顯示門檻",
+      "displayDesc": "低於此分數的結果會灰掉顯示。",
+      "reset": "重設為預設值"
     }
   },
   "compactBanner": {
