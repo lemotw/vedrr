@@ -501,7 +501,11 @@ pub fn export_context_zip(
 ) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     let dest_path = std::path::Path::new(&destination);
-    build_context_zip(&db, &id, dest_path)
+    let result = build_context_zip(&db, &id, dest_path);
+    if result.is_err() {
+        let _ = std::fs::remove_file(dest_path);
+    }
+    result
 }
 
 #[tauri::command]
