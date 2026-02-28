@@ -1,10 +1,10 @@
-# Mind Flow 架構文件
+# Vedrr Architecture
 
-> 2026-02-19
+> 2026-02-28
 
 ---
 
-## 總覽
+## Overview
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -23,186 +23,201 @@
 │  │                              │                 │  │
 │  │                              ▼                 │  │
 │  │                     SQLite (rusqlite)           │  │
-│  │                   ~/MindFlow/data/mindflow.db  │  │
+│  │                       ~/vedrr/data/vedrr.db    │  │
 │  └────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 資料流
+## Data Flow
 
 ```
-使用者操作（鍵盤/點擊）
+User Action (keyboard / click)
       │
       ▼
-React Component（NodeCard, TreeCanvas, QuickSwitcher...）
+React Component (NodeCard, TreeCanvas, QuickSwitcher...)
       │
       ▼
-Zustand Store（contextStore / treeStore / uiStore）
-      │  呼叫 ipc wrapper
+Zustand Store (contextStore / treeStore / uiStore)
+      │  calls ipc wrapper
       ▼
 src/lib/ipc.ts ── invoke(commandName, { params })
       │
-      │  Tauri IPC bridge（自動 camelCase → snake_case）
+      │  Tauri IPC bridge (auto camelCase → snake_case)
       ▼
-Rust #[tauri::command] fn（commands/context.rs, node.rs, file_ops.rs）
+Rust #[tauri::command] fn (commands/context.rs, node.rs, file_ops.rs, search.rs)
       │
       ▼
 AppState { db: Mutex<Connection> } ── SQL query
       │
       ▼
-SQLite ~/MindFlow/data/mindflow.db
+SQLite ~/vedrr/data/vedrr.db
 ```
 
 ---
 
-## 前端架構（React + TypeScript）
+## Frontend Architecture (React + TypeScript)
 
-### 檔案對應
+### File Map
 
 ```
 src/
-├── App.tsx                     # 啟動入口：初始化主題、載入 contexts、組合所有元件
-├── index.css                   # Tailwind v4 @theme tokens + 主題 CSS 變數覆蓋
+├── App.tsx                     # Entry: theme init, load contexts, loading screen, compose components
+├── index.css                   # Tailwind v4 @theme tokens + theme CSS variable overrides
 │
 ├── components/
-│   ├── StatusBar.tsx            # 頂部列：context 名稱 + 主題切換 + ⌘K
-│   ├── TreeCanvas.tsx           # 水平樹 + 連接線 + hover "+" 按鈕 + 拖曳排序
-│   ├── NodeCard.tsx             # 節點卡片（root heading / card / 圖片縮圖 / lightbox）
-│   ├── ContentPanel.tsx         # 右側 Markdown 編輯面板
-│   ├── MarkdownEditor.tsx       # Tiptap 編輯器 + toolbar
-│   ├── QuickSwitcher.tsx        # ⌘K 搜尋/切換/建立/歸檔 context
-│   ├── NodeTypePopover.tsx      # 節點類型選擇器（T/M/I/F）
-│   ├── NodeSearch.tsx           # ⌘F 節點搜尋
-│   ├── ContextMenu.tsx          # 右鍵選單
-│   └── ThemeSwitcher.tsx        # 主題切換 popover + 自定義色彩編輯器
+│   ├── StatusBar.tsx            # Top bar: context name + model status spinner + ⌘K
+│   ├── TreeCanvas.tsx           # Horizontal tree + connectors + hover "+" buttons + drag-sort
+│   ├── NodeCard.tsx             # Node card (root heading / card / image thumbnail / lightbox)
+│   ├── ContentPanel.tsx         # Right-side Markdown edit panel
+│   ├── MarkdownEditor.tsx       # Tiptap editor + toolbar
+│   ├── QuickSwitcher.tsx        # ⌘K search/switch/create/archive/vault/import context
+│   ├── NodeTypePopover.tsx      # Node type picker (T/M/I/F)
+│   ├── NodeSearch.tsx           # ⌘F node search (semantic + text)
+│   ├── ContextMenu.tsx          # Right-click context menu
+│   └── ThemeSwitcher.tsx        # Theme picker popover + custom color editor
 │
 ├── hooks/
-│   └── useKeyboard.ts           # 全域 keydown + paste listener（vim 風格導航）
+│   └── useKeyboard.ts           # Global keydown + paste listener (vim-style navigation)
 │
 ├── stores/
-│   ├── contextStore.ts          # Context CRUD（list/switch/create/archive/delete）
-│   ├── treeStore.ts             # Tree + Node CRUD（select/add/delete/move/paste/undo）
-│   └── uiStore.ts               # UI 狀態（popover/editor/theme/collapse）
+│   ├── contextStore.ts          # Context CRUD (list/switch/create/archive/vault/restore/import)
+│   ├── treeStore.ts             # Tree + Node CRUD (select/add/delete/move/paste/undo)
+│   └── uiStore.ts               # UI state (popover/editor/theme/collapse)
 │
 └── lib/
-    ├── constants.ts             # 集中管理所有 enum：NodeTypes, Themes, IpcCmd...
-    ├── types.ts                 # TypeScript 型別 + NODE_TYPE_CONFIG
-    └── ipc.ts                   # Tauri invoke wrappers（18 calls）
+    ├── constants.ts             # Centralized enums: NodeTypes, Themes, IpcCmd...
+    ├── types.ts                 # TypeScript types + NODE_TYPE_CONFIG
+    └── ipc.ts                   # Tauri invoke wrappers
 ```
 
-### Zustand Stores 職責
+### Zustand Store Responsibilities
 
-| Store | 職責 | 持久化 |
-|-------|------|--------|
-| `contextStore` | Context 列表、當前 context ID、CRUD 操作 | SQLite（via IPC） |
-| `treeStore` | 樹狀資料、選取節點、複製/剪下/貼上、undo stack | SQLite（via IPC） |
-| `uiStore` | UI 開關（popover/editor/switcher）、主題、收折狀態 | localStorage（主題） |
+| Store | Responsibility | Persistence |
+|-------|---------------|-------------|
+| `contextStore` | Context list, current context ID, CRUD, vault/restore/import | SQLite (via IPC) |
+| `treeStore` | Tree data, selected node, copy/cut/paste, undo stack | SQLite (via IPC) |
+| `uiStore` | UI toggles (popover/editor/switcher), theme, collapse state | localStorage (theme) |
 
-### ipc.ts → Rust 對應表
+### IPC Notes
 
-| ipc 方法 | Rust command | 說明 |
-|----------|-------------|------|
-| `ipc.createContext(name, tags)` | `create_context` | 建立 context + root node |
-| `ipc.listContexts()` | `list_contexts` | 列出所有 context（含 node_count） |
-| `ipc.switchContext(id)` | `switch_context` | 更新 last_accessed_at |
-| `ipc.archiveContext(id)` | `archive_context` | state → archived |
-| `ipc.activateContext(id)` | `activate_context` | state → active |
-| `ipc.renameContext(id, name)` | `rename_context` | 更新 context name + root node title |
-| `ipc.deleteContext(id)` | `delete_context` | CASCADE 刪除 context + 所有 nodes |
-| `ipc.getTree(contextId)` | `get_tree` | 回傳遞迴 TreeData（node + children） |
-| `ipc.createNode(contextId, parentId, nodeType, title)` | `create_node` | 建立子節點 |
-| `ipc.updateNode(id, updates)` | `update_node` | 更新 title/content/nodeType/filePath |
-| `ipc.deleteNode(id)` | `delete_node` | 刪除節點（子節點 CASCADE） |
-| `ipc.moveNode(id, newParentId, position)` | `move_node` | 移動節點到新 parent + position |
-| `ipc.cloneSubtree(sourceId, targetParentId, contextId)` | `clone_subtree` | 深拷貝子樹（用於 ⌘V 貼上） |
-| `ipc.restoreNodes(nodes)` | `restore_nodes` | 批量還原節點（用於 undo） |
-| `ipc.readFileBytes(filePath)` | `read_file_bytes` | 讀取檔案為 byte array |
-| `ipc.saveClipboardImage(contextId, nodeId, data, ext)` | `save_clipboard_image` | 儲存剪貼簿圖片到 ~/MindFlow/files/ |
-| `ipc.importImage(contextId, nodeId, sourcePath)` | `import_image` | 複製外部圖片到 ~/MindFlow/files/ |
-| `ipc.revealFile(filePath)` | *(plugin-opener)* | 在 Finder/Explorer 中顯示檔案 |
-| `ipc.pickFile()` / `ipc.pickImage()` | *(plugin-dialog)* | 系統檔案選擇對話框 |
-
-### IPC 注意事項
-
-- 前端用 **camelCase** 傳參數，Tauri 自動轉成 Rust 的 **snake_case**
-  - 例：`{ contextId }` → Rust 接收 `context_id: String`
-- Rust command 回傳 `Result<T, MindFlowError>`，`MindFlowError` 實作 `Serialize` 變成字串回前端
-- 前端用 `invoke<ReturnType>(commandName, params)` 呼叫，回傳 `Promise<ReturnType>`
+- Frontend uses **camelCase** params; Tauri auto-converts to Rust **snake_case**
+  - e.g. `{ contextId }` → Rust receives `context_id: String`
+- Rust commands return `Result<T, AppError>`; `AppError` implements `Serialize` and becomes a string on the frontend
+- Frontend calls `invoke<ReturnType>(commandName, params)` which returns `Promise<ReturnType>`
 
 ---
 
-## 後端架構（Rust）
+## Backend Architecture (Rust)
 
-### 檔案對應
+### File Map
 
 ```
 src-tauri/src/
-├── main.rs           # Tauri 入口：初始化 DB、註冊 plugins、註冊 commands
-├── db.rs             # DB 路徑 + Schema 初始化（CREATE TABLE）
-├── models.rs         # 資料結構：Context, ContextSummary, TreeNode, TreeData
-├── error.rs          # MindFlowError enum（Serialize for IPC）
+├── main.rs           # Tauri entry: init DB, register plugins, register commands, background model warmup
+├── db.rs             # DB path + schema init (CREATE TABLE) + migrations
+├── models.rs         # Data structs: Context, ContextSummary, TreeNode, TreeData, VaultExport, VaultEntry
+├── error.rs          # AppError enum (Serialize for IPC)
+├── embedding.rs      # Embedding model (multilingual-e5-small), queue system, cosine similarity
 └── commands/
-    ├── context.rs    # 7 個 context 相關 commands
-    ├── node.rs       # 7 個 node 相關 commands（含 get_tree 遞迴組裝）
-    └── file_ops.rs   # 3 個檔案操作 commands
+    ├── context.rs    # Context CRUD + vault (ZIP export) + restore + import + auto-vault
+    ├── node.rs       # Node CRUD (get_tree recursive assembly, create/update/delete/move/clone/restore)
+    ├── search.rs     # Semantic search + text search + embed commands
+    └── file_ops.rs   # File read/save/import commands
 ```
 
 ### AppState
 
 ```rust
 pub struct AppState {
-    pub db: Mutex<Connection>,  // 單一 SQLite 連線，Mutex 保護
+    pub db: Mutex<Connection>,  // Single SQLite connection, Mutex-protected
 }
 ```
 
-所有 `#[tauri::command]` 透過 `State<AppState>` 取得 DB 連線。
+All `#[tauri::command]` functions access the DB via `State<AppState>`.
+
+### Embedding System
+
+```
+App startup
+    │  (2s delay)
+    ▼
+ensure_model() ── download/load ONNX model + warmup inference
+    │
+    ▼
+warmup_all() ── queue all active contexts → process_embed_queue()
+    │             STATUS_WARMING_UP → process each → STATUS_READY
+    │
+    ▼
+Ready ── embed_single_node() on each node create/update
+         embed_context_core() on switchContext / restoreFromVault
+```
+
+- Model: `intfloat/multilingual-e5-small` via fastembed (ONNX Runtime)
+- Dual vectors per node: content embedding (title) + path embedding (ancestor chain)
+- Search formula: `score = α × content_score + (1-α) × path_score`
+- Queue deduplicates context IDs; items queued during model loading are processed on warmup
 
 ---
 
 ## SQLite Schema
 
-位置：`~/MindFlow/data/mindflow.db`
-定義：`src-tauri/src/db.rs` → `init_db()`
-模式：WAL mode + foreign_keys ON
+Location: `~/vedrr/data/vedrr.db`
+Definition: `src-tauri/src/db.rs` → `init_db()`
+Mode: WAL + foreign_keys ON
 
-### contexts 表
+### contexts
 
-| 欄位 | 型別 | 說明 |
-|------|------|------|
+| Column | Type | Description |
+|--------|------|-------------|
 | `id` | TEXT PK | UUID v4 |
-| `name` | TEXT NOT NULL | Context 名稱 |
-| `state` | TEXT NOT NULL | `active` / `archived` / `vault` |
-| `tags` | TEXT NOT NULL | JSON array 字串，預設 `[]` |
-| `root_node_id` | TEXT | 指向 tree_nodes.id（根節點） |
+| `name` | TEXT NOT NULL | Context name |
+| `state` | TEXT NOT NULL | `active` / `archived` (CHECK constraint) |
+| `tags` | TEXT NOT NULL | JSON array string, default `[]` |
+| `root_node_id` | TEXT | FK → tree_nodes.id (root node) |
 | `created_at` | TEXT | ISO datetime |
 | `updated_at` | TEXT | ISO datetime |
-| `last_accessed_at` | TEXT | ISO datetime，switch 時更新 |
 
-### tree_nodes 表
+### tree_nodes
 
-| 欄位 | 型別 | 說明 |
-|------|------|------|
+| Column | Type | Description |
+|--------|------|-------------|
 | `id` | TEXT PK | UUID v4 |
 | `context_id` | TEXT NOT NULL | FK → contexts.id, **ON DELETE CASCADE** |
 | `parent_id` | TEXT | FK → tree_nodes.id, ON DELETE SET NULL |
-| `position` | INTEGER NOT NULL | 同層排序，0-based |
+| `position` | INTEGER NOT NULL | Sibling sort order, 0-based |
 | `node_type` | TEXT NOT NULL | `text` / `markdown` / `image` / `file` |
-| `title` | TEXT NOT NULL | 節點標題 |
-| `content` | TEXT | Markdown HTML 內容（markdown 類型用） |
-| `file_path` | TEXT | 檔案絕對路徑（image/file 類型用） |
+| `title` | TEXT NOT NULL | Node title |
+| `content` | TEXT | Markdown HTML content (for markdown type) |
+| `file_path` | TEXT | Absolute file path (for image/file types) |
 | `created_at` | TEXT | ISO datetime |
 | `updated_at` | TEXT | ISO datetime |
 
-### 索引
+### node_embeddings
 
-```sql
-idx_nodes_context ON tree_nodes(context_id)
-idx_nodes_parent  ON tree_nodes(parent_id)
-```
+| Column | Type | Description |
+|--------|------|-------------|
+| `node_id` | TEXT PK | FK → tree_nodes.id |
+| `context_id` | TEXT NOT NULL | FK → contexts.id |
+| `embedding_content` | BLOB NOT NULL | f32 vector for title content |
+| `embedding_path` | BLOB NOT NULL | f32 vector for ancestor path |
+| `input_content` | TEXT | Original content text used for embedding |
+| `input_path` | TEXT | Original path text used for embedding |
+| `updated_at` | TEXT | ISO datetime |
 
-### 關係圖
+### vault_list
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | TEXT PK | Original context ID |
+| `name` | TEXT NOT NULL | Context name at vault time |
+| `tags` | TEXT NOT NULL | JSON array, default `[]` |
+| `node_count` | INTEGER NOT NULL | Number of nodes at vault time |
+| `original_created_at` | TEXT NOT NULL | Original creation date |
+| `vaulted_at` | TEXT NOT NULL | When vaulted |
+
+### Relationships
 
 ```
 contexts 1 ──────< tree_nodes
@@ -210,33 +225,46 @@ contexts 1 ──────< tree_nodes
     │ root_node_id ───→ │ id
     │                   │
                         │ parent_id ───→ id (self-referencing)
+
+contexts 1 ──────< node_embeddings
+                        │ node_id ───→ tree_nodes.id
+
+vault_list (standalone, no FK to contexts — vaulted contexts are deleted)
 ```
 
 ---
 
-## 檔案儲存
+## File Storage
 
 ```
-~/MindFlow/
+~/vedrr/
 ├── data/
-│   └── mindflow.db          # SQLite 資料庫
-└── files/
-    └── {context_id}/
-        └── {node_id_prefix}.{ext}   # 圖片/檔案
+│   └── vedrr.db              # SQLite database
+├── files/
+│   └── {context_id}/
+│       └── {node_id_prefix}.{ext}   # Images / files
+├── models/
+│   └── models--intfloat--multilingual-e5-small/   # ONNX embedding model
+└── vault/
+    └── {context_id}.zip       # Vaulted context ZIPs
 ```
 
-- 圖片透過 `save_clipboard_image` 或 `import_image` 複製進來
-- 前端透過 `read_file_bytes` → `Blob` → `ObjectURL` 顯示（不用 asset protocol）
-- 刪除 context 時 CASCADE 刪 nodes，但 **files/ 目錄不會自動清理**
+- Images saved via `save_clipboard_image` or `import_image` into `~/vedrr/files/`
+- Frontend renders via `read_file_bytes` → `Blob` → `ObjectURL` (no asset protocol)
+- Deleting a context CASCADE-deletes nodes; `files/` directory cleaned up by vault flow
+- Vault ZIPs contain `manifest.json` + `files/` directory (self-contained)
 
 ---
 
-## 型別對照（Rust ↔ TypeScript）
+## Type Mapping (Rust ↔ TypeScript)
 
-| Rust struct | TS interface | 用途 |
-|------------|-------------|------|
-| `Context` | `Context` | 完整 context 資料 |
-| `ContextSummary` | `ContextSummary` | 列表顯示（含 node_count） |
-| `TreeNode` | `TreeNode` | 單一節點 |
-| `TreeData` | `TreeData` | 遞迴樹（node + children） |
-| `MindFlowError` | `string`（rejected promise） | 錯誤訊息 |
+| Rust struct | TS interface | Usage |
+|------------|-------------|-------|
+| `Context` | `Context` | Full context data |
+| `ContextSummary` | `ContextSummary` | List display (with node_count) |
+| `TreeNode` | `TreeNode` | Single node |
+| `TreeData` | `TreeData` | Recursive tree (node + children) |
+| `VaultEntry` | `VaultEntry` | Vault list item |
+| `ModelStatus` | `ModelStatus` | Embedding model status + queue progress |
+| `SearchResult` | `SearchResult` | Search hit (node + score + context) |
+| `AppError` | `string` (rejected promise) | Error message |

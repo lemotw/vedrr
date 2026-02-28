@@ -1,67 +1,81 @@
-# Mind Flow — Code Architecture Index
+# Vedrr — Code Index
 
-> 詳細架構與 gotchas 見 `/CLAUDE.md`。本文件為快速查表。
-> 最後更新：2025-02-16
+> Quick-reference table. For detailed architecture and gotchas see `/CLAUDE.md`.
 
-## IPC 對照
+## IPC Reference
 
-| Frontend call | → Rust command | 功能 |
-|---------------|---------------|------|
-| `ipc.createContext(name, tags)` | `create_context` | 建立 context + root node |
-| `ipc.listContexts()` | `list_contexts` | 列出所有 contexts（含 node_count） |
-| `ipc.switchContext(id)` | `switch_context` | 切換 + 更新 last_accessed_at |
+| Frontend call | → Rust command | Description |
+|---------------|---------------|-------------|
+| `ipc.createContext(name, tags)` | `create_context` | Create context + root node |
+| `ipc.listContexts()` | `list_contexts` | List all contexts (with node_count) |
+| `ipc.switchContext(id)` | `switch_context` | Switch context, update timestamps |
 | `ipc.archiveContext(id)` | `archive_context` | state → archived |
 | `ipc.activateContext(id)` | `activate_context` | state → active |
-| `ipc.renameContext(id, name)` | `rename_context` | 改名 context + sync root node title |
-| `ipc.deleteContext(id)` | `delete_context` | 刪除 context（CASCADE 刪 nodes） |
-| `ipc.getTree(contextId)` | `get_tree` | 遞迴查詢整棵 tree |
-| `ipc.createNode(contextId, parentId, nodeType, title)` | `create_node` | 建立 node（position = max+1） |
-| `ipc.updateNode(id, {title?, content?, nodeType?, filePath?})` | `update_node` | 更新 node 指定欄位 |
-| `ipc.deleteNode(id)` | `delete_node` | 遞迴刪除子樹 |
-| `ipc.moveNode(id, newParentId, position)` | `move_node` | 移動 node 到新 parent |
-| `ipc.readFileBytes(filePath)` | `read_file_bytes` | 讀取檔案原始 bytes（用於圖片渲染） |
-| `ipc.saveClipboardImage(contextId, nodeId, data, ext)` | `save_clipboard_image` | 剪貼簿圖片存檔 → 回傳路徑 |
-| `ipc.importImage(contextId, nodeId, sourcePath)` | `import_image` | 複製圖片到 app 儲存區 → 回傳路徑 |
-| `ipc.revealFile(filePath)` | (plugin-opener) | 在 Finder 中顯示檔案 |
-| `ipc.pickFile()` | (plugin-dialog) | 系統檔案選擇器 |
-| `ipc.pickImage()` | (plugin-dialog) | 系統圖片選擇器（限 png/jpg/gif/webp） |
+| `ipc.renameContext(id, name)` | `rename_context` | Rename context + sync root node title |
+| `ipc.deleteContext(id)` | `delete_context` | Delete context (CASCADE deletes nodes) |
+| `ipc.vaultContext(id)` | `vault_context` | Export to ZIP, remove from DB |
+| `ipc.restoreFromVault(id)` | `restore_from_vault` | Restore ZIP → archived context + re-embed |
+| `ipc.importVaultZip(zipPath)` | `import_vault_zip` | Import external ZIP as new context |
+| `ipc.listVault()` | `list_vault` | List vault entries |
+| `ipc.deleteVaultEntry(id)` | `delete_vault_entry` | Delete vault ZIP + metadata |
+| `ipc.autoVaultArchived()` | `auto_vault_archived` | Auto-vault stale archived contexts |
+| `ipc.getTree(contextId)` | `get_tree` | Recursive tree query |
+| `ipc.createNode(contextId, parentId, nodeType, title)` | `create_node` | Create node (position = max+1) |
+| `ipc.updateNode(id, {title?, content?, nodeType?, filePath?})` | `update_node` | Update specified node fields |
+| `ipc.deleteNode(id)` | `delete_node` | Recursively delete subtree |
+| `ipc.moveNode(id, newParentId, position)` | `move_node` | Move node to new parent |
+| `ipc.cloneSubtree(sourceId, targetParentId, contextId)` | `clone_subtree` | Deep-copy subtree (for paste) |
+| `ipc.restoreNodes(nodes)` | `restore_nodes` | Batch restore nodes (for undo) |
+| `ipc.readFileBytes(filePath)` | `read_file_bytes` | Read file as byte array |
+| `ipc.saveClipboardImage(contextId, nodeId, data, ext)` | `save_clipboard_image` | Save clipboard image → return path |
+| `ipc.importImage(contextId, nodeId, sourcePath)` | `import_image` | Copy image to app storage → return path |
+| `ipc.semanticSearch(query, topK, alpha, minScore)` | `semantic_search` | Dual-vector cosine similarity search |
+| `ipc.textSearch(query, topK)` | `text_search` | LIKE match on title/content |
+| `ipc.embedContextNodes(contextId, force)` | `embed_context_nodes` | Batch-embed missing/all nodes |
+| `ipc.embedSingleNode(nodeId)` | `embed_single_node` | Embed one node (skips if model not ready) |
+| `ipc.getModelStatus()` | `get_model_status` | Model status + download progress + queue |
+| `ipc.ensureEmbeddingModel()` | `ensure_embedding_model` | Download + init model (legacy, now auto) |
+| `ipc.revealFile(filePath)` | *(plugin-opener)* | Reveal in Finder/Explorer |
+| `ipc.pickFile()` / `ipc.pickImage()` | *(plugin-dialog)* | System file picker |
 
-## Store Actions 快速查表
+## Store Actions
 
 ### contextStore
-`loadContexts` `createContext` `switchContext` `archiveContext` `deleteContext` `renameContext`
+`loadContexts` `loadVaultEntries` `createContext` `switchContext` `archiveContext` `activateContext` `vaultContext` `deleteContext` `renameContext` `restoreFromVault` `deleteVaultEntry` `importVaultZip`
 
 ### treeStore
 `loadTree` `selectNode` `addChild` `addSibling` `deleteNode` `updateNodeTitle` `updateNodeType` `updateNodeContent` `pasteAsNode` `openOrAttachFile` `pickAndImportImage`
 
 ### uiStore
-`openQuickSwitcher` `closeQuickSwitcher` `toggleQuickSwitcher` `setEditingNode` `openTypePopover` `closeTypePopover` `openMarkdownEditor` `closeMarkdownEditor`
+`openQuickSwitcher` `closeQuickSwitcher` `toggleQuickSwitcher` `setEditingNode` `openTypePopover` `closeTypePopover` `openMarkdownEditor` `closeMarkdownEditor` `openNodeSearch` `closeNodeSearch` `setTheme`
 
-## 常數定義（src/lib/constants.ts）
+## Constants (src/lib/constants.ts)
 
-| 常數 | 值 | 用途 |
-|------|-----|------|
-| `NodeTypes` | TEXT, MARKDOWN, IMAGE, FILE | 節點類型判斷、建立 |
-| `ContextStates` | ACTIVE, ARCHIVED, VAULT | Context 狀態篩選 |
-| `IpcCmd` | 16 個 Tauri invoke 命令名 | ipc.ts invoke 呼叫 |
-| `PasteKind` | IMAGE, TEXT | 貼上處理分派 |
-| `imageMime(ext)` | ext → MIME string | 圖片 Blob 建立 |
+| Constant | Values | Usage |
+|----------|--------|-------|
+| `NodeTypes` | TEXT, MARKDOWN, IMAGE, FILE | Node type checks, create calls |
+| `ContextStates` | ACTIVE, ARCHIVED, VAULT | Context state filtering |
+| `CompactStates` | IDLE, LOADING, PREVIEW | AI compact flow state |
+| `IpcCmd` | All Tauri invoke command names | ipc.ts invoke calls |
+| `PasteKind` | IMAGE, TEXT | Paste handler dispatch |
+| `imageMime(ext)` | ext → MIME string | Image Blob creation |
 
-## 快捷鍵完整對照
+## Keyboard Shortcuts
 
-| 快捷鍵 | 條件 | 動作 |
-|--------|------|------|
-| j / ↓ | tree focused | 下一個同級 node（breadth） |
-| k / ↑ | tree focused | 上一個同級 node（breadth） |
-| l / → | tree focused + has children | 第一個子節點（depth） |
-| h / ← | tree focused + has parent | 父節點（depth） |
-| Enter | tree focused + selected | 進入 inline edit |
-| Tab | tree focused + selected | 新增子節點 |
-| Shift+Tab | tree focused + selected | 新增同級節點 |
-| t | tree focused + selected | 開啟 type popover |
-| 1-4 | type popover open | 快速切換 type |
-| o | tree focused + FILE/IMAGE node | FILE: attach/reveal、IMAGE: pick image |
-| Backspace/Delete | tree focused + selected + not root | 刪除節點 |
-| Ctrl+V | tree focused + selected | 貼上為新 node（自動偵測圖片） |
+| Key | Condition | Action |
+|-----|-----------|--------|
+| j / ↓ | tree focused | Next sibling (breadth) |
+| k / ↑ | tree focused | Previous sibling (breadth) |
+| l / → | tree focused + has children | First child (depth) |
+| h / ← | tree focused + has parent | Parent node (depth) |
+| Enter | tree focused + selected | Inline edit title |
+| Tab | tree focused + selected | Add child node |
+| Shift+Tab | tree focused + selected | Add sibling node |
+| t | tree focused + selected | Open type popover |
+| 1-4 | type popover open | Quick switch type |
+| o | tree focused + FILE/IMAGE node | FILE: attach/reveal, IMAGE: pick image |
+| Backspace/Delete | tree focused + selected + not root | Delete node |
+| Ctrl+V | tree focused + selected | Paste as new node (auto-detect image) |
 | ⌘K | always | Quick Switcher |
-| Escape | lightbox / edit / popover / markdown editor | 關閉 |
+| ⌘F | always | Node Search |
+| Escape | lightbox / edit / popover / markdown editor | Close |

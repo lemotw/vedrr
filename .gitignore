@@ -16,6 +16,12 @@ dist-ssr
 src-tauri/target/
 src-tauri/gen/schemas/
 
+# Internal docs (keep only docs/specs/ tracked)
+docs/archived/
+docs/brainstorm/
+docs/context/
+docs/plans/
+
 # Editor directories and files
 .obsidian/
 .vscode/*
