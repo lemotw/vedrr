@@ -7,6 +7,9 @@ on:
 env:
   CARGO_INCREMENTAL: 0
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -24,7 +27,7 @@ jobs:
             args: ''
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
-            args: ''
+            args: '--bundles nsis'
 
     runs-on: ${{ matrix.platform }}
 
