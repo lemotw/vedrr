@@ -36,7 +36,12 @@
       "delete": "Delete",
       "restore": "Restore",
       "vault": "Vault",
-      "import": "匯入"
+      "import": "匯入",
+      "export": "匯出 ZIP",
+      "more": "更多操作",
+      "exporting": "匯出中...",
+      "exportDone": "匯出完成",
+      "exportError": "匯出失敗"
     },
     "empty": "還沒有 Context",
     "noMatch": "找不到",

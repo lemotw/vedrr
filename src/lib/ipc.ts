@@ -146,4 +146,7 @@ export const ipc = {
 
   importVaultZip: (zipPath: string) =>
     safeInvoke<string>(IpcCmd.IMPORT_VAULT_ZIP, { zipPath }),
+
+  exportContextZip: (id: string, destination: string) =>
+    safeInvoke<void>(IpcCmd.EXPORT_CONTEXT_ZIP, { id, destination }),
 };

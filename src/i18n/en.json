@@ -36,7 +36,12 @@
       "delete": "Delete",
       "restore": "Restore",
       "vault": "Vault",
-      "import": "Import"
+      "import": "Import",
+      "export": "Export ZIP",
+      "more": "More actions",
+      "exporting": "Exporting...",
+      "exportDone": "Export complete",
+      "exportError": "Export failed"
     },
     "empty": "No contexts yet",
     "noMatch": "No matches",
