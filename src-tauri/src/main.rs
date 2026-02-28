@@ -71,6 +71,7 @@ fn main() {
             commands::context::auto_vault_archived,
             commands::context::delete_vault_entry,
             commands::context::import_vault_zip,
+            commands::context::export_context_zip,
             commands::node::get_tree,
             commands::node::create_node,
             commands::node::update_node,

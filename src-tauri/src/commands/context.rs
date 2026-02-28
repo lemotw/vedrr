@@ -289,17 +289,20 @@ pub fn auto_vault_archived(state: State<'_, AppState>) -> Result<Vec<String>, Ap
     Ok(vaulted_names)
 }
 
-/// Inner vault logic reused by vault_context command and auto_vault_archived.
-fn vault_context_inner(state: &State<'_, AppState>, id: String) -> Result<(), AppError> {
-    let db = state.db.lock().unwrap();
-
-    let (ctx_name, tags_json, root_node_id, created_at): (String, String, String, String) = db
+/// Build a self-contained ZIP export for a context.
+/// Reads nodes from DB, builds manifest.json + files, writes to `dest_path`.
+fn build_context_zip(
+    db: &rusqlite::Connection,
+    id: &str,
+    dest_path: &std::path::Path,
+) -> Result<(), AppError> {
+    let (ctx_name, root_node_id): (String, String) = db
         .query_row(
-            "SELECT name, tags, root_node_id, created_at FROM contexts WHERE id = ?1",
-            [&id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            "SELECT name, root_node_id FROM contexts WHERE id = ?1",
+            [id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
-        .map_err(|_| AppError::ContextNotFound(id.clone()))?;
+        .map_err(|_| AppError::ContextNotFound(id.to_string()))?;
 
     let mut node_stmt = db.prepare(
         "SELECT id, parent_id, position, node_type, title, content, file_path
@@ -307,7 +310,7 @@ fn vault_context_inner(state: &State<'_, AppState>, id: String) -> Result<(), Ap
     )?;
     let nodes: Vec<(String, Option<String>, i32, String, String, Option<String>, Option<String>)> =
         node_stmt
-            .query_map([&id], |row| {
+            .query_map([id], |row| {
                 Ok((
                     row.get(0)?,
                     row.get(1)?,
@@ -319,16 +322,6 @@ fn vault_context_inner(state: &State<'_, AppState>, id: String) -> Result<(), Ap
                 ))
             })?
             .collect::<Result<Vec<_>, _>>()?;
-
-    let node_count = nodes.len() as i64;
-
-    let vault_dir = db::get_vault_dir();
-    let zip_path = vault_dir.join(format!("{id}.zip"));
-    let files_base = dirs::home_dir()
-        .unwrap()
-        .join("vedrr")
-        .join("files")
-        .join(&id);
 
     let mut export_nodes: Vec<VaultExportNode> = Vec::new();
     let mut zip_files: Vec<(String, std::path::PathBuf)> = Vec::new();
@@ -401,9 +394,9 @@ fn vault_context_inner(state: &State<'_, AppState>, id: String) -> Result<(), Ap
 
     let export = VaultExport {
         version: 1,
-        context_id: id.clone(),
-        context_name: ctx_name.clone(),
-        root_node_id: root_node_id.clone(),
+        context_id: id.to_string(),
+        context_name: ctx_name,
+        root_node_id,
         exported_at: chrono::Utc::now().to_rfc3339(),
         nodes: export_nodes,
     };
@@ -411,7 +404,7 @@ fn vault_context_inner(state: &State<'_, AppState>, id: String) -> Result<(), Ap
     let manifest_json = serde_json::to_string_pretty(&export)
         .map_err(|e| AppError::Other(format!("Failed to serialize manifest: {e}")))?;
 
-    let zip_file = std::fs::File::create(&zip_path)?;
+    let zip_file = std::fs::File::create(dest_path)?;
     let mut zip_writer = zip::ZipWriter::new(zip_file);
     let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
@@ -434,6 +427,32 @@ fn vault_context_inner(state: &State<'_, AppState>, id: String) -> Result<(), Ap
     zip_writer
         .finish()
         .map_err(|e| AppError::Other(format!("ZIP finish error: {e}")))?;
+
+    Ok(())
+}
+
+/// Inner vault logic reused by vault_context command and auto_vault_archived.
+fn vault_context_inner(state: &State<'_, AppState>, id: String) -> Result<(), AppError> {
+    let db = state.db.lock().unwrap();
+
+    let (ctx_name, tags_json, created_at): (String, String, String) = db
+        .query_row(
+            "SELECT name, tags, created_at FROM contexts WHERE id = ?1",
+            [&id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .map_err(|_| AppError::ContextNotFound(id.clone()))?;
+
+    let node_count: i64 = db.query_row(
+        "SELECT COUNT(*) FROM tree_nodes WHERE context_id = ?1",
+        [&id],
+        |row| row.get(0),
+    )?;
+
+    let vault_dir = db::get_vault_dir();
+    let zip_path = vault_dir.join(format!("{id}.zip"));
+
+    build_context_zip(&db, &id, &zip_path)?;
 
     db.execute_batch("BEGIN TRANSACTION")?;
 
@@ -461,11 +480,28 @@ fn vault_context_inner(state: &State<'_, AppState>, id: String) -> Result<(), Ap
         }
     }
 
+    let files_base = dirs::home_dir()
+        .unwrap()
+        .join("vedrr")
+        .join("files")
+        .join(&id);
     if files_base.exists() {
         let _ = std::fs::remove_dir_all(&files_base);
     }
 
     Ok(())
+}
+
+/// Export a context to a ZIP at a user-chosen path without deleting the context.
+#[tauri::command]
+pub fn export_context_zip(
+    state: State<'_, AppState>,
+    id: String,
+    destination: String,
+) -> Result<(), AppError> {
+    let db = state.db.lock().unwrap();
+    let dest_path = std::path::Path::new(&destination);
+    build_context_zip(&db, &id, dest_path)
 }
 
 #[tauri::command]
