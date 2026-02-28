@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useUIStore } from "../stores/uiStore";
 import { useContextStore } from "../stores/contextStore";
-import { ask, open as openDialog } from "@tauri-apps/plugin-dialog";
+import { ask, open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { ContextSummary, VaultEntry } from "../lib/types";
 import { ContextStates } from "../lib/constants";
@@ -90,6 +90,25 @@ function IcoDelete() {
   );
 }
 
+function IcoMore() {
+  return (
+    <svg className="w-[13px] h-[13px]" viewBox="0 0 16 16" fill="currentColor">
+      <circle cx="4" cy="8" r="1.5" />
+      <circle cx="8" cy="8" r="1.5" />
+      <circle cx="12" cy="8" r="1.5" />
+    </svg>
+  );
+}
+
+function IcoExport() {
+  return (
+    <svg className="w-[13px] h-[13px]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 11V3m0 0L5.5 5.5M8 3l2.5 2.5" />
+      <path d="M3 13h10" />
+    </svg>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────
 
 export function QuickSwitcher() {
@@ -108,14 +127,28 @@ export function QuickSwitcher() {
   const [focusPane, setFocusPane] = useState<"left" | "vault">("left");
   const [showImportZone, setShowImportZone] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const vaultInputRef = useRef<HTMLInputElement>(null);
   const activeScrollRef = useRef<HTMLDivElement>(null);
   const archivedScrollRef = useRef<HTMLDivElement>(null);
   const vaultScrollRef = useRef<HTMLDivElement>(null);
 
   const [importError, setImportError] = useState<string | null>(null);
+
+  // Close dropdown menu on click outside
+  useEffect(() => {
+    if (!menuOpenId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpenId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpenId]);
 
   const doImport = useCallback(async (zipPath: string) => {
     setImportError(null);
@@ -179,6 +212,7 @@ export function QuickSwitcher() {
       setFocusPane("left");
       setShowImportZone(false);
       setImportError(null);
+      setMenuOpenId(null);
       setTimeout(() => panelRef.current?.focus(), 50);
     }
   }, [quickSwitcherOpen, loadContexts, loadVaultEntries]);
@@ -263,6 +297,22 @@ export function QuickSwitcher() {
     await restoreFromVault(entry.id);
   };
 
+  const handleExport = async (e: React.MouseEvent, ctx: ContextSummary) => {
+    e.stopPropagation();
+    setMenuOpenId(null);
+    const destination = await saveDialog({
+      title: t("quickSwitcher.button.export"),
+      defaultPath: `${ctx.name}.zip`,
+      filters: [{ name: "ZIP", extensions: ["zip"] }],
+    });
+    if (!destination) return;
+    try {
+      await ipc.exportContextZip(ctx.id, destination);
+    } catch (err) {
+      console.error("[export] Failed:", err);
+    }
+  };
+
   const handleDelete = async (e: React.MouseEvent, ctx: ContextSummary) => {
     e.stopPropagation();
     const confirmed = await ask(
@@ -343,6 +393,13 @@ export function QuickSwitcher() {
       return;
     }
 
+    // Close dropdown menu on Escape
+    if (e.key === "Escape" && menuOpenId) {
+      e.preventDefault();
+      setMenuOpenId(null);
+      return;
+    }
+
     // Escape
     if (e.key === "Escape") {
       e.preventDefault();
@@ -407,47 +464,72 @@ export function QuickSwitcher() {
         )}>
           {ctx.name}
         </span>
-        <div className={cn(
-          "flex items-center gap-0.5 shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity ml-1",
-          isSelected && "opacity-100",
-        )}>
-          {isActive ? (
-            <button
-              className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer"
-              onClick={(e) => handleArchive(e, ctx)}
-              title={t("quickSwitcher.button.archive")}
-              aria-label={t("quickSwitcher.button.archive")}
-            >
-              <IcoArchive />
-            </button>
-          ) : (
-            <>
-              <button
-                className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer"
-                onClick={(e) => handleActivate(e, ctx)}
-                title={t("quickSwitcher.button.restore")}
-                aria-label={t("quickSwitcher.button.restore")}
-              >
-                <IcoRestore />
-              </button>
-              <button
-                className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer"
-                onClick={(e) => handleVault(e, ctx)}
-                title={t("quickSwitcher.button.vault")}
-                aria-label={t("quickSwitcher.button.vault")}
-              >
-                <IcoVault />
-              </button>
-            </>
-          )}
+        <div className="relative shrink-0 ml-1">
           <button
-            className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-[#FF4444] transition-all cursor-pointer"
-            onClick={(e) => handleDelete(e, ctx)}
-            title={t("quickSwitcher.button.delete")}
-            aria-label={t("quickSwitcher.button.delete")}
+            className={cn(
+              "w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer",
+              "opacity-0 group-hover/row:opacity-100",
+              isSelected && "opacity-100",
+              menuOpenId === ctx.id && "opacity-100 bg-[var(--color-hover)] text-text-primary",
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpenId(menuOpenId === ctx.id ? null : ctx.id);
+            }}
+            title={t("quickSwitcher.button.more")}
+            aria-label={t("quickSwitcher.button.more")}
           >
-            <IcoDelete />
+            <IcoMore />
           </button>
+
+          {menuOpenId === ctx.id && (
+            <div
+              ref={menuRef}
+              className="absolute right-0 top-full mt-1 z-50 min-w-[140px] bg-bg-elevated border border-border rounded-lg py-1 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+            >
+              <button
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-colors cursor-pointer"
+                onClick={(e) => handleExport(e, ctx)}
+              >
+                <IcoExport />
+                {t("quickSwitcher.button.export")}
+              </button>
+              {isActive ? (
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-colors cursor-pointer"
+                  onClick={(e) => { setMenuOpenId(null); handleArchive(e, ctx); }}
+                >
+                  <IcoArchive />
+                  {t("quickSwitcher.button.archive")}
+                </button>
+              ) : (
+                <>
+                  <button
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-colors cursor-pointer"
+                    onClick={(e) => { setMenuOpenId(null); handleActivate(e, ctx); }}
+                  >
+                    <IcoRestore />
+                    {t("quickSwitcher.button.restore")}
+                  </button>
+                  <button
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-colors cursor-pointer"
+                    onClick={(e) => { setMenuOpenId(null); handleVault(e, ctx); }}
+                  >
+                    <IcoVault />
+                    {t("quickSwitcher.button.vault")}
+                  </button>
+                </>
+              )}
+              <div className="h-px bg-border my-1" />
+              <button
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-[#FF4444] transition-colors cursor-pointer"
+                onClick={(e) => { setMenuOpenId(null); handleDelete(e, ctx); }}
+              >
+                <IcoDelete />
+                {t("quickSwitcher.button.delete")}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
