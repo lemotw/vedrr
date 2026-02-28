@@ -76,7 +76,11 @@ src/
 │   ├── NodeTypePopover.tsx      # Node type picker (T/M/I/F)
 │   ├── NodeSearch.tsx           # ⌘F node search (semantic + text)
 │   ├── ContextMenu.tsx          # Right-click context menu
-│   └── ThemeSwitcher.tsx        # Theme picker popover + custom color editor
+│   ├── ThemeSwitcher.tsx        # Theme picker popover + custom color editor
+│   ├── SettingsPanel.tsx        # Settings modal (tabs: General, AI, Search, Theme)
+│   ├── AISettings.tsx           # AI tab: API key management + profile CRUD
+│   ├── SearchSettings.tsx       # Search tab: mode toggle, alpha/threshold sliders
+│   └── CompactBanner.tsx        # AI Compact result banner (undo/accept/details)
 │
 ├── hooks/
 │   └── useKeyboard.ts           # Global keydown + paste listener (vim-style navigation)
@@ -89,7 +93,10 @@ src/
 └── lib/
     ├── constants.ts             # Centralized enums: NodeTypes, Themes, IpcCmd...
     ├── types.ts                 # TypeScript types + NODE_TYPE_CONFIG
-    └── ipc.ts                   # Tauri invoke wrappers
+    ├── ipc.ts                   # Tauri invoke wrappers
+    ├── cn.ts                    # Classname merge utility (clsx + twMerge)
+    ├── platform.ts              # OS detection (⌘ vs Ctrl symbol)
+    └── dragContext.ts            # Drag-and-drop context for dnd-kit
 ```
 
 ### Zustand Store Responsibilities
@@ -121,9 +128,11 @@ src-tauri/src/
 ├── error.rs          # AppError enum (Serialize for IPC)
 ├── embedding.rs      # Embedding model (multilingual-e5-small), queue system, cosine similarity
 └── commands/
+    ├── mod.rs        # Module declarations
     ├── context.rs    # Context CRUD + vault (ZIP export) + restore + import + auto-vault
     ├── node.rs       # Node CRUD (get_tree recursive assembly, create/update/delete/move/clone/restore)
     ├── search.rs     # Semantic search + text search + embed commands
+    ├── ai.rs         # AI compact: proxy LLM calls, profile/key CRUD, model listing
     └── file_ops.rs   # File read/save/import commands
 ```
 
@@ -217,6 +226,47 @@ Mode: WAL + foreign_keys ON
 | `original_created_at` | TEXT NOT NULL | Original creation date |
 | `vaulted_at` | TEXT NOT NULL | When vaulted |
 
+### ai_settings
+
+Key-value store for AI configuration (e.g. system prompt).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `key` | TEXT PK | Setting key |
+| `value` | TEXT NOT NULL | Setting value |
+
+### api_keys
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | TEXT PK | UUID v4 |
+| `name` | TEXT NOT NULL | Display name |
+| `provider` | TEXT NOT NULL | `anthropic` / `openai` / `gemini` (CHECK) |
+| `created_at` | TEXT | ISO datetime |
+
+Actual API key secrets are stored in the OS keychain via the `keyring` crate, not in SQLite.
+
+### ai_profiles
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | TEXT PK | UUID v4 |
+| `name` | TEXT NOT NULL | Profile display name |
+| `provider` | TEXT NOT NULL | Provider name |
+| `model` | TEXT NOT NULL | Model identifier |
+| `api_key_id` | TEXT | FK → api_keys.id, ON DELETE SET NULL |
+| `created_at` | TEXT | ISO datetime |
+
+### model_cache
+
+Caches available model lists per provider to avoid repeated API calls.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `provider` | TEXT PK | Provider name |
+| `models_json` | TEXT NOT NULL | Cached JSON model list |
+| `cached_at` | TEXT | ISO datetime |
+
 ### Relationships
 
 ```
@@ -229,7 +279,9 @@ contexts 1 ──────< tree_nodes
 contexts 1 ──────< node_embeddings
                         │ node_id ───→ tree_nodes.id
 
-vault_list (standalone, no FK to contexts — vaulted contexts are deleted)
+api_keys 1 ─────< ai_profiles (api_key_id, ON DELETE SET NULL)
+
+vault_list (standalone — vaulted contexts are deleted from contexts table)
 ```
 
 ---
