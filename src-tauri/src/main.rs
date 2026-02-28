@@ -17,6 +17,15 @@ pub struct AppState {
 }
 
 fn main() {
+    // Write panics to a log file (Windows GUI subsystem has no stderr)
+    std::panic::set_hook(Box::new(|info| {
+        let log_path = std::env::var("USERPROFILE")
+            .map(|p| std::path::PathBuf::from(p).join("vedrr_crash.log"))
+            .unwrap_or_else(|_| std::path::PathBuf::from("vedrr_crash.log"));
+        let bt = std::backtrace::Backtrace::force_capture();
+        let _ = std::fs::write(&log_path, format!("{info}\n\n{bt}"));
+    }));
+
     let db_path = db::get_db_path();
     let conn = Connection::open(&db_path).expect("Failed to open database");
     db::init_db(&conn).expect("Failed to init database");
