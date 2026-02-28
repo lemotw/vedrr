@@ -9,7 +9,6 @@ pub struct Context {
     pub root_node_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
-    pub last_accessed_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,7 +18,7 @@ pub struct ContextSummary {
     pub state: String,
     pub tags: Vec<String>,
     pub node_count: i64,
-    pub last_accessed_at: String,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

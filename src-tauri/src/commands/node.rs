@@ -23,7 +23,7 @@ fn row_to_node(row: &rusqlite::Row) -> rusqlite::Result<TreeNode> {
 /// Touch context timestamps on any content change; also promote archived → active.
 fn touch_and_promote_context(db: &rusqlite::Connection, context_id: &str) -> Result<(), AppError> {
     db.execute(
-        "UPDATE contexts SET updated_at = datetime('now'), last_accessed_at = datetime('now'),
+        "UPDATE contexts SET updated_at = datetime('now'),
          state = CASE WHEN state = 'archived' THEN 'active' ELSE state END
          WHERE id = ?1",
         [context_id],

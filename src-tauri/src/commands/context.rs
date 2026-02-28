@@ -29,7 +29,7 @@ pub fn create_context(
     )?;
 
     let ctx = db.query_row(
-        "SELECT id, name, state, tags, root_node_id, created_at, updated_at, last_accessed_at FROM contexts WHERE id = ?1",
+        "SELECT id, name, state, tags, root_node_id, created_at, updated_at FROM contexts WHERE id = ?1",
         [&id],
         |row| {
             Ok(Context {
@@ -41,7 +41,6 @@ pub fn create_context(
                 root_node_id: row.get(4)?,
                 created_at: row.get(5)?,
                 updated_at: row.get(6)?,
-                last_accessed_at: row.get(7)?,
             })
         },
     )?;
@@ -52,12 +51,12 @@ pub fn create_context(
 pub fn list_contexts(state: State<'_, AppState>) -> Result<Vec<ContextSummary>, AppError> {
     let db = state.db.lock().unwrap();
     let mut stmt = db.prepare(
-        "SELECT c.id, c.name, c.state, c.tags, c.last_accessed_at,
+        "SELECT c.id, c.name, c.state, c.tags, c.updated_at,
                 (SELECT COUNT(*) FROM tree_nodes WHERE context_id = c.id) as node_count
          FROM contexts c
          ORDER BY
             CASE c.state WHEN 'active' THEN 0 WHEN 'archived' THEN 1 ELSE 2 END,
-            c.last_accessed_at DESC",
+            c.updated_at DESC",
     )?;
     let rows = stmt
         .query_map([], |row| {
@@ -67,7 +66,7 @@ pub fn list_contexts(state: State<'_, AppState>) -> Result<Vec<ContextSummary>, 
                 state: row.get(2)?,
                 tags: serde_json::from_str::<Vec<String>>(&row.get::<_, String>(3)?)
                     .unwrap_or_default(),
-                last_accessed_at: row.get(4)?,
+                updated_at: row.get(4)?,
                 node_count: row.get(5)?,
             })
         })?
@@ -78,13 +77,13 @@ pub fn list_contexts(state: State<'_, AppState>) -> Result<Vec<ContextSummary>, 
 #[tauri::command]
 pub fn switch_context(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
-    // Only update timestamps — don't change state. Users can view archived contexts
-    // without promoting them. Content modification triggers auto-promote instead.
-    let changed = db.execute(
-        "UPDATE contexts SET last_accessed_at = datetime('now') WHERE id = ?1",
+    // Verify context exists. No state or timestamp change — viewing doesn't count as modification.
+    let exists: bool = db.query_row(
+        "SELECT EXISTS(SELECT 1 FROM contexts WHERE id = ?1)",
         [&id],
+        |row| row.get(0),
     )?;
-    if changed == 0 {
+    if !exists {
         return Err(AppError::ContextNotFound(id));
     }
     Ok(())
@@ -202,8 +201,8 @@ pub fn restore_from_vault(state: State<'_, AppState>, id: String) -> Result<(), 
 
     let result = (|| -> Result<(), AppError> {
         db.execute(
-            "INSERT INTO contexts (id, name, state, tags, root_node_id, created_at, updated_at, last_accessed_at)
-             VALUES (?1, ?2, 'archived', ?3, ?4, ?5, datetime('now'), datetime('now'))",
+            "INSERT INTO contexts (id, name, state, tags, root_node_id, created_at, updated_at)
+             VALUES (?1, ?2, 'archived', ?3, ?4, ?5, datetime('now'))",
             rusqlite::params![
                 id,
                 vault_name,
@@ -502,7 +501,7 @@ fn vault_context_inner(state: &State<'_, AppState>, id: String) -> Result<(), Ap
 pub fn activate_context(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
     db.execute(
-        "UPDATE contexts SET state = 'active', last_accessed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?1",
+        "UPDATE contexts SET state = 'active', updated_at = datetime('now') WHERE id = ?1",
         [&id],
     )?;
     Ok(())

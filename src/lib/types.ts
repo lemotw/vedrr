@@ -9,7 +9,6 @@ export interface Context {
   root_node_id: string | null;
   created_at: string;
   updated_at: string;
-  last_accessed_at: string;
 }
 
 export interface ContextSummary {
@@ -18,7 +17,7 @@ export interface ContextSummary {
   state: ContextState;
   tags: string[];
   node_count: number;
-  last_accessed_at: string;
+  updated_at: string;
 }
 
 export interface TreeNode {

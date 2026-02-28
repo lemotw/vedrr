@@ -316,7 +316,7 @@ export function QuickSwitcher() {
           {isCurrent ? "\u25B8" : isActive ? "\u25CF" : "\u25CB"}
         </span>
         <span className="text-[9px] text-text-secondary shrink-0 ml-1 mr-1.5 opacity-45 w-6">
-          {timeAgo(ctx.last_accessed_at)}
+          {timeAgo(ctx.updated_at)}
         </span>
         <span className={cn(
           "text-[12px] font-mono truncate flex-1 min-w-0",
