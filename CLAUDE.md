@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-ADHD-friendly desktop knowledge management tool. Horizontal XMind-style tree per "context", vim-style keyboard-first UX.
+Desktop knowledge management tool. Horizontal XMind-style tree per "context", vim-style keyboard-first UX.
 
 ## Tech Stack
 
