@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StatusBar } from "./components/StatusBar";
 import { TreeCanvas } from "./components/TreeCanvas";
@@ -15,6 +15,7 @@ import { useKeyboard } from "./hooks/useKeyboard";
 import { useUIStore } from "./stores/uiStore";
 import { ipc } from "./lib/ipc";
 import { ContextStates, CompactStates } from "./lib/constants";
+import type { ModelStatus } from "./lib/types";
 
 export default function App() {
   const { t } = useTranslation();
@@ -22,19 +23,37 @@ export default function App() {
   const { openQuickSwitcher } = useUIStore();
   const compactState = useUIStore((s) => s.compactState);
   const compactError = useUIStore((s) => s.compactError);
+  const [appReady, setAppReady] = useState(false);
+  const [setupStatus, setSetupStatus] = useState<ModelStatus>({ status: "not_ready", progress: 0, queue_done: 0, queue_total: 0 });
   useKeyboard();
+
+  // Poll model status while app is loading
+  useEffect(() => {
+    if (appReady) return;
+    let cancelled = false;
+    const poll = () => {
+      ipc.getModelStatus().then((s) => {
+        if (!cancelled) setSetupStatus(s);
+      }).catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 500);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [appReady]);
 
   useEffect(() => {
     // Apply saved theme on startup
     const { currentTheme, setTheme } = useUIStore.getState();
     setTheme(currentTheme);
-    // Pre-download embedding model in background
-    ipc.ensureEmbeddingModel().catch(console.error);
 
     loadContexts().then(() => {
       const active = useContextStore.getState().contexts.find(c => c.state === ContextStates.ACTIVE);
-      if (active) switchContext(active.id);
-      else openQuickSwitcher();
+      if (active) {
+        switchContext(active.id).then(() => setAppReady(true));
+      } else {
+        setAppReady(true);
+        openQuickSwitcher();
+      }
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -50,6 +69,26 @@ export default function App() {
     });
     return unsub;
   }, []);
+
+  // Loading screen
+  if (!appReady) {
+    const statusText = setupStatus.status === "warming_up"
+      ? setupStatus.queue_total > 0
+        ? t("statusBar.setup.warmingProgress", { done: setupStatus.queue_done, total: setupStatus.queue_total })
+        : t("statusBar.setup.warming")
+      : setupStatus.status === "downloading" || setupStatus.status === "not_ready"
+        ? t("statusBar.setup.loading")
+        : null;
+
+    return (
+      <div className="flex flex-col items-center justify-center h-screen w-screen bg-bg-page gap-4">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent-primary border-t-transparent" />
+        <span className="font-mono text-[11px] text-text-secondary">
+          {statusText ?? t("common.loading")}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen w-screen bg-bg-page">

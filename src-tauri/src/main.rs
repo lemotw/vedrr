@@ -40,6 +40,21 @@ fn main() {
                 embedding::bootstrap_bundled_model(&resource_dir);
             }
 
+            // Eagerly load embedding model + warm up embeddings in background.
+            // Delay start so the webview can initialize without CPU contention from ONNX loading.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(2));
+                if let Err(e) = embedding::ensure_model() {
+                    eprintln!("[embedding] Background model load failed: {e}");
+                    return;
+                }
+                let state = handle.state::<AppState>();
+                if let Err(e) = embedding::warmup_all(&state.db) {
+                    eprintln!("[embedding] Warmup failed: {e}");
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -55,6 +70,7 @@ fn main() {
             commands::context::restore_from_vault,
             commands::context::auto_vault_archived,
             commands::context::delete_vault_entry,
+            commands::context::import_vault_zip,
             commands::node::get_tree,
             commands::node::create_node,
             commands::node::update_node,

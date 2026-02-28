@@ -29,8 +29,7 @@ pub fn init_db(conn: &Connection) -> Result<(), AppError> {
             tags TEXT NOT NULL DEFAULT '[]',
             root_node_id TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-            last_accessed_at TEXT NOT NULL DEFAULT (datetime('now'))
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
         CREATE TABLE IF NOT EXISTS tree_nodes (
@@ -67,6 +66,7 @@ pub fn init_db(conn: &Connection) -> Result<(), AppError> {
             name TEXT NOT NULL,
             provider TEXT NOT NULL,
             model TEXT NOT NULL,
+            api_key_id TEXT REFERENCES api_keys(id) ON DELETE SET NULL,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
@@ -112,15 +112,16 @@ pub fn init_db(conn: &Connection) -> Result<(), AppError> {
     ",
     )?;
 
-    // Migration: add api_key_id column to ai_profiles (idempotent — fails silently if exists)
+    // ── Idempotent migrations ──
+
+    // Migration: add api_key_id column to ai_profiles (fails silently if exists)
     let _ = conn.execute(
         "ALTER TABLE ai_profiles ADD COLUMN api_key_id TEXT REFERENCES api_keys(id) ON DELETE SET NULL",
         [],
     );
 
-    // Migration: single-vector → dual-vector embeddings
+    // Migration: single-vector → dual-vector embeddings.
     // Detect old schema (single `embedding` column) and recreate with dual blobs.
-    // Existing embeddings are cleared; next switchContext triggers re-embed.
     let has_old_schema = conn
         .prepare("SELECT embedding FROM node_embeddings LIMIT 0")
         .is_ok();
@@ -141,10 +142,6 @@ pub fn init_db(conn: &Connection) -> Result<(), AppError> {
     }
 
     // Migration: old vault contexts → archived (they still have tree_nodes).
-    // The CHECK constraint now only allows 'active'/'archived', so clear 'vault' first.
-    // This runs via execute (not execute_batch) to avoid CHECK constraint errors on
-    // databases where the contexts table was already created with the old CHECK.
-    // On fresh DBs where no vault rows exist, this is a no-op.
     let _ = conn.execute("UPDATE contexts SET state = 'archived' WHERE state = 'vault'", []);
 
     Ok(())

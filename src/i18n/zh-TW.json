@@ -16,6 +16,11 @@
     "activeCount": "{{count}} 個作用中",
     "tooltip": {
       "settings": "設定"
+    },
+    "setup": {
+      "loading": "載入搜尋引擎...",
+      "warming": "建立節點索引...",
+      "warmingProgress": "建立節點索引 ({{done}}/{{total}})..."
     }
   },
   "quickSwitcher": {
@@ -30,11 +35,15 @@
       "archive": "Archive",
       "delete": "Delete",
       "restore": "Restore",
-      "vault": "Vault"
+      "vault": "Vault",
+      "import": "匯入"
     },
     "empty": "還沒有 Context",
     "noMatch": "找不到",
     "vaultEmpty": "沒有封存項目",
+    "dropZip": "拖放 .zip 或點擊選擇",
+    "dropRelease": "放開匯入",
+    "importError": "匯入失敗",
     "vaultSearch": "搜尋...",
     "defaultName": "新 Context",
     "hint": {

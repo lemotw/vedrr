@@ -99,8 +99,10 @@ export interface SearchResult {
 }
 
 export interface ModelStatus {
-  status: "not_ready" | "downloading" | "ready" | "error";
+  status: "not_ready" | "downloading" | "warming_up" | "ready" | "error";
   progress: number;
+  queue_done: number;
+  queue_total: number;
 }
 
 export interface VaultEntry {

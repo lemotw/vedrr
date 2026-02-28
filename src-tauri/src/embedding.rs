@@ -1,14 +1,22 @@
 use crate::error::AppError;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use rusqlite::Connection;
+use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
 use std::sync::OnceLock;
 
 static MODEL: OnceLock<Result<TextEmbedding, String>> = OnceLock::new();
 
-/// Model status: 0=not_ready, 1=downloading, 2=ready, 3=error
+/// Model status: 0=not_ready, 1=downloading, 2=ready, 3=error, 4=warming_up
 static MODEL_STATUS: AtomicU8 = AtomicU8::new(0);
+
+/// Embed queue: context IDs waiting to be embedded (deduped on push).
+static EMBED_QUEUE: std::sync::Mutex<VecDeque<String>> = std::sync::Mutex::new(VecDeque::new());
+/// Total items added to current queue batch.
+static QUEUE_TOTAL: AtomicUsize = AtomicUsize::new(0);
+/// Items completed in current queue batch.
+static QUEUE_DONE: AtomicUsize = AtomicUsize::new(0);
 
 const MAX_PATH_CHARS: usize = 450;
 const EXPECTED_MODEL_BYTES: u64 = 130_000_000; // ~130 MB for multilingual-e5-small
@@ -18,6 +26,7 @@ pub const STATUS_NOT_READY: u8 = 0;
 pub const STATUS_DOWNLOADING: u8 = 1;
 pub const STATUS_READY: u8 = 2;
 pub const STATUS_ERROR: u8 = 3;
+pub const STATUS_WARMING_UP: u8 = 4;
 
 /// Returns ~/vedrr/models/ and creates the directory if needed.
 pub fn get_models_dir() -> PathBuf {
@@ -103,8 +112,8 @@ fn dir_size(path: &std::path::Path) -> u64 {
     total
 }
 
-/// Get current model status and download progress.
-pub fn get_status() -> (u8, u8) {
+/// Get current model status, download progress, and queue counts.
+pub fn get_status() -> (u8, u8, usize, usize) {
     let status = MODEL_STATUS.load(Ordering::Relaxed);
     let progress = if status == STATUS_DOWNLOADING {
         model_download_progress()
@@ -113,11 +122,17 @@ pub fn get_status() -> (u8, u8) {
     } else {
         0
     };
-    (status, progress)
+    let queue_done = QUEUE_DONE.load(Ordering::Relaxed);
+    let queue_total = QUEUE_TOTAL.load(Ordering::Relaxed);
+    (status, progress, queue_done, queue_total)
 }
 
 /// Initialize the model (downloads if needed). Call from a background thread.
 pub fn ensure_model() -> Result<(), AppError> {
+    use std::time::Instant;
+    let t0 = Instant::now();
+    eprintln!("[model] ensure_model START");
+
     // Already initialized?
     if MODEL.get().is_some() {
         let status = match MODEL.get().unwrap() {
@@ -125,6 +140,7 @@ pub fn ensure_model() -> Result<(), AppError> {
             Err(_) => STATUS_ERROR,
         };
         MODEL_STATUS.store(status, Ordering::Relaxed);
+        eprintln!("[model] {:>6}ms  already initialized (status={})", t0.elapsed().as_millis(), status);
         return MODEL.get().unwrap().as_ref().map(|_| ()).map_err(|e| {
             AppError::Other(format!("Embedding model init failed: {e}"))
         });
@@ -133,8 +149,18 @@ pub fn ensure_model() -> Result<(), AppError> {
     MODEL_STATUS.store(STATUS_DOWNLOADING, Ordering::Relaxed);
     let result = get_model();
     match &result {
-        Ok(_) => MODEL_STATUS.store(STATUS_READY, Ordering::Relaxed),
-        Err(_) => MODEL_STATUS.store(STATUS_ERROR, Ordering::Relaxed),
+        Ok(_) => {
+            eprintln!("[model] {:>6}ms  model loaded, running ONNX warmup...", t0.elapsed().as_millis());
+            // Trigger ONNX graph optimization with a dummy inference.
+            // First inference is ~45s regardless of input size; subsequent calls are <200ms.
+            let _ = embed_passages(&["warmup".to_string()]);
+            MODEL_STATUS.store(STATUS_READY, Ordering::Relaxed);
+            eprintln!("[model] {:>6}ms  ONNX warmup done", t0.elapsed().as_millis());
+        }
+        Err(e) => {
+            MODEL_STATUS.store(STATUS_ERROR, Ordering::Relaxed);
+            eprintln!("[model] {:>6}ms  model load FAILED: {e}", t0.elapsed().as_millis());
+        }
     }
     result.map(|_| ())
 }
@@ -272,6 +298,168 @@ pub fn blob_to_vec(blob: &[u8]) -> Vec<f32> {
     blob.chunks_exact(4)
         .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
         .collect()
+}
+
+/// Queue a context for background embedding. Deduplicates.
+pub fn queue_embed(context_id: String) {
+    let mut q = EMBED_QUEUE.lock().unwrap();
+    if !q.contains(&context_id) {
+        q.push_back(context_id);
+        QUEUE_TOTAL.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+/// Process all queued embedding requests. Returns when queue is empty.
+pub fn process_embed_queue(db: &std::sync::Mutex<Connection>) {
+    use std::time::Instant;
+    let t0 = Instant::now();
+    loop {
+        let id = {
+            let mut q = EMBED_QUEUE.lock().unwrap();
+            q.pop_front()
+        };
+        match id {
+            Some(id) => {
+                match embed_context_core(db, &id, false) {
+                    Ok(count) => {
+                        eprintln!("[queue] {:>6}ms  ctx {} — {} nodes embedded",
+                            t0.elapsed().as_millis(), &id[..8.min(id.len())], count);
+                    }
+                    Err(e) => {
+                        eprintln!("[queue] {:>6}ms  ctx {} — ERROR: {e}",
+                            t0.elapsed().as_millis(), &id[..8.min(id.len())]);
+                    }
+                }
+                QUEUE_DONE.fetch_add(1, Ordering::Relaxed);
+            }
+            None => break,
+        }
+    }
+}
+
+/// Core embedding logic for a single context. Used by both Tauri command and warmup.
+pub fn embed_context_core(
+    db: &std::sync::Mutex<Connection>,
+    context_id: &str,
+    force: bool,
+) -> Result<usize, AppError> {
+    use std::time::Instant;
+    let t0 = Instant::now();
+
+    // If model isn't loaded yet, queue for later instead of blocking.
+    let status = MODEL_STATUS.load(Ordering::Relaxed);
+    if status != STATUS_READY && status != STATUS_WARMING_UP {
+        eprintln!("[embed_core] queued ctx={} — model not ready (status={status})",
+            &context_id[..8.min(context_id.len())]);
+        queue_embed(context_id.to_string());
+        return Ok(0);
+    }
+
+    // Phase 1: Read — collect node IDs + dual texts (lock held briefly)
+    let texts: Vec<(String, String, String, String)> = {
+        let conn = db.lock().unwrap();
+        if force {
+            conn.execute(
+                "DELETE FROM node_embeddings WHERE context_id = ?1",
+                [context_id],
+            )?;
+        }
+        let mut stmt = conn.prepare(
+            "SELECT tn.id FROM tree_nodes tn
+             LEFT JOIN node_embeddings ne ON tn.id = ne.node_id
+             WHERE tn.context_id = ?1 AND ne.node_id IS NULL",
+        )?;
+        let missing_ids: Vec<String> = stmt
+            .query_map([context_id], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        if missing_ids.is_empty() {
+            return Ok(0);
+        }
+        eprintln!("[embed_core] {:>6}ms  ctx={} — {} missing nodes to embed",
+            t0.elapsed().as_millis(), &context_id[..8.min(context_id.len())], missing_ids.len());
+        let mut result: Vec<(String, String, String, String)> = Vec::new();
+        for node_id in &missing_ids {
+            match build_node_texts(&conn, node_id) {
+                Ok((content_text, path_text, display_path)) => {
+                    result.push((node_id.clone(), content_text, path_text, display_path));
+                }
+                Err(e) => {
+                    eprintln!("[embed] skip node {node_id}: {e}");
+                }
+            }
+        }
+        result
+    }; // lock released
+
+    if texts.is_empty() {
+        return Ok(0);
+    }
+
+    eprintln!("[embed_core] {:>6}ms  texts built, starting embed ({} passages x2)...",
+        t0.elapsed().as_millis(), texts.len());
+
+    // Phase 2: Embed — CPU heavy, no lock
+    let content_inputs: Vec<String> = texts.iter().map(|(_, c, _, _)| c.clone()).collect();
+    let path_inputs: Vec<String> = texts.iter().map(|(_, _, p, _)| p.clone()).collect();
+    let content_embeddings = embed_passages(&content_inputs)?;
+    eprintln!("[embed_core] {:>6}ms  content embeddings done", t0.elapsed().as_millis());
+    let path_embeddings = embed_passages(&path_inputs)?;
+    eprintln!("[embed_core] {:>6}ms  path embeddings done", t0.elapsed().as_millis());
+
+    // Phase 3: Write — re-acquire lock, insert results
+    let conn = db.lock().unwrap();
+    let mut insert_stmt = conn.prepare(
+        "INSERT OR REPLACE INTO node_embeddings
+         (node_id, context_id, embedding_content, embedding_path, input_content, input_path, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))",
+    )?;
+    let mut count = 0;
+    for (i, (node_id, content_text, _path_text, display_path)) in texts.iter().enumerate() {
+        if let (Some(cvec), Some(pvec)) = (content_embeddings.get(i), path_embeddings.get(i)) {
+            let content_blob = vec_to_blob(cvec);
+            let path_blob = vec_to_blob(pvec);
+            insert_stmt.execute(rusqlite::params![
+                node_id, context_id, content_blob, path_blob, content_text, display_path
+            ])?;
+            count += 1;
+        }
+    }
+    eprintln!("[embed_core] {:>6}ms  DB write done ({} rows)", t0.elapsed().as_millis(), count);
+    Ok(count)
+}
+
+/// Warm up: queue all active context nodes + any previously queued items, then process.
+/// Called from setup background thread after ensure_model().
+pub fn warmup_all(db: &std::sync::Mutex<Connection>) -> Result<(), AppError> {
+    use std::time::Instant;
+    let t0 = Instant::now();
+    MODEL_STATUS.store(STATUS_WARMING_UP, Ordering::Relaxed);
+
+    // Push all active contexts to queue (items queued during model loading are already there)
+    let context_ids: Vec<String> = {
+        let conn = db.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id FROM contexts WHERE state = 'active'")?;
+        let ids = stmt.query_map([], |row| row.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+        ids
+    };
+    for id in context_ids {
+        queue_embed(id);
+    }
+
+    // Reset counters AFTER merging — reflects the real queue size (including pre-queued items)
+    let total = EMBED_QUEUE.lock().unwrap().len();
+    QUEUE_TOTAL.store(total, Ordering::Relaxed);
+    QUEUE_DONE.store(0, Ordering::Relaxed);
+    eprintln!("[warmup] START — {} contexts queued", total);
+
+    // Process all queued items
+    process_embed_queue(db);
+
+    MODEL_STATUS.store(STATUS_READY, Ordering::Relaxed);
+    eprintln!("[warmup] {:>6}ms  DONE", t0.elapsed().as_millis());
+    Ok(())
 }
 
 #[cfg(test)]

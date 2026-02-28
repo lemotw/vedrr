@@ -143,4 +143,7 @@ export const ipc = {
 
   deleteVaultEntry: (id: string) =>
     safeInvoke<void>(IpcCmd.DELETE_VAULT_ENTRY, { id }),
+
+  importVaultZip: (zipPath: string) =>
+    safeInvoke<string>(IpcCmd.IMPORT_VAULT_ZIP, { zipPath }),
 };

@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useUIStore } from "../stores/uiStore";
 import { useContextStore } from "../stores/contextStore";
-import { ask } from "@tauri-apps/plugin-dialog";
+import { ask, open as openDialog } from "@tauri-apps/plugin-dialog";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { ContextSummary, VaultEntry } from "../lib/types";
 import { ContextStates } from "../lib/constants";
 import { cn } from "../lib/cn";
@@ -62,6 +63,25 @@ function IcoUndo() {
   );
 }
 
+function IcoVault() {
+  return (
+    <svg className="w-[13px] h-[13px]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M2 6.5h12" />
+      <circle cx="8" cy="10" r="1.5" />
+    </svg>
+  );
+}
+
+function IcoImport() {
+  return (
+    <svg className="w-[11px] h-[11px]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 2v9m0 0l-3-3m3 3l3-3" />
+      <path d="M3 13h10" />
+    </svg>
+  );
+}
+
 function IcoDelete() {
   return (
     <svg className="w-[13px] h-[13px]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
@@ -78,20 +98,76 @@ export function QuickSwitcher() {
   const {
     contexts, vaultEntries, loadContexts, loadVaultEntries,
     switchContext, createContext,
-    archiveContext, activateContext, deleteContext,
-    restoreFromVault,
+    archiveContext, activateContext, vaultContext, deleteContext,
+    restoreFromVault, importVaultZip,
     currentContextId,
   } = useContextStore();
 
   const [vaultSearch, setVaultSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [focusPane, setFocusPane] = useState<"left" | "vault">("left");
+  const [showImportZone, setShowImportZone] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const vaultInputRef = useRef<HTMLInputElement>(null);
   const activeScrollRef = useRef<HTMLDivElement>(null);
   const archivedScrollRef = useRef<HTMLDivElement>(null);
   const vaultScrollRef = useRef<HTMLDivElement>(null);
+
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const doImport = useCallback(async (zipPath: string) => {
+    setImportError(null);
+    try {
+      const newId = await importVaultZip(zipPath);
+      await switchContext(newId);
+      closeQuickSwitcher();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setImportError(msg);
+      console.error("[import] Failed to import vault ZIP:", err);
+    }
+  }, [importVaultZip, switchContext, closeQuickSwitcher]);
+
+  const handleImportDrop = useCallback(async (paths: string[]) => {
+    const zipPath = paths.find(p => p.toLowerCase().endsWith(".zip"));
+    if (!zipPath) return;
+    doImport(zipPath);
+  }, [doImport]);
+
+  const handleImportClick = useCallback(async () => {
+    const selected = await openDialog({
+      multiple: false,
+      directory: false,
+      filters: [{ name: "Vault ZIP", extensions: ["zip"] }],
+    });
+    if (selected) doImport(selected);
+  }, [doImport]);
+
+  // Tauri drag-drop listener (only active when import zone is open)
+  useEffect(() => {
+    if (!quickSwitcherOpen || !showImportZone) {
+      setIsDragging(false);
+      return;
+    }
+    let cancelled = false;
+    const unlisten = getCurrentWebviewWindow().onDragDropEvent((event) => {
+      if (cancelled) return;
+      if (event.payload.type === "over") {
+        setIsDragging(true);
+      } else if (event.payload.type === "leave") {
+        setIsDragging(false);
+      } else if (event.payload.type === "drop") {
+        setIsDragging(false);
+        handleImportDrop(event.payload.paths);
+      }
+    });
+    return () => {
+      cancelled = true;
+      unlisten.then(fn => fn());
+    };
+  }, [quickSwitcherOpen, showImportZone, handleImportDrop]);
 
   useEffect(() => {
     if (quickSwitcherOpen) {
@@ -101,6 +177,8 @@ export function QuickSwitcher() {
       setVaultSearch("");
       setSelectedIndex(0);
       setFocusPane("left");
+      setShowImportZone(false);
+      setImportError(null);
       setTimeout(() => panelRef.current?.focus(), 50);
     }
   }, [quickSwitcherOpen, loadContexts, loadVaultEntries]);
@@ -168,6 +246,11 @@ export function QuickSwitcher() {
   const handleArchive = async (e: React.MouseEvent, ctx: ContextSummary) => {
     e.stopPropagation();
     await archiveContext(ctx.id);
+  };
+
+  const handleVault = async (e: React.MouseEvent, ctx: ContextSummary) => {
+    e.stopPropagation();
+    await vaultContext(ctx.id);
   };
 
   const handleActivate = async (e: React.MouseEvent, ctx: ContextSummary) => {
@@ -338,14 +421,24 @@ export function QuickSwitcher() {
               <IcoArchive />
             </button>
           ) : (
-            <button
-              className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer"
-              onClick={(e) => handleActivate(e, ctx)}
-              title={t("quickSwitcher.button.restore")}
-              aria-label={t("quickSwitcher.button.restore")}
-            >
-              <IcoRestore />
-            </button>
+            <>
+              <button
+                className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer"
+                onClick={(e) => handleActivate(e, ctx)}
+                title={t("quickSwitcher.button.restore")}
+                aria-label={t("quickSwitcher.button.restore")}
+              >
+                <IcoRestore />
+              </button>
+              <button
+                className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer"
+                onClick={(e) => handleVault(e, ctx)}
+                title={t("quickSwitcher.button.vault")}
+                aria-label={t("quickSwitcher.button.vault")}
+              >
+                <IcoVault />
+              </button>
+            </>
           )}
           <button
             className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-[#FF4444] transition-all cursor-pointer"
@@ -408,106 +501,156 @@ export function QuickSwitcher() {
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        {/* Body: left + right panes */}
+        {/* Body */}
         <div className="flex min-h-0 h-[420px]">
-          {/* ── Left pane: Active + Archived ── */}
-          <div className={cn(
-            "w-[70%] flex flex-col min-h-0 border-r border-border transition-opacity",
-            inVaultMode && "opacity-20 pointer-events-none",
-          )}>
-            {/* Active area (flex 7) */}
-            <div className="flex-[7] flex flex-col min-h-0 overflow-hidden">
-              <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
-                <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
-                  {t("quickSwitcher.section.active")}
-                </span>
-                <span className="text-[10px] text-text-secondary opacity-50">{active.length}</span>
-              </div>
-              <div ref={activeScrollRef} className="flex-1 overflow-y-auto">
-                {active.map((ctx, i) => renderLeftRow(ctx, i))}
-                {active.length === 0 && archived.length === 0 && (
-                  <div className="px-3 py-6 text-center text-text-secondary text-[11px]">
-                    {t("quickSwitcher.empty")}
-                  </div>
+          {showImportZone ? (
+            /* ── Full-area import drop zone ── */
+            <div className="flex-1 flex items-center justify-center p-6">
+              <button
+                onClick={handleImportClick}
+                className={cn(
+                  "w-full h-full rounded-xl flex flex-col items-center justify-center gap-3 transition-all cursor-pointer",
+                  isDragging
+                    ? "border-2 border-solid border-accent-primary bg-accent-primary/15"
+                    : "border-2 border-dashed border-text-secondary/25 hover:border-text-secondary/50 bg-transparent hover:bg-[var(--color-hover)]",
                 )}
-              </div>
-            </div>
-
-            {/* Archived area (flex 3) */}
-            <div className="flex-[3] flex flex-col min-h-0 overflow-hidden border-t border-border">
-              <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
-                <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
-                  {t("quickSwitcher.section.archived")}
+              >
+                <span className={cn(
+                  "text-[32px] transition-colors",
+                  isDragging ? "text-accent-primary" : "text-text-secondary/30",
+                )}>
+                  {"\u2B07"}
                 </span>
-                <span className="text-[10px] text-text-secondary opacity-50">{archived.length}</span>
-              </div>
-              <div ref={archivedScrollRef} className="flex-1 overflow-y-auto">
-                {archived.map((ctx, i) => renderLeftRow(ctx, active.length + i))}
-              </div>
+                <span className={cn(
+                  "text-[12px] font-mono transition-colors",
+                  isDragging ? "text-accent-primary font-bold" : "text-text-secondary/40",
+                )}>
+                  {isDragging ? t("quickSwitcher.dropRelease") : t("quickSwitcher.dropZip")}
+                </span>
+                {importError && (
+                  <span className="text-[11px] font-mono text-red-400 max-w-[80%] text-center truncate">
+                    {t("quickSwitcher.importError")}: {importError}
+                  </span>
+                )}
+              </button>
             </div>
-          </div>
-
-          {/* ── Right pane: Vault ── */}
-          <div className="w-[30%] flex flex-col min-h-0">
-            <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
-              <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
-                {t("quickSwitcher.section.vault")}
-              </span>
-              <span className="text-[10px] text-text-secondary opacity-50">
-                {vaultSearch ? `${filteredVault.length} / ${vaultEntries.length}` : vaultEntries.length}
-              </span>
-            </div>
-
-            {/* Vault search */}
-            <div className={cn(
-              "flex items-center mx-2 mb-1.5 bg-bg-card rounded-md px-2 h-7 border border-transparent transition-colors shrink-0",
-              inVaultMode && "border-text-secondary/30",
-            )}>
-              <span className="text-[10px] text-text-secondary opacity-40 mr-1.5 shrink-0">{"\u2315"}</span>
-              <input
-                ref={vaultInputRef}
-                value={vaultSearch}
-                onChange={(e) => setVaultSearch(e.target.value)}
-                onFocus={() => {
-                  if (focusPane !== "vault") {
-                    setFocusPane("vault");
-                    setSelectedIndex(0);
-                  }
-                }}
-                placeholder={t("quickSwitcher.vaultSearch")}
-                className="flex-1 bg-transparent text-[10px] text-text-primary placeholder:text-text-secondary/35 outline-none font-mono min-w-0"
-              />
-              <span className="text-[8px] text-text-secondary opacity-30 bg-bg-elevated px-1 py-0.5 rounded-sm shrink-0">
-                {inVaultMode ? "esc" : "/"}
-              </span>
-            </div>
-
-            {/* Vault list */}
-            <div ref={vaultScrollRef} className="flex-1 overflow-y-auto">
-              {filteredVault.map((entry) => renderVaultRow(entry))}
-              {filteredVault.length === 0 && vaultEntries.length > 0 && (
-                <div className="px-3 py-4 text-center text-text-secondary text-[11px]">
-                  {t("quickSwitcher.noMatch")}
+          ) : (
+            <>
+              {/* ── Left pane: Active + Archived ── */}
+              <div className={cn(
+                "w-[70%] flex flex-col min-h-0 border-r border-border transition-opacity",
+                inVaultMode && "opacity-20 pointer-events-none",
+              )}>
+                {/* Active area (flex 7) */}
+                <div className="flex-[7] flex flex-col min-h-0 overflow-hidden">
+                  <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
+                    <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
+                      {t("quickSwitcher.section.active")}
+                    </span>
+                    <span className="text-[10px] text-text-secondary opacity-50">{active.length}</span>
+                  </div>
+                  <div ref={activeScrollRef} className="flex-1 overflow-y-auto">
+                    {active.map((ctx, i) => renderLeftRow(ctx, i))}
+                    {active.length === 0 && archived.length === 0 && (
+                      <div className="px-3 py-6 text-center text-text-secondary text-[11px]">
+                        {t("quickSwitcher.empty")}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-              {vaultEntries.length === 0 && (
-                <div className="px-3 py-4 text-center text-text-secondary/50 text-[10px]">
-                  {t("quickSwitcher.vaultEmpty")}
+
+                {/* Archived area (flex 3) */}
+                <div className="flex-[3] flex flex-col min-h-0 overflow-hidden border-t border-border">
+                  <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
+                    <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
+                      {t("quickSwitcher.section.archived")}
+                    </span>
+                    <span className="text-[10px] text-text-secondary opacity-50">{archived.length}</span>
+                  </div>
+                  <div ref={archivedScrollRef} className="flex-1 overflow-y-auto">
+                    {archived.map((ctx, i) => renderLeftRow(ctx, active.length + i))}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+
+              {/* ── Right pane: Vault ── */}
+              <div className="w-[30%] flex flex-col min-h-0">
+                <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
+                  <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
+                    {t("quickSwitcher.section.vault")}
+                  </span>
+                  <span className="text-[10px] text-text-secondary opacity-50">
+                    {vaultSearch ? `${filteredVault.length} / ${vaultEntries.length}` : vaultEntries.length}
+                  </span>
+                </div>
+
+                {/* Vault search */}
+                <div className={cn(
+                  "flex items-center mx-2 mb-1.5 bg-bg-card rounded-md px-2 h-7 border border-transparent transition-colors shrink-0",
+                  inVaultMode && "border-text-secondary/30",
+                )}>
+                  <span className="text-[10px] text-text-secondary opacity-40 mr-1.5 shrink-0">{"\u2315"}</span>
+                  <input
+                    ref={vaultInputRef}
+                    value={vaultSearch}
+                    onChange={(e) => setVaultSearch(e.target.value)}
+                    onFocus={() => {
+                      if (focusPane !== "vault") {
+                        setFocusPane("vault");
+                        setSelectedIndex(0);
+                      }
+                    }}
+                    placeholder={t("quickSwitcher.vaultSearch")}
+                    className="flex-1 bg-transparent text-[10px] text-text-primary placeholder:text-text-secondary/35 outline-none font-mono min-w-0"
+                  />
+                  <span className="text-[8px] text-text-secondary opacity-30 bg-bg-elevated px-1 py-0.5 rounded-sm shrink-0">
+                    {inVaultMode ? "esc" : "/"}
+                  </span>
+                </div>
+
+                {/* Vault list */}
+                <div ref={vaultScrollRef} className="flex-1 overflow-y-auto">
+                  {filteredVault.map((entry) => renderVaultRow(entry))}
+                  {filteredVault.length === 0 && vaultEntries.length > 0 && (
+                    <div className="px-3 py-4 text-center text-text-secondary text-[11px]">
+                      {t("quickSwitcher.noMatch")}
+                    </div>
+                  )}
+                  {vaultEntries.length === 0 && (
+                    <div className="px-3 py-4 text-center text-text-secondary/50 text-[10px]">
+                      {t("quickSwitcher.vaultEmpty")}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Footer ── */}
         <div className="flex items-center justify-between px-3 h-12 bg-bg-card shrink-0">
-          <button
-            onClick={handleCreate}
-            className="px-3 py-1.5 text-[11px] font-bold text-white bg-accent-primary rounded-md font-mono cursor-pointer flex items-center gap-1.5"
-          >
-            {t("quickSwitcher.button.new")}
-            <span className="text-[9px] opacity-70">{modSymbol}N</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleCreate}
+              className="px-3 py-1.5 text-[11px] font-bold text-white bg-accent-primary rounded-md font-mono cursor-pointer flex items-center gap-1.5"
+            >
+              {t("quickSwitcher.button.new")}
+              <span className="text-[9px] opacity-70">{modSymbol}N</span>
+            </button>
+            <button
+              onClick={() => setShowImportZone(!showImportZone)}
+              className={cn(
+                "px-2.5 py-1.5 text-[11px] font-bold rounded-md font-mono cursor-pointer flex items-center gap-1 transition-all",
+                showImportZone
+                  ? "bg-text-secondary/20 text-text-primary"
+                  : "bg-bg-elevated text-text-secondary hover:text-text-primary",
+              )}
+              title={t("quickSwitcher.button.import")}
+            >
+              <IcoImport />
+              {t("quickSwitcher.button.import")}
+            </button>
+          </div>
 
           <div className="flex items-center gap-2.5">
             {inVaultMode ? (

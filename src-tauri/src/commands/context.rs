@@ -322,26 +322,6 @@ fn vault_context_inner(state: &State<'_, AppState>, id: String) -> Result<(), Ap
 
     let node_count = nodes.len() as i64;
 
-    let mut emb_stmt = db.prepare(
-        "SELECT ne.node_id, ne.embedding_content, ne.embedding_path, ne.input_path,
-                tn.title, tn.node_type
-         FROM node_embeddings ne
-         JOIN tree_nodes tn ON ne.node_id = tn.id
-         WHERE ne.context_id = ?1",
-    )?;
-    let embeddings: Vec<(String, Vec<u8>, Vec<u8>, String, String, String)> = emb_stmt
-        .query_map([&id], |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                row.get(3)?,
-                row.get(4)?,
-                row.get(5)?,
-            ))
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-
     let vault_dir = db::get_vault_dir();
     let zip_path = vault_dir.join(format!("{id}.zip"));
     let files_base = dirs::home_dir()
@@ -464,16 +444,7 @@ fn vault_context_inner(state: &State<'_, AppState>, id: String) -> Result<(), Ap
             rusqlite::params![id, ctx_name, tags_json, node_count, created_at],
         )?;
 
-        for (node_id, emb_content, emb_path, ancestor_path, node_title, node_type) in &embeddings {
-            db.execute(
-                "INSERT INTO vault_embeddings (id, vault_id, node_title, node_type, ancestor_path, embedding_content, embedding_path)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                rusqlite::params![
-                    node_id, id, node_title, node_type, ancestor_path, emb_content, emb_path
-                ],
-            )?;
-        }
-
+        // CASCADE deletes tree_nodes + node_embeddings
         db.execute("DELETE FROM contexts WHERE id = ?1", [&id])?;
 
         Ok(())
@@ -526,6 +497,170 @@ pub fn delete_context(state: State<'_, AppState>, id: String) -> Result<(), AppE
     let db = state.db.lock().unwrap();
     db.execute("DELETE FROM contexts WHERE id = ?1", [&id])?;
     Ok(())
+}
+
+/// Import an external vault ZIP as a new active context.
+/// Generates new IDs for everything to avoid collisions.
+#[tauri::command]
+pub fn import_vault_zip(state: State<'_, AppState>, zip_path: String) -> Result<String, AppError> {
+    use std::time::Instant;
+    let t0 = Instant::now();
+    eprintln!("[import] START import_vault_zip: {zip_path}");
+
+    let path = std::path::Path::new(&zip_path);
+    if !path.exists() {
+        return Err(AppError::Other(format!("ZIP file not found: {zip_path}")));
+    }
+
+    // 1. Read ZIP, parse manifest
+    let zip_file = std::fs::File::open(path)?;
+    let mut archive = zip::ZipArchive::new(zip_file)
+        .map_err(|e| AppError::Other(format!("Failed to open ZIP: {e}")))?;
+    eprintln!("[import] {:>6}ms  ZIP opened ({} entries)", t0.elapsed().as_millis(), archive.len());
+
+    let manifest: VaultExport = {
+        let mut manifest_file = archive
+            .by_name("manifest.json")
+            .map_err(|e| AppError::Other(format!("manifest.json not found in ZIP: {e}")))?;
+        let mut buf = String::new();
+        manifest_file.read_to_string(&mut buf)?;
+        serde_json::from_str(&buf)
+            .map_err(|e| AppError::Other(format!("Failed to parse manifest: {e}")))?
+    };
+    eprintln!("[import] {:>6}ms  manifest parsed ({} nodes, context=\"{}\")",
+        t0.elapsed().as_millis(), manifest.nodes.len(), manifest.context_name);
+
+    // 2. Generate new IDs
+    let new_context_id = uuid::Uuid::new_v4().to_string();
+    let mut id_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for node in &manifest.nodes {
+        id_map.insert(node.id.clone(), uuid::Uuid::new_v4().to_string());
+    }
+
+    let new_root_id = id_map
+        .get(&manifest.root_node_id)
+        .ok_or_else(|| AppError::Other("Root node not found in manifest".into()))?
+        .clone();
+    eprintln!("[import] {:>6}ms  new IDs generated", t0.elapsed().as_millis());
+
+    // 3. Compute extraction paths (keyed by ZIP entry name)
+    let files_dir = dirs::home_dir()
+        .unwrap()
+        .join("vedrr")
+        .join("files")
+        .join(&new_context_id);
+    std::fs::create_dir_all(&files_dir)?;
+
+    let mut file_ref_to_path: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+
+    for node in &manifest.nodes {
+        if let Some(ref file_ref) = node.file_ref {
+            let new_node_id = id_map.get(&node.id).unwrap();
+            let new_filename = match node.node_type.as_str() {
+                "markdown" => format!("{new_node_id}.md"),
+                "image" => {
+                    let ext = file_ref.rsplit('.').next().unwrap_or("png");
+                    let len = 8.min(new_node_id.len());
+                    format!("{}.{ext}", &new_node_id[..len])
+                }
+                _ => {
+                    // "file" type: files/{nid}_{filename} → preserve original filename
+                    let raw = file_ref.strip_prefix("files/").unwrap_or(file_ref);
+                    if let Some(pos) = raw.find('_') {
+                        raw[pos + 1..].to_string()
+                    } else {
+                        raw.to_string()
+                    }
+                }
+            };
+            let dest = files_dir.join(&new_filename);
+            file_ref_to_path.insert(file_ref.clone(), dest.to_string_lossy().to_string());
+        }
+    }
+    eprintln!("[import] {:>6}ms  path mapping computed ({} files to extract)",
+        t0.elapsed().as_millis(), file_ref_to_path.len());
+
+    // 4. Extract files from ZIP
+    let mut extracted_count = 0u32;
+    let mut extracted_bytes = 0u64;
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| AppError::Other(format!("ZIP entry error: {e}")))?;
+        let name = entry.name().to_string();
+        if let Some(dest_path) = file_ref_to_path.get(&name) {
+            let mut buf = Vec::new();
+            entry.read_to_end(&mut buf)?;
+            extracted_bytes += buf.len() as u64;
+            std::fs::write(dest_path, &buf)?;
+            extracted_count += 1;
+        }
+    }
+    eprintln!("[import] {:>6}ms  files extracted ({} files, {:.1} MB)",
+        t0.elapsed().as_millis(), extracted_count, extracted_bytes as f64 / 1_048_576.0);
+
+    // 5. DB transaction: create context + tree_nodes
+    eprintln!("[import] {:>6}ms  acquiring DB lock...", t0.elapsed().as_millis());
+    let db = state.db.lock().unwrap();
+    eprintln!("[import] {:>6}ms  DB lock acquired, starting transaction", t0.elapsed().as_millis());
+    db.execute_batch("BEGIN TRANSACTION")?;
+
+    let result = (|| -> Result<(), AppError> {
+        db.execute(
+            "INSERT INTO contexts (id, name, state, tags, root_node_id, created_at, updated_at)
+             VALUES (?1, ?2, 'active', '[]', ?3, ?4, datetime('now'))",
+            rusqlite::params![
+                new_context_id,
+                manifest.context_name,
+                new_root_id,
+                manifest.exported_at,
+            ],
+        )?;
+        eprintln!("[import] {:>6}ms  context row inserted", t0.elapsed().as_millis());
+
+        for node in &manifest.nodes {
+            let new_id = id_map.get(&node.id).unwrap();
+            let new_parent_id = node.parent_id.as_ref().and_then(|pid| id_map.get(pid));
+            let file_path = node
+                .file_ref
+                .as_ref()
+                .and_then(|fr| file_ref_to_path.get(fr));
+
+            db.execute(
+                "INSERT INTO tree_nodes (id, context_id, parent_id, position, node_type, title, content, file_path)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                rusqlite::params![
+                    new_id,
+                    new_context_id,
+                    new_parent_id,
+                    node.position,
+                    node.node_type,
+                    node.title,
+                    node.content,
+                    file_path,
+                ],
+            )?;
+        }
+        eprintln!("[import] {:>6}ms  {} tree_nodes inserted", t0.elapsed().as_millis(), manifest.nodes.len());
+
+        Ok(())
+    })();
+
+    match result {
+        Ok(()) => {
+            db.execute_batch("COMMIT")?;
+            eprintln!("[import] {:>6}ms  transaction committed", t0.elapsed().as_millis());
+        }
+        Err(e) => {
+            let _ = db.execute_batch("ROLLBACK");
+            let _ = std::fs::remove_dir_all(&files_dir);
+            return Err(e);
+        }
+    }
+
+    eprintln!("[import] {:>6}ms  DONE (new context_id={})", t0.elapsed().as_millis(), new_context_id);
+    Ok(new_context_id)
 }
 
 /// Delete a vault entry and its ZIP file.

@@ -16,6 +16,11 @@
     "activeCount": "{{count}} active",
     "tooltip": {
       "settings": "Settings"
+    },
+    "setup": {
+      "loading": "Loading search engine...",
+      "warming": "Indexing nodes...",
+      "warmingProgress": "Indexing nodes ({{done}}/{{total}})..."
     }
   },
   "quickSwitcher": {
@@ -30,11 +35,15 @@
       "archive": "Archive",
       "delete": "Delete",
       "restore": "Restore",
-      "vault": "Vault"
+      "vault": "Vault",
+      "import": "Import"
     },
     "empty": "No contexts yet",
     "noMatch": "No matches",
     "vaultEmpty": "No vault items",
+    "dropZip": "Drop .zip or click",
+    "dropRelease": "Release to import",
+    "importError": "Import failed",
     "vaultSearch": "Search...",
     "defaultName": "New Context",
     "hint": {

@@ -16,7 +16,7 @@ export function NodeSearch() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [modelStatus, setModelStatus] = useState<ModelStatus>({ status: "not_ready", progress: 0 });
+  const [modelStatus, setModelStatus] = useState<ModelStatus>({ status: "not_ready", progress: 0, queue_done: 0, queue_total: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Read search settings once when modal opens
@@ -80,8 +80,8 @@ export function NodeSearch() {
     return () => { cancelled = true; clearInterval(id); };
   }, [nodeSearchOpen, isTextMode]);
 
-  // In text mode, model is always "ready"
-  const modelReady = isTextMode || modelStatus.status === "ready";
+  // In text mode, model is always "ready"; warming_up = model loaded, embeddings in progress
+  const modelReady = isTextMode || modelStatus.status === "ready" || modelStatus.status === "warming_up";
 
   // Reset state on open
   useEffect(() => {

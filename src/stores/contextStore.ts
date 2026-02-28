@@ -20,6 +20,7 @@ interface ContextStore {
   deleteContext: (id: string) => Promise<void>;
   restoreFromVault: (id: string) => Promise<void>;
   deleteVaultEntry: (id: string) => Promise<void>;
+  importVaultZip: (zipPath: string) => Promise<string>;
 }
 
 export const useContextStore = create<ContextStore>((set, get) => ({
@@ -98,10 +99,18 @@ export const useContextStore = create<ContextStore>((set, get) => ({
     await ipc.restoreFromVault(id);
     await get().loadContexts();
     await get().loadVaultEntries();
+    // Re-embed restored nodes so they appear in semantic search
+    ipc.embedContextNodes(id, true).catch(console.error);
   },
 
   deleteVaultEntry: async (id: string) => {
     await ipc.deleteVaultEntry(id);
     await get().loadVaultEntries();
+  },
+
+  importVaultZip: async (zipPath: string) => {
+    const newContextId = await ipc.importVaultZip(zipPath);
+    await get().loadContexts();
+    return newContextId;
   },
 }));

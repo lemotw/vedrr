@@ -7,6 +7,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Oswald:wght@700&display=swap" rel="stylesheet">
+    <script>
+      // Apply saved theme BEFORE CSS loads to prevent white flash.
+      // document.body doesn't exist yet in <head>, so style <html> element instead.
+      // SYNC: bg map must match @theme bg-page values in index.css per theme.
+      (function(){
+        var t = localStorage.getItem('vedrr-theme') || 'mocha';
+        if (t !== 'obsidian') document.documentElement.setAttribute('data-theme', t);
+        var bg = {obsidian:'#1A1A1A',mocha:'#1A1410',midnight:'#0F1923',forest:'#0D1A14',amethyst:'#15101E',slate:'#2B3440',paper:'#F5F3EF',daylight:'#FFFFFF'};
+        document.documentElement.style.backgroundColor = bg[t] || '#1A1A1A';
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

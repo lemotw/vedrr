@@ -57,6 +57,7 @@ export const IpcCmd = {
   RESTORE_FROM_VAULT: "restore_from_vault",
   AUTO_VAULT_ARCHIVED: "auto_vault_archived",
   DELETE_VAULT_ENTRY: "delete_vault_entry",
+  IMPORT_VAULT_ZIP: "import_vault_zip",
 } as const;
 
 // ── Search Settings Defaults ─────────────────────────────
