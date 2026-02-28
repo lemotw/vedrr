@@ -81,33 +81,6 @@ jobs:
 
       - run: pnpm install
 
-      # Windows: pre-build Rust to extract onnxruntime.dll, then inject into bundle
-      - name: Pre-build Rust (Windows)
-        if: matrix.platform == 'windows-latest'
-        shell: bash
-        working-directory: src-tauri
-        run: cargo build --release
-
-      - name: Bundle onnxruntime.dll (Windows)
-        if: matrix.platform == 'windows-latest'
-        shell: bash
-        run: |
-          dll=$(find src-tauri/target/release/build -name "onnxruntime.dll" -type f | head -1)
-          if [ -z "$dll" ]; then
-            echo "ERROR: onnxruntime.dll not found in build output"
-            exit 1
-          fi
-          echo "Found DLL: $dll"
-          cp "$dll" src-tauri/onnxruntime.dll
-          python -c "
-          import json
-          with open('src-tauri/tauri.conf.json', 'r') as f:
-              conf = json.load(f)
-          conf['bundle']['resources']['onnxruntime.dll'] = '.'
-          with open('src-tauri/tauri.conf.json', 'w') as f:
-              json.dump(conf, f, indent=2)
-          "
-
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
