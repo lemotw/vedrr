@@ -81,6 +81,30 @@ jobs:
 
       - run: pnpm install
 
+      # Windows: bundle MSVC runtime DLLs so users don't need VC++ Redistributable
+      - name: Bundle MSVC runtime (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          for dll in vcruntime140.dll vcruntime140_1.dll msvcp140.dll; do
+            src="/c/Windows/System32/$dll"
+            if [ -f "$src" ]; then
+              cp "$src" src-tauri/
+              echo "Copied $dll"
+            fi
+          done
+          python -c "
+          import json
+          with open('src-tauri/tauri.conf.json', 'r') as f:
+              conf = json.load(f)
+          res = conf['bundle']['resources']
+          res['vcruntime140.dll'] = '.'
+          res['vcruntime140_1.dll'] = '.'
+          res['msvcp140.dll'] = '.'
+          with open('src-tauri/tauri.conf.json', 'w') as f:
+              json.dump(conf, f, indent=2)
+          "
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
