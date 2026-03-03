@@ -64,6 +64,13 @@ export function useKeyboard() {
       // Helper: check if compact is busy (LOADING or APPLIED — locks context-switching actions)
       const isCompactBusy = () => useUIStore.getState().compactState !== CompactStates.IDLE;
 
+      // Mod+Shift+Space — Quick Capture
+      if (isModKey(e) && e.shiftKey && e.code === "Space") {
+        e.preventDefault();
+        ui.quickCaptureOpen ? ui.closeQuickCapture() : ui.openQuickCapture();
+        return;
+      }
+
       // Mod+K — Quick Switcher (blocked during APPLIED)
       if (isModKey(e) && e.key === "k" && !e.shiftKey) {
         e.preventDefault();
@@ -127,7 +134,7 @@ export function useKeyboard() {
       }
 
       // Don't handle tree keys when switcher/search is open, editing, content panel focused, type popover or context menu open
-      if (ui.quickSwitcherOpen || ui.nodeSearchOpen || ui.editingNodeId || ui.typePopoverNodeId || ui.contentPanelFocused || ui.contextMenuNodeId) return;
+      if (ui.quickSwitcherOpen || ui.nodeSearchOpen || ui.quickCaptureOpen || ui.editingNodeId || ui.typePopoverNodeId || ui.contentPanelFocused || ui.contextMenuNodeId) return;
       if (!tree || !currentContextId) return;
 
       // Compact lock: block mutations on nodes outside compact subtree
@@ -302,7 +309,7 @@ export function useKeyboard() {
     function handlePaste(e: ClipboardEvent) {
       const ui = useUIStore.getState();
       if (ui.settingsOpen) return;
-      if (ui.quickSwitcherOpen || ui.nodeSearchOpen || ui.editingNodeId || ui.typePopoverNodeId || ui.contentPanelFocused || ui.contextMenuNodeId) return;
+      if (ui.quickSwitcherOpen || ui.nodeSearchOpen || ui.quickCaptureOpen || ui.editingNodeId || ui.typePopoverNodeId || ui.contentPanelFocused || ui.contextMenuNodeId) return;
       if (!tree || !currentContextId || !selectedNodeId) return;
       // Block paste on nodes outside compact subtree
       const { compactState: pCS, compactRootId: pCR } = useUIStore.getState();

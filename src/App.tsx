@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { listen } from "@tauri-apps/api/event";
 import { StatusBar } from "./components/StatusBar";
 import { TreeCanvas } from "./components/TreeCanvas";
 import { ContentPanel } from "./components/ContentPanel";
@@ -9,6 +10,7 @@ import { NodeSearch } from "./components/NodeSearch";
 import { ContextMenu } from "./components/ContextMenu";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { CompactBanner } from "./components/CompactBanner";
+import { QuickCapture } from "./components/QuickCapture";
 import { useContextStore } from "./stores/contextStore";
 import { useTreeStore } from "./stores/treeStore";
 import { useKeyboard } from "./hooks/useKeyboard";
@@ -70,6 +72,14 @@ export default function App() {
     return unsub;
   }, []);
 
+  // Listen for global shortcut trigger (when app is brought from background)
+  useEffect(() => {
+    const unlisten = listen("quick-capture-trigger", () => {
+      useUIStore.getState().openQuickCapture();
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
   // Loading screen
   if (!appReady) {
     const statusText = setupStatus.status === "warming_up"
@@ -105,6 +115,7 @@ export default function App() {
       <NodeSearch />
       <ContextMenu />
       <SettingsPanel />
+      <QuickCapture />
       {compactState === CompactStates.LOADING && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
           <div className="rounded-xl border border-border bg-bg-elevated px-8 py-6 shadow-2xl">
