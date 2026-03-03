@@ -113,6 +113,9 @@
       "nav": "nav"
     }
   },
+  "quickCapture": {
+    "placeholder": "Capture a thought..."
+  },
   "markdownEditor": {
     "placeholder": "Start writing..."
   },
@@ -135,7 +138,10 @@
     },
     "general": {
       "language": "Language",
-      "restartHint": "Restart may be needed for full effect."
+      "restartHint": "Restart may be needed for full effect.",
+      "quickCaptureShortcut": "Quick Capture Shortcut",
+      "pressShortcut": "Press shortcut...",
+      "shortcutHint": "Restart app to apply new global shortcut"
     },
     "ai": {
       "apiKeys": "API Keys",

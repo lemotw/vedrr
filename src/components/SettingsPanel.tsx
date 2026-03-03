@@ -28,6 +28,77 @@ function detectLocale(): string {
   return navigator.language.startsWith("zh") ? "zh-TW" : "en";
 }
 
+// ── Shortcut Recorder ───────────────────────────────────
+
+function ShortcutRecorder() {
+  const { t } = useTranslation();
+  const [shortcut, setShortcut] = useState("CmdOrCtrl+Shift+Space");
+  const [recording, setRecording] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    ipc.getSetting("quick_capture_shortcut").then((val) => {
+      if (val) setShortcut(val);
+    });
+  }, []);
+
+  const handleRecord = (e: React.KeyboardEvent) => {
+    if (!recording) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Ignore bare modifier keys
+    if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+
+    const parts: string[] = [];
+    if (e.metaKey || e.ctrlKey) parts.push("CmdOrCtrl");
+    if (e.shiftKey) parts.push("Shift");
+    if (e.altKey) parts.push("Alt");
+
+    // Map key to Tauri accelerator format
+    let key = e.code;
+    if (key.startsWith("Key")) key = key.slice(3);
+    else if (key.startsWith("Digit")) key = key.slice(5);
+    else if (key === "Space") key = "Space";
+    parts.push(key);
+
+    const newShortcut = parts.join("+");
+    setShortcut(newShortcut);
+    setRecording(false);
+
+    // Save to DB (restart required for global shortcut to update)
+    setSaving(true);
+    ipc.setSetting("quick_capture_shortcut", newShortcut)
+      .catch((err) => console.error("[settings] save shortcut failed:", err))
+      .finally(() => setSaving(false));
+  };
+
+  return (
+    <div className="mt-4">
+      <label className="flex items-center gap-3">
+        <span className="font-mono text-xs text-text-primary">{t("settings.general.quickCaptureShortcut")}</span>
+        <button
+          onKeyDown={handleRecord}
+          onClick={() => setRecording(true)}
+          onBlur={() => setRecording(false)}
+          className={cn(
+            "rounded border px-3 py-1.5 font-mono text-xs transition-colors",
+            recording
+              ? "border-accent-primary bg-bg-card text-accent-primary"
+              : "border-border bg-bg-card text-text-primary hover:border-text-secondary",
+          )}
+          disabled={saving}
+        >
+          {recording ? t("settings.general.pressShortcut") : shortcut}
+        </button>
+      </label>
+      <p className="mt-2 font-mono text-[10px] text-text-secondary">
+        {t("settings.general.shortcutHint")}
+      </p>
+    </div>
+  );
+}
+
 // ── General Tab ──────────────────────────────────────────
 
 function GeneralTab() {
@@ -59,6 +130,7 @@ function GeneralTab() {
       <p className="mt-2 font-mono text-[10px] text-text-secondary">
         {t("settings.general.restartHint")}
       </p>
+      <ShortcutRecorder />
     </div>
   );
 }

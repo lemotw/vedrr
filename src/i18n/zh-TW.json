@@ -113,6 +113,9 @@
       "nav": "導航"
     }
   },
+  "quickCapture": {
+    "placeholder": "快速輸入想法..."
+  },
   "markdownEditor": {
     "placeholder": "開始寫作..."
   },
@@ -135,7 +138,10 @@
     },
     "general": {
       "language": "語言",
-      "restartHint": "切換語言後可能需要重啟以完整生效。"
+      "restartHint": "切換語言後可能需要重啟以完整生效。",
+      "quickCaptureShortcut": "Quick Capture 快捷鍵",
+      "pressShortcut": "按下快捷鍵...",
+      "shortcutHint": "需要重啟程式才會套用新的全域快捷鍵"
     },
     "ai": {
       "apiKeys": "API Keys",
