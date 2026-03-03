@@ -112,3 +112,13 @@ pub struct VaultEntry {
     pub vaulted_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InboxItem {
+    pub id: String,
+    pub content: String,
+    pub status: String,
+    pub context_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+

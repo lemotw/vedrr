@@ -109,6 +109,22 @@ pub fn init_db(conn: &Connection) -> Result<(), AppError> {
         );
 
         CREATE INDEX IF NOT EXISTS idx_vault_emb_vault ON vault_embeddings(vault_id);
+
+        CREATE TABLE IF NOT EXISTS inbox_items (
+            id          TEXT PRIMARY KEY,
+            content     TEXT NOT NULL,
+            embedding   BLOB,
+            status      TEXT NOT NULL DEFAULT 'pending'
+                CHECK (status IN ('pending', 'embedded', 'matched')),
+            context_id  TEXT,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
     ",
     )?;
 
