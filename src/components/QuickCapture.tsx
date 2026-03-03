@@ -25,11 +25,12 @@ export function QuickCapture() {
     setSubmitting(true);
     try {
       await ipc.createInboxItem(trimmed);
+      closeQuickCapture();
     } catch (e) {
       console.error("[quick-capture] save failed:", e);
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
-    closeQuickCapture();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

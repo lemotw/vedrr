@@ -95,7 +95,7 @@ export function useKeyboard() {
       }
 
       // Mod+C — Copy node (when not editing): write marker to clipboard
-      if (isModKey(e) && e.key === "c" && !ui.editingNodeId && !ui.contentPanelFocused && !ui.quickSwitcherOpen
+      if (isModKey(e) && e.key === "c" && !ui.editingNodeId && !ui.contentPanelFocused && !ui.quickSwitcherOpen && !ui.quickCaptureOpen
           && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
         e.preventDefault();
         useTreeStore.getState().copyNode(selectedNodeId);
@@ -104,7 +104,7 @@ export function useKeyboard() {
       }
 
       // Mod+X — Cut node
-      if (isModKey(e) && e.key === "x" && !ui.editingNodeId && !ui.contentPanelFocused && !ui.quickSwitcherOpen
+      if (isModKey(e) && e.key === "x" && !ui.editingNodeId && !ui.contentPanelFocused && !ui.quickSwitcherOpen && !ui.quickCaptureOpen
           && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
         e.preventDefault();
         useTreeStore.getState().cutNode(selectedNodeId);
