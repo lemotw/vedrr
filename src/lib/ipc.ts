@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Context, ContextSummary, TreeData, TreeNode, CompactResult, AiProfile, ApiKey, ModelInfo, SearchResult, ModelStatus, VaultEntry } from "./types";
+import type { Context, ContextSummary, TreeData, TreeNode, CompactResult, AiProfile, ApiKey, ModelInfo, SearchResult, ModelStatus, VaultEntry, InboxItem } from "./types";
 import { IpcCmd } from "./constants";
 
 async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -149,4 +149,13 @@ export const ipc = {
 
   exportContextZip: (id: string, destination: string) =>
     safeInvoke<void>(IpcCmd.EXPORT_CONTEXT_ZIP, { id, destination }),
+
+  createInboxItem: (content: string) =>
+    safeInvoke<InboxItem>(IpcCmd.CREATE_INBOX_ITEM, { content }),
+
+  getSetting: (key: string) =>
+    safeInvoke<string | null>(IpcCmd.GET_SETTING, { key }),
+
+  setSetting: (key: string, value: string) =>
+    safeInvoke<void>(IpcCmd.SET_SETTING, { key, value }),
 };

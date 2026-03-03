@@ -114,6 +114,15 @@ export interface VaultEntry {
   vaulted_at: string;
 }
 
+export interface InboxItem {
+  id: string;
+  content: string;
+  status: string;
+  context_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 import { NodeTypes } from "./constants";
 
 export const NODE_TYPE_CONFIG: Record<NodeType, { letter: string; color: string }> = {

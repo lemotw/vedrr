@@ -59,6 +59,9 @@ export const IpcCmd = {
   DELETE_VAULT_ENTRY: "delete_vault_entry",
   IMPORT_VAULT_ZIP: "import_vault_zip",
   EXPORT_CONTEXT_ZIP: "export_context_zip",
+  CREATE_INBOX_ITEM: "create_inbox_item",
+  GET_SETTING: "get_setting",
+  SET_SETTING: "set_setting",
 } as const;
 
 // ── Search Settings Defaults ─────────────────────────────
