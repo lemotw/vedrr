@@ -9,7 +9,8 @@ mod models;
 
 use rusqlite::Connection;
 use std::sync::Mutex;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 pub struct AppState {
     pub db: Mutex<Connection>,
@@ -39,6 +40,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState {
             db: Mutex::new(conn),
             http_client,
@@ -63,6 +65,32 @@ fn main() {
                     eprintln!("[embedding] Warmup failed: {e}");
                 }
             });
+
+            // Register Quick Capture global shortcut
+            {
+                let shortcut_str = {
+                    let state = app.state::<AppState>();
+                    let db = state.db.lock().unwrap();
+                    let mut stmt = db.prepare("SELECT value FROM settings WHERE key = 'quick_capture_shortcut'").unwrap();
+                    stmt.query_row([], |row| row.get::<_, String>(0))
+                        .unwrap_or_else(|_| "CmdOrCtrl+Shift+Space".to_string())
+                };
+
+                let handle = app.handle().clone();
+                match app.global_shortcut().on_shortcut(shortcut_str.as_str(), move |_app, _shortcut, event| {
+                    if event.state == ShortcutState::Pressed {
+                        if let Some(window) = handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.unminimize();
+                            let _ = window.set_focus();
+                            let _ = window.emit("quick-capture-trigger", ());
+                        }
+                    }
+                }) {
+                    Ok(()) => eprintln!("[shortcut] Registered global shortcut: {shortcut_str}"),
+                    Err(e) => eprintln!("[shortcut] Failed to register shortcut '{shortcut_str}': {e}"),
+                }
+            }
 
             Ok(())
         })
@@ -108,6 +136,9 @@ fn main() {
             commands::search::embed_single_node,
             commands::search::get_model_status,
             commands::search::ensure_embedding_model,
+            commands::settings::get_setting,
+            commands::settings::set_setting,
+            commands::inbox::create_inbox_item,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

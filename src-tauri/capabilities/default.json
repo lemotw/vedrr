@@ -8,6 +8,7 @@
     "opener:default",
     "opener:allow-reveal-item-in-dir",
     "dialog:allow-open",
-    "dialog:allow-ask"
+    "dialog:allow-ask",
+    "global-shortcut:default"
   ]
 }
