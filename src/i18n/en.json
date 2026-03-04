@@ -114,7 +114,9 @@
     }
   },
   "quickCapture": {
-    "placeholder": "Capture a thought..."
+    "placeholder": "Capture a thought...",
+    "submit": "Submit",
+    "enterAgain": "Press Enter again to send"
   },
   "markdownEditor": {
     "placeholder": "Start writing..."

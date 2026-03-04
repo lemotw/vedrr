@@ -158,4 +158,7 @@ export const ipc = {
 
   setSetting: (key: string, value: string) =>
     safeInvoke<void>(IpcCmd.SET_SETTING, { key, value }),
+
+  updateShortcut: (shortcut: string) =>
+    safeInvoke<void>(IpcCmd.UPDATE_SHORTCUT, { shortcut }),
 };

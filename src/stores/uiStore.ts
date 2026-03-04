@@ -55,8 +55,6 @@ interface UIStore {
   compactFading: boolean;
   compactError: string | null;
   compactBannerFlash: number;
-  quickCaptureOpen: boolean;
-
   toggleQuickSwitcher: () => void;
   openQuickSwitcher: () => void;
   closeQuickSwitcher: () => void;
@@ -83,8 +81,6 @@ interface UIStore {
   toggleCompactBannerExpanded: () => void;
   setCompactError: (error: string | null) => void;
   flashCompactBanner: () => void;
-  openQuickCapture: () => void;
-  closeQuickCapture: () => void;
 }
 
 let fadeTimer1 = 0;
@@ -111,8 +107,6 @@ export const useUIStore = create<UIStore>((set) => ({
   compactFading: false,
   compactError: null,
   compactBannerFlash: 0,
-  quickCaptureOpen: false,
-
   toggleQuickSwitcher: () => set((s) => ({ quickSwitcherOpen: !s.quickSwitcherOpen, nodeSearchOpen: false })),
   openQuickSwitcher: () => set({ quickSwitcherOpen: true, nodeSearchOpen: false }),
   closeQuickSwitcher: () => set({ quickSwitcherOpen: false }),
@@ -206,14 +200,4 @@ export const useUIStore = create<UIStore>((set) => ({
     });
   },
   flashCompactBanner: () => set((s) => ({ compactBannerFlash: s.compactBannerFlash + 1 })),
-  openQuickCapture: () => set({
-    quickCaptureOpen: true,
-    quickSwitcherOpen: false,
-    nodeSearchOpen: false,
-    editingNodeId: null,
-    typePopoverNodeId: null,
-    contextMenuNodeId: null,
-    contextMenuPosition: null,
-  }),
-  closeQuickCapture: () => set({ quickCaptureOpen: false }),
 }));

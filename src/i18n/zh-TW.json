@@ -114,7 +114,9 @@
     }
   },
   "quickCapture": {
-    "placeholder": "快速輸入想法..."
+    "placeholder": "快速輸入想法...",
+    "submit": "送出",
+    "enterAgain": "再按一次 Enter 送出"
   },
   "markdownEditor": {
     "placeholder": "開始寫作..."

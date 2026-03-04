@@ -62,6 +62,7 @@ export const IpcCmd = {
   CREATE_INBOX_ITEM: "create_inbox_item",
   GET_SETTING: "get_setting",
   SET_SETTING: "set_setting",
+  UPDATE_SHORTCUT: "update_shortcut",
 } as const;
 
 // ── Search Settings Defaults ─────────────────────────────

@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "vedrr",
@@ -19,6 +20,18 @@
         "minHeight": 600,
         "decorations": true,
         "resizable": true
+      },
+      {
+        "label": "quickcapture",
+        "title": "",
+        "width": 600,
+        "height": 100,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "skipTaskbar": true,
+        "visible": false
       }
     ],
     "security": {

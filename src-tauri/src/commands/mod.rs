@@ -5,3 +5,4 @@ pub mod inbox;
 pub mod node;
 pub mod search;
 pub mod settings;
+pub mod shortcuts;

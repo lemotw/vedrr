@@ -42,45 +42,67 @@ function ShortcutRecorder() {
     });
   }, []);
 
-  const handleRecord = (e: React.KeyboardEvent) => {
+  // WKWebView on macOS doesn't focus buttons on click, so onKeyDown won't fire.
+  // Use a window-level listener while recording.
+  // On enter: unregister global shortcut so it doesn't fire during recording.
+  // On exit: save + re-register with the new shortcut immediately.
+  useEffect(() => {
     if (!recording) return;
-    e.preventDefault();
-    e.stopPropagation();
 
-    // Ignore bare modifier keys
-    if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+    // Unregister global shortcut while recording so key combos aren't intercepted
+    ipc.updateShortcut("").catch((err) => console.error("[settings] unregister shortcut failed:", err));
 
-    const parts: string[] = [];
-    if (e.metaKey || e.ctrlKey) parts.push("CmdOrCtrl");
-    if (e.shiftKey) parts.push("Shift");
-    if (e.altKey) parts.push("Alt");
+    let captured = false;
 
-    // Map key to Tauri accelerator format
-    let key = e.code;
-    if (key.startsWith("Key")) key = key.slice(3);
-    else if (key.startsWith("Digit")) key = key.slice(5);
-    else if (key === "Space") key = "Space";
-    parts.push(key);
+    function handleKey(e: KeyboardEvent) {
+      e.preventDefault();
+      e.stopPropagation();
 
-    const newShortcut = parts.join("+");
-    setShortcut(newShortcut);
-    setRecording(false);
+      // Ignore bare modifier keys
+      if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
 
-    // Save to DB (restart required for global shortcut to update)
-    setSaving(true);
-    ipc.setSetting("quick_capture_shortcut", newShortcut)
-      .catch((err) => console.error("[settings] save shortcut failed:", err))
-      .finally(() => setSaving(false));
-  };
+      const parts: string[] = [];
+      if (e.metaKey || e.ctrlKey) parts.push("CmdOrCtrl");
+      if (e.shiftKey) parts.push("Shift");
+      if (e.altKey) parts.push("Alt");
+
+      // Map key to Tauri accelerator format
+      let key = e.code;
+      if (key.startsWith("Key")) key = key.slice(3);
+      else if (key.startsWith("Digit")) key = key.slice(5);
+      else if (key === "Space") key = "Space";
+      parts.push(key);
+
+      const newShortcut = parts.join("+");
+      captured = true;
+      setShortcut(newShortcut);
+      setRecording(false);
+
+      // Save to DB + immediately re-register the new global shortcut
+      setSaving(true);
+      ipc.setSetting("quick_capture_shortcut", newShortcut)
+        .then(() => ipc.updateShortcut(newShortcut))
+        .catch((err) => console.error("[settings] save shortcut failed:", err))
+        .finally(() => setSaving(false));
+    }
+
+    window.addEventListener("keydown", handleKey, true);
+    return () => {
+      window.removeEventListener("keydown", handleKey, true);
+      // If recording was interrupted (e.g. settings panel closed) without capturing
+      // a new key, re-register the previous shortcut so it's not left disabled.
+      if (!captured) {
+        ipc.updateShortcut(shortcut).catch((err) => console.error("[settings] restore shortcut failed:", err));
+      }
+    };
+  }, [recording, shortcut]);
 
   return (
     <div className="mt-4">
       <label className="flex items-center gap-3">
         <span className="font-mono text-xs text-text-primary">{t("settings.general.quickCaptureShortcut")}</span>
         <button
-          onKeyDown={handleRecord}
           onClick={() => setRecording(true)}
-          onBlur={() => setRecording(false)}
           className={cn(
             "rounded border px-3 py-1.5 font-mono text-xs transition-colors",
             recording

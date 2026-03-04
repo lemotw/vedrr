@@ -122,6 +122,18 @@
     user-select: none;
   }
 
+  /* QuickCapture: force every layer transparent so only the input bar is visible */
+  html.quickcapture,
+  html.quickcapture body,
+  html.quickcapture #root {
+    background: transparent !important;
+    height: 100%;
+    margin: 0;
+  }
+  html.quickcapture {
+    overflow: hidden;
+  }
+
   *:focus {
     outline: none;
   }

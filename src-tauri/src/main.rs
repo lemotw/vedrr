@@ -9,8 +9,8 @@ mod models;
 
 use rusqlite::Connection;
 use std::sync::Mutex;
-use tauri::{Emitter, Manager};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri::Manager;
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 pub struct AppState {
     pub db: Mutex<Connection>,
@@ -66,6 +66,11 @@ fn main() {
                 }
             });
 
+            // Force QC webview background to fully transparent (WKWebView defaults to white)
+            if let Some(qc) = app.get_webview_window("quickcapture") {
+                let _ = qc.set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
+            }
+
             // Register Quick Capture global shortcut
             {
                 let shortcut_str = {
@@ -78,14 +83,7 @@ fn main() {
 
                 let handle = app.handle().clone();
                 match app.global_shortcut().on_shortcut(shortcut_str.as_str(), move |_app, _shortcut, event| {
-                    if event.state == ShortcutState::Pressed {
-                        if let Some(window) = handle.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.unminimize();
-                            let _ = window.set_focus();
-                            let _ = window.emit("quick-capture-trigger", ());
-                        }
-                    }
+                    commands::shortcuts::handle_qc_shortcut(&handle, event);
                 }) {
                     Ok(()) => eprintln!("[shortcut] Registered global shortcut: {shortcut_str}"),
                     Err(e) => eprintln!("[shortcut] Failed to register shortcut '{shortcut_str}': {e}"),
@@ -138,8 +136,21 @@ fn main() {
             commands::search::ensure_embedding_model,
             commands::settings::get_setting,
             commands::settings::set_setting,
+            commands::settings::update_shortcut,
             commands::inbox::create_inbox_item,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            // macOS: clicking dock icon when main window is hidden → show it
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
+                if !has_visible_windows {
+                    if let Some(main) = app_handle.get_webview_window("main") {
+                        let _ = main.show();
+                        let _ = main.set_focus();
+                    }
+                }
+            }
+        });
 }

@@ -2,13 +2,17 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": ["main", "quickcapture"],
   "permissions": [
     "core:default",
     "opener:default",
     "opener:allow-reveal-item-in-dir",
     "dialog:allow-open",
     "dialog:allow-ask",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-start-dragging"
   ]
 }
