@@ -111,7 +111,7 @@ export const useUIStore = create<UIStore>((set) => ({
   compactError: null,
   compactBannerFlash: 0,
   inboxTriageOpen: false,
-  openInboxTriage: () => set({ inboxTriageOpen: true }),
+  openInboxTriage: () => set({ inboxTriageOpen: true, quickSwitcherOpen: false, nodeSearchOpen: false, settingsOpen: false }),
   closeInboxTriage: () => set({ inboxTriageOpen: false }),
   toggleQuickSwitcher: () => set((s) => ({ quickSwitcherOpen: !s.quickSwitcherOpen, nodeSearchOpen: false })),
   openQuickSwitcher: () => set({ quickSwitcherOpen: true, nodeSearchOpen: false }),

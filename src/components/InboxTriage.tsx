@@ -97,11 +97,15 @@ export default function InboxTriage() {
 
   const handleDelete = useCallback(async () => {
     if (!currentItem) return;
-    await ipc.deleteInboxItem(currentItem.id);
-    const remaining = items.filter((_, i) => i !== currentIndex);
-    setItems(remaining);
-    setCurrentIndex(Math.min(currentIndex, Math.max(remaining.length - 1, 0)));
-    setSelectedIdx(0);
+    try {
+      await ipc.deleteInboxItem(currentItem.id);
+      const remaining = items.filter((_, i) => i !== currentIndex);
+      setItems(remaining);
+      setCurrentIndex(Math.min(currentIndex, Math.max(remaining.length - 1, 0)));
+      setSelectedIdx(0);
+    } catch (e) {
+      console.error("[inbox-triage] delete failed:", e);
+    }
   }, [currentItem, items, currentIndex]);
 
   // Keyboard handler

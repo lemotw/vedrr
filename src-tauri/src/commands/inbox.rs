@@ -216,14 +216,15 @@ pub fn match_inbox_to_node(
     target_node_id: String,
 ) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
+    let tx = db.unchecked_transaction()?;
 
-    let content: String = db.query_row(
+    let content: String = tx.query_row(
         "SELECT content FROM inbox_items WHERE id = ?1",
         [&inbox_item_id],
         |row| row.get(0),
     )?;
 
-    let (context_id, parent_id, position): (String, Option<String>, i32) = db.query_row(
+    let (context_id, parent_id, position): (String, Option<String>, i32) = tx.query_row(
         "SELECT context_id, parent_id, position FROM tree_nodes WHERE id = ?1",
         [&target_node_id],
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
@@ -234,32 +235,33 @@ pub fn match_inbox_to_node(
         .ok_or_else(|| AppError::Other("Cannot insert sibling of root node".into()))?;
 
     // Shift siblings after target to make room
-    db.execute(
+    tx.execute(
         "UPDATE tree_nodes SET position = position + 1
          WHERE context_id = ?1 AND parent_id = ?2 AND position > ?3",
         rusqlite::params![context_id, parent, position],
     )?;
 
     let new_id = uuid::Uuid::new_v4().to_string();
-    db.execute(
+    tx.execute(
         "INSERT INTO tree_nodes (id, context_id, parent_id, position, node_type, title)
          VALUES (?1, ?2, ?3, ?4, 'text', ?5)",
         rusqlite::params![new_id, context_id, parent, position + 1, content],
     )?;
 
-    db.execute(
+    tx.execute(
         "UPDATE inbox_items SET status = 'matched', context_id = ?1, updated_at = datetime('now')
          WHERE id = ?2",
         rusqlite::params![context_id, inbox_item_id],
     )?;
 
-    db.execute(
+    tx.execute(
         "UPDATE contexts SET updated_at = datetime('now'),
          state = CASE WHEN state = 'archived' THEN 'active' ELSE state END
          WHERE id = ?1",
         [&context_id],
     )?;
 
+    tx.commit()?;
     Ok(())
 }
 
@@ -274,14 +276,15 @@ pub fn match_inbox_to_context(
     context_id: String,
 ) -> Result<(), AppError> {
     let db = state.db.lock().unwrap();
+    let tx = db.unchecked_transaction()?;
 
-    let content: String = db.query_row(
+    let content: String = tx.query_row(
         "SELECT content FROM inbox_items WHERE id = ?1",
         [&inbox_item_id],
         |row| row.get(0),
     )?;
 
-    let root_id: String = db
+    let root_id: String = tx
         .query_row(
             "SELECT root_node_id FROM contexts WHERE id = ?1",
             [&context_id],
@@ -289,7 +292,7 @@ pub fn match_inbox_to_context(
         )
         .map_err(|_| AppError::Other("Context has no root node".into()))?;
 
-    let max_pos: i32 = db
+    let max_pos: i32 = tx
         .query_row(
             "SELECT COALESCE(MAX(position), -1) FROM tree_nodes WHERE context_id = ?1 AND parent_id = ?2",
             rusqlite::params![context_id, root_id],
@@ -298,24 +301,25 @@ pub fn match_inbox_to_context(
         .unwrap_or(-1);
 
     let new_id = uuid::Uuid::new_v4().to_string();
-    db.execute(
+    tx.execute(
         "INSERT INTO tree_nodes (id, context_id, parent_id, position, node_type, title)
          VALUES (?1, ?2, ?3, ?4, 'text', ?5)",
         rusqlite::params![new_id, context_id, root_id, max_pos + 1, content],
     )?;
 
-    db.execute(
+    tx.execute(
         "UPDATE inbox_items SET status = 'matched', context_id = ?1, updated_at = datetime('now')
          WHERE id = ?2",
         rusqlite::params![context_id, inbox_item_id],
     )?;
 
-    db.execute(
+    tx.execute(
         "UPDATE contexts SET updated_at = datetime('now'),
          state = CASE WHEN state = 'archived' THEN 'active' ELSE state END
          WHERE id = ?1",
         [&context_id],
     )?;
 
+    tx.commit()?;
     Ok(())
 }
