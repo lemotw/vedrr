@@ -138,6 +138,11 @@ fn main() {
             commands::settings::set_setting,
             commands::settings::update_shortcut,
             commands::inbox::create_inbox_item,
+            commands::inbox::list_inbox_items,
+            commands::inbox::delete_inbox_item,
+            commands::inbox::find_similar_nodes_for_inbox,
+            commands::inbox::match_inbox_to_node,
+            commands::inbox::match_inbox_to_context,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
