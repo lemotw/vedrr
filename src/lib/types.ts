@@ -123,6 +123,16 @@ export interface InboxItem {
   updated_at: string;
 }
 
+export interface InboxSuggestion {
+  node_id: string;
+  node_title: string;
+  node_type: string;
+  context_id: string;
+  context_name: string;
+  ancestor_path: string;
+  score: number;
+}
+
 import { NodeTypes } from "./constants";
 
 export const NODE_TYPE_CONFIG: Record<NodeType, { letter: string; color: string }> = {

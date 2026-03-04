@@ -8,6 +8,7 @@ import { NodeTypePopover } from "./components/NodeTypePopover";
 import { NodeSearch } from "./components/NodeSearch";
 import { ContextMenu } from "./components/ContextMenu";
 import { SettingsPanel } from "./components/SettingsPanel";
+import InboxTriage from "./components/InboxTriage";
 import { CompactBanner } from "./components/CompactBanner";
 import { useContextStore } from "./stores/contextStore";
 import { useTreeStore } from "./stores/treeStore";
@@ -105,6 +106,7 @@ export default function App() {
       <NodeSearch />
       <ContextMenu />
       <SettingsPanel />
+      <InboxTriage />
       {compactState === CompactStates.LOADING && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
           <div className="rounded-xl border border-border bg-bg-elevated px-8 py-6 shadow-2xl">

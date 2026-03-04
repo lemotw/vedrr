@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Context, ContextSummary, TreeData, TreeNode, CompactResult, AiProfile, ApiKey, ModelInfo, SearchResult, ModelStatus, VaultEntry, InboxItem } from "./types";
+import type { Context, ContextSummary, TreeData, TreeNode, CompactResult, AiProfile, ApiKey, ModelInfo, SearchResult, ModelStatus, VaultEntry, InboxItem, InboxSuggestion } from "./types";
 import { IpcCmd } from "./constants";
 
 async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -152,6 +152,21 @@ export const ipc = {
 
   createInboxItem: (content: string) =>
     safeInvoke<InboxItem>(IpcCmd.CREATE_INBOX_ITEM, { content }),
+
+  listInboxItems: () =>
+    safeInvoke<InboxItem[]>(IpcCmd.LIST_INBOX_ITEMS),
+
+  deleteInboxItem: (id: string) =>
+    safeInvoke<void>(IpcCmd.DELETE_INBOX_ITEM, { id }),
+
+  findSimilarNodesForInbox: (inboxItemId: string, topK: number = 8, alpha: number = 0.7) =>
+    safeInvoke<InboxSuggestion[]>(IpcCmd.FIND_SIMILAR_NODES_FOR_INBOX, { inboxItemId, topK, alpha }),
+
+  matchInboxToNode: (inboxItemId: string, targetNodeId: string) =>
+    safeInvoke<void>(IpcCmd.MATCH_INBOX_TO_NODE, { inboxItemId, targetNodeId }),
+
+  matchInboxToContext: (inboxItemId: string, contextId: string) =>
+    safeInvoke<void>(IpcCmd.MATCH_INBOX_TO_CONTEXT, { inboxItemId, contextId }),
 
   getSetting: (key: string) =>
     safeInvoke<string | null>(IpcCmd.GET_SETTING, { key }),

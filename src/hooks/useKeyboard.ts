@@ -58,11 +58,24 @@ export function useKeyboard() {
     function handleKeyDown(e: KeyboardEvent) {
       const ui = useUIStore.getState();
 
-      // Block ALL keys when modal overlays are open
-      if (ui.settingsOpen) return;
-
       // Helper: check if compact is busy (LOADING or APPLIED — locks context-switching actions)
       const isCompactBusy = () => useUIStore.getState().compactState !== CompactStates.IDLE;
+
+      // Mod+I — Inbox Triage (must be checked before modal guard)
+      if (isModKey(e) && e.key === "i" && !e.shiftKey) {
+        e.preventDefault();
+        if (isCompactBusy()) { useUIStore.getState().flashCompactBanner(); return; }
+        const uiState = useUIStore.getState();
+        if (uiState.inboxTriageOpen) {
+          uiState.closeInboxTriage();
+        } else {
+          uiState.openInboxTriage();
+        }
+        return;
+      }
+
+      // Block ALL keys when modal overlays are open
+      if (ui.settingsOpen || ui.inboxTriageOpen) return;
 
       // Mod+K — Quick Switcher (blocked during APPLIED)
       if (isModKey(e) && e.key === "k" && !e.shiftKey) {
