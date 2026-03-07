@@ -1,10 +1,11 @@
 import { useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useUIStore } from "../stores/uiStore";
-import { useTreeStore } from "../stores/treeStore";
+import { useTreeStore, findNode } from "../stores/treeStore";
 import { useContextStore } from "../stores/contextStore";
 import { NodeTypes, CompactStates } from "../lib/constants";
 import type { TreeData } from "../lib/types";
+import { writeNodeToClipboard } from "../lib/clipboard";
 import { cn } from "../lib/cn";
 import { modSymbol } from "../lib/platform";
 
@@ -16,7 +17,6 @@ interface MenuItem {
   action: () => void;
   danger?: boolean;
   disabled?: boolean;
-  rootOnly?: boolean;
 }
 
 type MenuEntry = MenuItem | "separator";
@@ -107,9 +107,9 @@ export function ContextMenu() {
       shortcut: "",
       icon: "📋",
       action: () => exec(() => {
-        if (tree) copyTreeToClipboard(tree);
+        const subtree = findNode(tree, contextMenuNodeId);
+        if (subtree) copyTreeToClipboard(subtree);
       }),
-      rootOnly: true,
     },
     "separator",
     {
@@ -136,7 +136,8 @@ export function ContextMenu() {
       icon: "⧉",
       action: () => exec(() => {
         copyNode(contextMenuNodeId);
-        navigator.clipboard.writeText("vedrr:node:" + contextMenuNodeId);
+        const title = findNode(tree, contextMenuNodeId)?.node.title || "";
+        writeNodeToClipboard(contextMenuNodeId, title);
       }),
       disabled: isRoot,
     },
@@ -147,7 +148,8 @@ export function ContextMenu() {
       icon: "✂",
       action: () => exec(() => {
         cutNode(contextMenuNodeId);
-        navigator.clipboard.writeText("vedrr:node:" + contextMenuNodeId);
+        const title = findNode(tree, contextMenuNodeId)?.node.title || "";
+        writeNodeToClipboard(contextMenuNodeId, title);
       }),
       disabled: isRoot || compactLocked,
     },
@@ -198,7 +200,6 @@ export function ContextMenu() {
   // Filter out items based on root context
   const filtered = items.filter((item) => {
     if (item === "separator") return true;
-    if (!isRoot && item.rootOnly) return false;
     if (isRoot && ["addSibling", "copy", "cut", "moveUp", "moveDown", "delete"].includes(item.key)) return false;
     return true;
   });
@@ -254,13 +255,4 @@ export function ContextMenu() {
       </div>
     </div>
   );
-}
-
-function findNode(tree: TreeData, id: string): TreeData | null {
-  if (tree.node.id === id) return tree;
-  for (const child of tree.children) {
-    const found = findNode(child, id);
-    if (found) return found;
-  }
-  return null;
 }

@@ -147,10 +147,23 @@
   }
 }
 
-/* Recency border fade — smoothly fades the left border from accent to transparent */
+/* Recency border — pseudo-element left bar, independent of box-shadow/ring */
+.recency-bar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 6px 0 0 6px;
+  background: var(--color-accent-primary);
+  animation: recency-fade var(--recency-duration) linear forwards;
+  pointer-events: none;
+}
+
 @keyframes recency-fade {
-  from { box-shadow: inset 3px 0 0 0 var(--color-accent-primary); }
-  to   { box-shadow: inset 3px 0 0 0 transparent; }
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 
 /* Compact banner flash — draws attention when a blocked action is attempted */

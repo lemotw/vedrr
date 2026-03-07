@@ -203,14 +203,14 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, showReorderHi
           !isDropTarget && !showReorderHint && !isSelected && "hover:ring-1 hover:ring-border",
           isCutNode && "opacity-40",
           dimmed && "opacity-40 pointer-events-none",
+          showRecencyBorder && "recency-bar",
         )}
         style={hl ? {
           backgroundColor: hl.bg,
           borderLeft: `3px solid ${hl.border}`,
         } : showRecencyBorder ? {
-          boxShadow: "inset 3px 0 0 0 var(--color-accent-primary)",
-          animation: `recency-fade ${recencySeconds}s linear forwards`,
-        } : undefined}
+          "--recency-duration": `${recencySeconds}s`,
+        } as React.CSSProperties : undefined}
         onClick={onClick}
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
         onDoubleClick={() => {

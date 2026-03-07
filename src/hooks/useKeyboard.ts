@@ -1,28 +1,11 @@
 import { useEffect } from "react";
 import { useUIStore } from "../stores/uiStore";
-import { useTreeStore } from "../stores/treeStore";
+import { useTreeStore, findNode, findParent } from "../stores/treeStore";
 import { useContextStore } from "../stores/contextStore";
 import type { TreeData } from "../lib/types";
 import { NodeTypes, PasteKind, CompactStates } from "../lib/constants";
 import { isModKey } from "../lib/platform";
-
-function findNodeInTree(tree: TreeData, id: string): TreeData | null {
-  if (tree.node.id === id) return tree;
-  for (const child of tree.children) {
-    const found = findNodeInTree(child, id);
-    if (found) return found;
-  }
-  return null;
-}
-
-function findParentInTree(tree: TreeData, id: string): TreeData | null {
-  for (const child of tree.children) {
-    if (child.node.id === id) return tree;
-    const found = findParentInTree(child, id);
-    if (found) return found;
-  }
-  return null;
-}
+import { writeNodeToClipboard } from "../lib/clipboard";
 
 // Get the depth of a node in the tree (-1 if not found)
 function getNodeDepth(tree: TreeData, id: string, depth: number = 0): number {
@@ -105,7 +88,8 @@ export function useKeyboard() {
           && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
         e.preventDefault();
         useTreeStore.getState().copyNode(selectedNodeId);
-        navigator.clipboard.writeText("vedrr:node:" + selectedNodeId);
+        const title = findNode(tree, selectedNodeId)?.node.title || "";
+        writeNodeToClipboard(selectedNodeId, title);
         return;
       }
 
@@ -114,7 +98,8 @@ export function useKeyboard() {
           && selectedNodeId && tree && selectedNodeId !== tree.node.id) {
         e.preventDefault();
         useTreeStore.getState().cutNode(selectedNodeId);
-        navigator.clipboard.writeText("vedrr:node:" + selectedNodeId);
+        const title = findNode(tree, selectedNodeId)?.node.title || "";
+        writeNodeToClipboard(selectedNodeId, title);
         return;
       }
 
@@ -147,9 +132,9 @@ export function useKeyboard() {
       const compactLocked = (() => {
         const { compactState, compactRootId } = useUIStore.getState();
         if (compactState !== CompactStates.APPLIED || !compactRootId || !selectedNodeId) return false;
-        const root = findNodeInTree(tree, compactRootId);
+        const root = findNode(tree, compactRootId);
         if (!root) return false;
-        return findNodeInTree(root, selectedNodeId) === null;
+        return findNode(root, selectedNodeId) === null;
       })();
 
       // Alt+j/↓ Alt+k/↑ — reorder node among siblings
@@ -170,7 +155,7 @@ export function useKeyboard() {
         if (e.code === "KeyL" || e.key === "ArrowRight") {
           e.preventDefault();
           // Move into previous sibling as last child
-          const parent = findParentInTree(tree, selectedNodeId);
+          const parent = findParent(tree, selectedNodeId);
           if (!parent) return;
           const siblings = parent.children;
           const idx = siblings.findIndex(s => s.node.id === selectedNodeId);
@@ -185,9 +170,9 @@ export function useKeyboard() {
         if (e.code === "KeyH" || e.key === "ArrowLeft") {
           e.preventDefault();
           // Move up to grandparent (become sibling of parent)
-          const parent = findParentInTree(tree, selectedNodeId);
+          const parent = findParent(tree, selectedNodeId);
           if (!parent || parent.node.id === tree.node.id) return; // parent is root, can't go higher
-          const grandparent = findParentInTree(tree, parent.node.id);
+          const grandparent = findParent(tree, parent.node.id);
           if (!grandparent) return;
           useTreeStore.getState().dragMoveNode(selectedNodeId, grandparent.node.id, parent.node.position + 1, currentContextId);
           return;
@@ -237,7 +222,7 @@ export function useKeyboard() {
         case "ArrowRight": {
           e.preventDefault();
           if (!selectedNodeId) break;
-          const nodeR = findNodeInTree(tree, selectedNodeId);
+          const nodeR = findNode(tree, selectedNodeId);
           if (nodeR && nodeR.children.length > 0) {
             if (collapsedNodes.has(selectedNodeId)) {
               useUIStore.getState().toggleCollapse(selectedNodeId);
@@ -250,7 +235,7 @@ export function useKeyboard() {
         case "z": {
           e.preventDefault();
           if (!selectedNodeId) break;
-          const nodeZ = findNodeInTree(tree, selectedNodeId);
+          const nodeZ = findNode(tree, selectedNodeId);
           if (nodeZ && nodeZ.children.length > 0) {
             useUIStore.getState().toggleCollapse(selectedNodeId);
           }
@@ -260,7 +245,7 @@ export function useKeyboard() {
         case "ArrowLeft": {
           e.preventDefault();
           if (!selectedNodeId) break;
-          const parent = findParentInTree(tree, selectedNodeId);
+          const parent = findParent(tree, selectedNodeId);
           if (parent) useTreeStore.getState().selectNode(parent.node.id);
           break;
         }
@@ -268,7 +253,7 @@ export function useKeyboard() {
           e.preventDefault();
           if (!selectedNodeId) break;
           if (compactLocked) { useUIStore.getState().flashCompactBanner(); break; }
-          const selectedNode = findNodeInTree(tree, selectedNodeId);
+          const selectedNode = findNode(tree, selectedNodeId);
           if (selectedNode && selectedNode.node.node_type === NodeTypes.MARKDOWN) {
             useUIStore.getState().openMarkdownEditor(selectedNodeId);
           } else {
@@ -320,8 +305,8 @@ export function useKeyboard() {
       // Block paste on nodes outside compact subtree
       const { compactState: pCS, compactRootId: pCR } = useUIStore.getState();
       if (pCS === CompactStates.APPLIED && pCR) {
-        const pRoot = findNodeInTree(tree, pCR);
-        if (pRoot && !findNodeInTree(pRoot, selectedNodeId)) {
+        const pRoot = findNode(tree, pCR);
+        if (pRoot && !findNode(pRoot, selectedNodeId)) {
           useUIStore.getState().flashCompactBanner();
           return;
         }
@@ -343,20 +328,23 @@ export function useKeyboard() {
         }
       }
 
-      // 2. Clipboard has text → check if it's a node marker or regular text
+      // 2. Clipboard has HTML with vedrr marker → internal node paste
+      const html = e.clipboardData?.getData("text/html") || "";
+      const vedrMatch = html.match(/data-vedrr="node:([^"]+)"/);
+      if (vedrMatch) {
+        e.preventDefault();
+        useTreeStore.getState().pasteNodeUnder(selectedNodeId!, currentContextId!);
+        return;
+      }
+
+      // 3. Clipboard has plain text → paste as text node
       if (items) {
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
           if (item.type === "text/plain") {
             e.preventDefault();
             item.getAsString((text) => {
-              if (text.startsWith("vedrr:node:")) {
-                // Internal node copy → clone subtree
-                const sourceId = text.replace("vedrr:node:", "");
-                if (sourceId) {
-                  useTreeStore.getState().pasteNodeUnder(selectedNodeId!, currentContextId!);
-                }
-              } else if (text.trim()) {
+              if (text.trim()) {
                 useTreeStore.getState().pasteAsNode(selectedNodeId!, currentContextId!, { kind: PasteKind.TEXT, text });
               }
             });
