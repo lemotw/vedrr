@@ -1,9 +1,12 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useUIStore } from "../stores/uiStore";
 import { ipc } from "../lib/ipc";
 import type { InboxItem, InboxSuggestion, ContextSummary } from "../lib/types";
 
-type TabId = "suggested" | "contexts";
+type ListEntry =
+  | { kind: "suggestion"; data: InboxSuggestion }
+  | { kind: "context"; data: ContextSummary }
+  | { kind: "divider" };
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -24,13 +27,33 @@ export default function InboxTriage() {
 
   const [items, setItems] = useState<InboxItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [tab, setTab] = useState<TabId>("suggested");
   const [suggestions, setSuggestions] = useState<InboxSuggestion[]>([]);
   const [contexts, setContexts] = useState<ContextSummary[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const currentItem = items[currentIndex] ?? null;
+
+  // Build merged list: suggestions → divider → contexts
+  const mergedList = useMemo<ListEntry[]>(() => {
+    const list: ListEntry[] = [];
+    for (const s of suggestions) {
+      list.push({ kind: "suggestion", data: s });
+    }
+    if (suggestions.length > 0 && contexts.length > 0) {
+      list.push({ kind: "divider" });
+    }
+    for (const c of contexts) {
+      list.push({ kind: "context", data: c });
+    }
+    return list;
+  }, [suggestions, contexts]);
+
+  // Selectable indices (skip dividers)
+  const selectableIndices = useMemo(
+    () => mergedList.map((e, i) => e.kind !== "divider" ? i : -1).filter((i) => i >= 0),
+    [mergedList],
+  );
 
   // Load inbox items on open
   useEffect(() => {
@@ -40,7 +63,6 @@ export default function InboxTriage() {
       setItems(result);
       setCurrentIndex(0);
       setSelectedIdx(0);
-      setTab("suggested");
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [open]);
@@ -62,20 +84,16 @@ export default function InboxTriage() {
     });
   }, [open]);
 
-  // Reset selection when tab changes
-  useEffect(() => { setSelectedIdx(0); }, [tab]);
-
-  const listLength = tab === "suggested" ? suggestions.length : contexts.length;
-
   const handleAssign = useCallback(async () => {
     if (!currentItem) return;
+    const entry = mergedList[selectedIdx];
+    if (!entry || entry.kind === "divider") return;
     try {
-      if (tab === "suggested" && suggestions[selectedIdx]) {
-        await ipc.matchInboxToNode(currentItem.id, suggestions[selectedIdx].node_id);
-      } else if (tab === "contexts" && contexts[selectedIdx]) {
-        await ipc.matchInboxToContext(currentItem.id, contexts[selectedIdx].id);
-      } else return;
-
+      if (entry.kind === "suggestion") {
+        await ipc.matchInboxToNode(currentItem.id, entry.data.node_id);
+      } else {
+        await ipc.matchInboxToContext(currentItem.id, entry.data.id);
+      }
       const remaining = items.filter((_, i) => i !== currentIndex);
       setItems(remaining);
       setCurrentIndex(Math.min(currentIndex, Math.max(remaining.length - 1, 0)));
@@ -83,7 +101,7 @@ export default function InboxTriage() {
     } catch (e) {
       console.error("[inbox-triage] assign failed:", e);
     }
-  }, [currentItem, tab, suggestions, contexts, selectedIdx, items, currentIndex]);
+  }, [currentItem, mergedList, selectedIdx, items, currentIndex]);
 
   const handleSkip = useCallback(() => {
     if (items.length <= 1) return;
@@ -91,6 +109,16 @@ export default function InboxTriage() {
       setCurrentIndex(currentIndex + 1);
     } else {
       setCurrentIndex(0);
+    }
+    setSelectedIdx(0);
+  }, [currentIndex, items.length]);
+
+  const handlePrev = useCallback(() => {
+    if (items.length <= 1) return;
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    } else {
+      setCurrentIndex(items.length - 1);
     }
     setSelectedIdx(0);
   }, [currentIndex, items.length]);
@@ -113,19 +141,28 @@ export default function InboxTriage() {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") { e.preventDefault(); close(); return; }
-      if (e.key === "Tab" && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
-        setTab((t) => (t === "suggested" ? "contexts" : "suggested"));
-        return;
+      if (e.key === "h" || e.key === "ArrowLeft") {
+        e.preventDefault(); handlePrev(); return;
+      }
+      if (e.key === "l" || e.key === "ArrowRight") {
+        e.preventDefault(); handleSkip(); return;
       }
       if (e.key === "j" || e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIdx((i) => Math.min(i + 1, listLength - 1));
+        setSelectedIdx((cur) => {
+          const pos = selectableIndices.indexOf(cur);
+          const next = selectableIndices[pos + 1];
+          return next !== undefined ? next : cur;
+        });
         return;
       }
       if (e.key === "k" || e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedIdx((i) => Math.max(i - 1, 0));
+        setSelectedIdx((cur) => {
+          const pos = selectableIndices.indexOf(cur);
+          const prev = selectableIndices[pos - 1];
+          return prev !== undefined ? prev : cur;
+        });
         return;
       }
       if (e.key === "Enter") { e.preventDefault(); handleAssign(); return; }
@@ -134,7 +171,16 @@ export default function InboxTriage() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, close, listLength, handleAssign, handleSkip, handleDelete]);
+  }, [open, close, selectableIndices, handleAssign, handleSkip, handlePrev, handleDelete]);
+
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = listRef.current;
+    if (!container) return;
+    const el = container.querySelector(`[data-idx="${selectedIdx}"]`);
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedIdx]);
 
   if (!open) return null;
 
@@ -151,7 +197,20 @@ export default function InboxTriage() {
           <h2 className="font-heading text-xl font-bold text-text-primary">
             {isEmpty ? "Inbox" : `Inbox (${currentIndex + 1}/${items.length})`}
           </h2>
-          <span className="font-mono text-xs text-text-secondary">Cmd+I close</span>
+          <div className="relative group/help">
+            <span className="font-mono text-[11px] text-text-secondary cursor-help">?</span>
+            <div className="absolute right-0 top-7 z-10 w-48 px-3 py-2.5 rounded-lg bg-bg-elevated border border-border shadow-xl
+              opacity-0 pointer-events-none group-hover/help:opacity-100 group-hover/help:pointer-events-auto transition-opacity">
+              <ul className="font-mono text-[11px] text-text-secondary leading-relaxed space-y-1">
+                <li><span className="text-text-primary">j/k</span> navigate list</li>
+                <li><span className="text-text-primary">h/l</span> prev / next item</li>
+                <li><span className="text-text-primary">⏎</span> assign to selected</li>
+                <li><span className="text-text-primary">s</span> skip item</li>
+                <li><span className="text-text-primary">d</span> delete item</li>
+                <li><span className="text-text-primary">esc</span> close</li>
+              </ul>
+            </div>
+          </div>
         </div>
 
         <div className="h-px bg-border" />
@@ -176,85 +235,78 @@ export default function InboxTriage() {
 
             <div className="h-px bg-border" />
 
-            {/* Tabs */}
-            <div className="flex px-6">
-              <button
-                className={`flex-1 flex items-center justify-center gap-2 py-3 font-mono text-sm transition-colors
-                  ${tab === "suggested" ? "text-accent-primary font-semibold border-b-2 border-accent-primary" : "text-text-secondary font-medium"}`}
-                onClick={() => setTab("suggested")}
-              >
-                Suggested
-              </button>
-              <button
-                className={`flex-1 flex items-center justify-center gap-2 py-3 font-mono text-sm transition-colors
-                  ${tab === "contexts" ? "text-accent-primary font-semibold border-b-2 border-accent-primary" : "text-text-secondary font-medium"}`}
-                onClick={() => setTab("contexts")}
-              >
-                Contexts
-              </button>
-            </div>
-
-            {/* List */}
-            <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1 min-h-[200px] max-h-[300px]">
-              {tab === "suggested" ? (
-                suggestions.length === 0 ? (
-                  <div className="flex items-center justify-center h-full font-mono text-sm text-text-secondary">
-                    {currentItem.status === "pending" ? "Embedding in progress..." : "No suggestions found"}
-                  </div>
-                ) : (
-                  suggestions.map((s, i) => (
+            {/* Merged list */}
+            <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1 min-h-[200px] max-h-[300px]">
+              {mergedList.length === 0 ? (
+                <div className="flex items-center justify-center h-full font-mono text-sm text-text-secondary">
+                  {currentItem.status === "pending" ? "Embedding in progress..." : "No suggestions found"}
+                </div>
+              ) : (
+                mergedList.map((entry, i) => {
+                  if (entry.kind === "divider") {
+                    return (
+                      <div key="divider" className="flex items-center gap-3 px-4 py-2">
+                        <div className="flex-1 h-px bg-border" />
+                        <span className="font-mono text-[10px] text-text-secondary uppercase tracking-wider">contexts</span>
+                        <div className="flex-1 h-px bg-border" />
+                      </div>
+                    );
+                  }
+                  if (entry.kind === "suggestion") {
+                    const s = entry.data;
+                    return (
+                      <button
+                        key={s.node_id}
+                        data-idx={i}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors
+                          ${i === selectedIdx ? "bg-bg-elevated" : "bg-bg-card hover:bg-bg-elevated"}`}
+                        onClick={() => { setSelectedIdx(i); handleAssign(); }}
+                        onMouseEnter={() => setSelectedIdx(i)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-mono text-[11px] text-text-secondary truncate">{s.context_name} &rsaquo; {s.ancestor_path}</div>
+                          <div className="font-mono text-sm font-medium text-text-primary truncate">{s.node_title}</div>
+                        </div>
+                        <span className="font-mono text-sm font-bold text-accent-primary shrink-0">
+                          {Math.round(s.score * 100)}%
+                        </span>
+                      </button>
+                    );
+                  }
+                  const c = entry.data;
+                  return (
                     <button
-                      key={s.node_id}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors
-                        ${i === selectedIdx ? "bg-bg-elevated ring-1 ring-accent-primary" : "bg-bg-card hover:bg-bg-elevated"}`}
+                      key={c.id}
+                      data-idx={i}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors
+                        ${i === selectedIdx ? "bg-bg-elevated" : "bg-bg-card hover:bg-bg-elevated"}`}
                       onClick={() => { setSelectedIdx(i); handleAssign(); }}
                       onMouseEnter={() => setSelectedIdx(i)}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-mono text-[11px] text-text-secondary truncate">{s.context_name} &rsaquo; {s.ancestor_path}</div>
-                        <div className="font-mono text-sm font-medium text-text-primary truncate">{s.node_title}</div>
-                      </div>
-                      <span className="font-mono text-sm font-bold text-accent-primary shrink-0">
-                        {Math.round(s.score * 100)}%
-                      </span>
+                      <span className="font-mono text-sm font-medium text-text-primary truncate">{c.name}</span>
+                      <span className="font-mono text-xs text-text-secondary shrink-0">{c.node_count} nodes</span>
                     </button>
-                  ))
-                )
-              ) : (
-                contexts.map((c, i) => (
-                  <button
-                    key={c.id}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors
-                      ${i === selectedIdx ? "bg-bg-elevated ring-1 ring-accent-primary" : "bg-bg-card hover:bg-bg-elevated"}`}
-                    onClick={() => { setSelectedIdx(i); handleAssign(); }}
-                    onMouseEnter={() => setSelectedIdx(i)}
-                  >
-                    <span className="font-mono text-sm font-medium text-text-primary truncate">{c.name}</span>
-                    <span className="font-mono text-xs text-text-secondary shrink-0">{c.node_count} nodes</span>
-                  </button>
-                ))
+                  );
+                })
               )}
             </div>
 
             <div className="h-px bg-border" />
 
-            {/* Footer */}
-            <div className="flex items-center justify-between px-6 py-3">
-              <button
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-bg-elevated font-mono text-sm font-medium text-text-primary hover:brightness-110 transition-colors"
-                onClick={handleSkip}
-              >
-                Skip
+            {/* Footer — keyboard hint bar */}
+            <div className="flex items-center justify-center gap-5 px-6 py-3">
+              <button onClick={handleSkip} className="font-mono text-[11px] text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                <span className="text-text-primary">s</span> skip
               </button>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-[11px] text-text-secondary">Enter to assign</span>
-                <button
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#3D1515] font-mono text-sm font-medium text-[#FF4444] hover:brightness-110 transition-colors"
-                  onClick={handleDelete}
-                >
-                  Delete
-                </button>
-              </div>
+              <button onClick={handleDelete} className="font-mono text-[11px] text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                <span className="text-text-primary">d</span> delete
+              </button>
+              <button onClick={handleAssign} className="font-mono text-[11px] text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                <span className="text-text-primary">⏎</span> assign
+              </button>
+              <button onClick={close} className="font-mono text-[11px] text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                <span className="text-text-primary">esc</span> close
+              </button>
             </div>
           </>
         ) : null}

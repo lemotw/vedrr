@@ -30,6 +30,14 @@ interface Props {
   dragHandleListeners?: Record<string, any>;
 }
 
+// How long the recency border stays visible (ms). Change this one value to adjust.
+const RECENCY_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+
+function useRecencySeconds(updatedAt: string): number {
+  const remaining = Math.max(0, RECENCY_WINDOW_MS - (Date.now() - new Date(updatedAt + "Z").getTime()));
+  return Math.ceil(remaining / 1000);
+}
+
 function useNodeEdit(
   node: TreeNode,
   isEditing: boolean,
@@ -179,6 +187,8 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, showReorderHi
   }, [isImage, node.file_path]);
 
   const hl = compactHighlight && !compactFading ? HIGHLIGHT_COLORS[compactHighlight.type] : null;
+  const recencySeconds = useRecencySeconds(node.updated_at);
+  const showRecencyBorder = recencySeconds > 0 && !hl;
 
   return (
     <>
@@ -197,6 +207,9 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, showReorderHi
         style={hl ? {
           backgroundColor: hl.bg,
           borderLeft: `3px solid ${hl.border}`,
+        } : showRecencyBorder ? {
+          boxShadow: "inset 3px 0 0 0 var(--color-accent-primary)",
+          animation: `recency-fade ${recencySeconds}s linear forwards`,
         } : undefined}
         onClick={onClick}
         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); openContextMenu(node.id, e.clientX, e.clientY); }}
