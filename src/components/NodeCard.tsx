@@ -50,6 +50,11 @@ function useNodeEdit(
   updateNodeTitle: (id: string, title: string) => Promise<void>,
 ) {
   const [editValue, setEditValue] = useState(node.title);
+  const prevTitleRef = useRef(node.title);
+  if (prevTitleRef.current !== node.title) {
+    prevTitleRef.current = node.title;
+    setEditValue(node.title);
+  }
   const inputRef = useRef<HTMLInputElement>(null);
   const lastEnterRef = useRef<number>(0);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -66,10 +71,6 @@ function useNodeEdit(
       inputRef.current.select();
     }
   }, [isEditing]);
-
-  useEffect(() => {
-    setEditValue(node.title);
-  }, [node.title]);
 
   const commitEdit = () => {
     const trimmed = editValue.trim();
