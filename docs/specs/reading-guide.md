@@ -12,7 +12,7 @@ Read these first to understand what the app does without diving into implementat
 
 - **`src/lib/types.ts`** — All TypeScript interfaces. Shows every data shape in the system.
 - **`src/lib/constants.ts`** — All enums and magic strings. If you see a string constant, it's defined here.
-- **`docs/specs/code-index.md`** — IPC reference table mapping every frontend call to its Rust handler.
+- **`docs/specs/architecture.md`** — Full architecture diagram, file map, schema reference, and command listing.
 
 ### 2. Understand the data model
 
@@ -40,15 +40,18 @@ useKeyboard.ts (Tab key pressed)
 - **`App.tsx`** — Shell: init sequence, loading screen, layout composition. Read this to see how everything wires together.
 - **`components/TreeCanvas.tsx`** — The main canvas. Renders the horizontal tree, connectors, hover buttons.
 - **`components/NodeCard.tsx`** — Individual node rendering. Type-specific behavior lives here.
-- **`components/QuickSwitcher.tsx`** — The ⌘K modal. Handles context switching, vault, import.
+- **`components/QuickSwitcher.tsx`** — The ⌘K modal. Handles context switching, vault, import, export (ZIP + PNG).
+- **`components/QuickCapture.tsx`** — Global shortcut capture panel. NSPanel on macOS.
+- **`components/InboxTriage.tsx`** — ⌘I modal. Matches captured items to existing nodes/contexts via semantic similarity.
+- **`components/ContextMenu.tsx`** — Right-click context menu with grouped actions.
 
 ### 5. State management
 
 Three Zustand stores, each with a single responsibility:
 
-- **`stores/contextStore.ts`** — Context list + vault operations. No tree data.
+- **`stores/contextStore.ts`** — Context list + vault operations + export. No tree data.
 - **`stores/treeStore.ts`** — Tree structure + node CRUD + clipboard + undo. The largest store.
-- **`stores/uiStore.ts`** — Pure UI toggles (which panel is open, theme, collapse state).
+- **`stores/uiStore.ts`** — Pure UI toggles (which panel is open, theme, collapse state, compact state, inbox).
 
 ### 6. Backend commands
 
@@ -57,7 +60,11 @@ Read in this order:
 1. **`commands/context.rs`** — Context lifecycle (create → active → archive → vault → restore). The vault flow (ZIP export/import) is the most complex part.
 2. **`commands/node.rs`** — Node CRUD. `get_tree` does recursive assembly. `clone_subtree` is the deepest function.
 3. **`commands/search.rs`** — Search + embedding commands. Thin wrappers around `embedding.rs`.
-4. **`commands/file_ops.rs`** — Simple file I/O. Smallest command file.
+4. **`commands/ai.rs`** — AI compact: LLM proxy, profile/key CRUD, model listing.
+5. **`commands/inbox.rs`** — Inbox item CRUD + semantic matching to nodes/contexts.
+6. **`commands/settings.rs`** — Key-value settings + global shortcut update.
+7. **`commands/shortcuts.rs`** — Quick Capture NSPanel init + global shortcut handler.
+8. **`commands/file_ops.rs`** — Simple file I/O. Smallest command file.
 
 ### 7. Embedding system
 
@@ -111,3 +118,4 @@ Cleanup: URL.revokeObjectURL() in useEffect return
 | `src/i18n/` | Translation strings (read only if working on i18n) |
 | `src/lib/cn.ts` | Tiny classname utility |
 | `src/lib/platform.ts` | OS detection (⌘ vs Ctrl) |
+| `src/lib/timeAgo.ts` | Simple relative time formatter |

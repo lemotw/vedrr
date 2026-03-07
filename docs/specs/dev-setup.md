@@ -55,6 +55,14 @@ To reset everything: `rm -rf ~/vedrr` and restart the app.
 
 ---
 
+## Versioning
+
+- Settings panel displays the app version via `import.meta.env.VITE_APP_VERSION`
+- In CI (GitHub Actions release workflow), `VITE_APP_VERSION` is set from the git tag (e.g. `v0.2.0`)
+- Local dev builds show `dev` as the version
+
+---
+
 ## Common Dev Tasks
 
 ### Add a new IPC command
@@ -124,3 +132,8 @@ Things that will bite you if you don't know about them.
 
 - j/k moves between siblings (breadth), h/l moves parent/child (depth). This is NOT DFS order.
 - Root node title and context name are bidirectionally synced via `rename_context`.
+
+### Quick Capture (macOS)
+
+- Uses `tauri-nspanel` to create a non-activating NSPanel, preventing the main window from popping up when the global shortcut is triggered.
+- The global shortcut is configurable via Settings and stored in the `settings` table (default: `CmdOrCtrl+Shift+Space`).
