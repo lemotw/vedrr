@@ -108,6 +108,7 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_APP_VERSION: ${{ github.ref_name }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'vedrr ${{ github.ref_name }}'

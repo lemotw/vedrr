@@ -273,7 +273,7 @@ export function SettingsPanel() {
         {/* Footer */}
         <div className="border-t border-border px-6 py-3">
           <p className="font-mono text-[10px] text-text-secondary">
-            vedrr v0.1.0
+            vedrr {import.meta.env.VITE_APP_VERSION || "dev"}
           </p>
         </div>
       </div>
