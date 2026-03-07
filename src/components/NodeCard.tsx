@@ -7,6 +7,10 @@ import { useTreeStore } from "../stores/treeStore";
 import { useUIStore } from "../stores/uiStore";
 import { ipc } from "../lib/ipc";
 import { cn } from "../lib/cn";
+import { isUrl, formatUrl } from "../lib/url";
+import { openUrl } from "@tauri-apps/plugin-opener";
+
+const NODE_ACTION_BTN = "ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 cursor-pointer bg-bg-elevated text-text-secondary hover:text-text-primary hover:ring-1 hover:ring-border transition-colors";
 
 const HIGHLIGHT_COLORS: Record<string, { border: string; bg: string; text: string }> = {
   added:           { border: "#2DD4BF99", bg: "#1E3A36", text: "#2DD4BF" },
@@ -154,6 +158,7 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, showReorderHi
   );
 
   const isFileish = node.node_type === NodeTypes.FILE;
+  const isUrlNode = node.node_type === NodeTypes.TEXT && isUrl(node.title);
   const isImage = node.node_type === NodeTypes.IMAGE && node.file_path;
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [showLightbox, setShowLightbox] = useState(false);
@@ -254,9 +259,9 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, showReorderHi
               className="bg-transparent text-[13px] text-text-primary outline-none border-b border-accent-primary min-w-[60px]"
             />
           ) : (
-            <div className="flex flex-col">
-              <span className="text-[13px] text-text-primary">
-                {node.title || t("common.untitled")}
+            <div className={cn("flex flex-col", isUrlNode && "overflow-hidden")}>
+              <span className={cn("text-[13px] text-text-primary", isUrlNode && "truncate max-w-[200px]")}>
+                {isUrlNode ? formatUrl(node.title) : (node.title || t("common.untitled"))}
               </span>
               {compactHighlight?.oldTitle && (
                 <span className="text-[10px]" style={{ color: HIGHLIGHT_COLORS[compactHighlight.type]?.text }}>
@@ -270,10 +275,18 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, showReorderHi
               )}
             </div>
           )}
+          {isUrlNode && !isEditing && (
+            <button
+              className={NODE_ACTION_BTN}
+              onClick={(e) => { e.stopPropagation(); openUrl(node.title); }}
+              title={t("nodeCard.tooltip.openInBrowser")}
+            >
+              {t("nodeCard.button.open")}
+            </button>
+          )}
           {isFileish && (
             <button
-              className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 cursor-pointer
-                bg-bg-elevated text-text-secondary hover:text-text-primary hover:ring-1 hover:ring-border transition-colors"
+              className={NODE_ACTION_BTN}
               onClick={(e) => { e.stopPropagation(); openOrAttachFile(node.id); }}
               title={node.file_path ? t("nodeCard.tooltip.revealFile") : t("nodeCard.tooltip.attachFile")}
             >
@@ -282,8 +295,7 @@ function LeafNodeCard({ node, isSelected, isCutNode, isDropTarget, showReorderHi
           )}
           {node.node_type === NodeTypes.IMAGE && !node.file_path && (
             <button
-              className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 cursor-pointer
-                bg-bg-elevated text-text-secondary hover:text-text-primary hover:ring-1 hover:ring-border transition-colors"
+              className={NODE_ACTION_BTN}
               onClick={(e) => { e.stopPropagation(); pickAndImportImage(node.id); }}
               title={t("nodeCard.tooltip.chooseImage")}
             >

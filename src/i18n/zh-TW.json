@@ -90,7 +90,8 @@
       "changeType": "變更類型 (T)",
       "revealFile": "在 Finder 中顯示 (O)",
       "attachFile": "附加檔案 (O)",
-      "chooseImage": "選擇圖片"
+      "chooseImage": "選擇圖片",
+      "openInBrowser": "在瀏覽器中開啟"
     },
     "button": {
       "open": "open",

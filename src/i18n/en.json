@@ -90,7 +90,8 @@
       "changeType": "Change type (T)",
       "revealFile": "Reveal in Finder (O)",
       "attachFile": "Attach file (O)",
-      "chooseImage": "Choose image"
+      "chooseImage": "Choose image",
+      "openInBrowser": "Open in browser"
     },
     "button": {
       "open": "open",
