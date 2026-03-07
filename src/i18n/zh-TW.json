@@ -28,7 +28,8 @@
     "section": {
       "active": "ACTIVE",
       "archived": "ARCHIVED",
-      "vault": "VAULT"
+      "vault": "VAULT",
+      "contexts": "CONTEXTS"
     },
     "button": {
       "new": "+ New",
@@ -42,7 +43,8 @@
       "more": "更多操作",
       "exporting": "匯出中...",
       "exportDone": "匯出完成",
-      "exportError": "匯出失敗"
+      "exportError": "匯出失敗",
+      "exportPng": "匯出 PNG"
     },
     "empty": "還沒有 Context",
     "noMatch": "找不到",
@@ -58,13 +60,16 @@
       "close": "關閉",
       "results": "結果",
       "restoreAction": "還原",
-      "clear": "清除"
+      "clear": "清除",
+      "tab": "切換分頁",
+      "actions": "操作"
     },
     "help": {
       "active": "使用中的心智圖，可隨時切換編輯。依最近存取時間排序。",
       "archived": "暫時不用的心智圖。不會出現在主畫面，但可以隨時 restore 回 Active。",
       "vault": "長期封存的心智圖。資料完整保留，不佔用 Active 空間。需要時可搜尋並 restore。"
     },
+    "autoVaulted": "{{count}} 個已自動封存：{{names}}",
     "confirm": {
       "deleteTitle": "刪除確認",
       "deleteMessage": "確定要永久刪除「{{name}}」？此操作無法復原。"

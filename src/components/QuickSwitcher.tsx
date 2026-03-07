@@ -11,7 +11,6 @@ import { ipc } from "../lib/ipc";
 import { isModKey, modSymbol } from "../lib/platform";
 import { exportTreeAsPng } from "../lib/exportPng";
 
-
 function timeAgo(dateStr: string): string {
   const now = Date.now();
   const then = new Date(dateStr + "Z").getTime();
@@ -111,6 +110,16 @@ function IcoExport() {
   );
 }
 
+function IcoPng() {
+  return (
+    <svg className="w-[13px] h-[13px]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="12" height="12" rx="1.5" />
+      <circle cx="5.5" cy="6" r="1" />
+      <path d="M2 11l3-3 2 2 3-4 4 5" />
+    </svg>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────
 
 export function QuickSwitcher() {
@@ -126,19 +135,20 @@ export function QuickSwitcher() {
 
   const [vaultSearch, setVaultSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [focusPane, setFocusPane] = useState<"left" | "vault">("left");
+  const [activeTab, setActiveTab] = useState<"contexts" | "vault">("contexts");
   const [showImportZone, setShowImportZone] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [menuSelectedIndex, setMenuSelectedIndex] = useState(0);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const vaultInputRef = useRef<HTMLInputElement>(null);
-  const activeScrollRef = useRef<HTMLDivElement>(null);
-  const archivedScrollRef = useRef<HTMLDivElement>(null);
+  const listScrollRef = useRef<HTMLDivElement>(null);
   const vaultScrollRef = useRef<HTMLDivElement>(null);
 
   const [importError, setImportError] = useState<string | null>(null);
+  const [autoVaultedNames, setAutoVaultedNames] = useState<string[]>([]);
 
   // Close dropdown menu on click outside
   useEffect(() => {
@@ -207,15 +217,20 @@ export function QuickSwitcher() {
   useEffect(() => {
     if (quickSwitcherOpen) {
       ipc.autoVaultArchived()
-        .then(() => Promise.all([loadContexts(), loadVaultEntries()]))
+        .then((names) => {
+          setAutoVaultedNames(names ?? []);
+          return Promise.all([loadContexts(), loadVaultEntries()]);
+        })
         .catch(() => Promise.all([loadContexts(), loadVaultEntries()]));
       setVaultSearch("");
       setSelectedIndex(0);
-      setFocusPane("left");
+      setActiveTab("contexts");
       setShowImportZone(false);
       setImportError(null);
       setMenuOpenId(null);
       setTimeout(() => panelRef.current?.focus(), 50);
+    } else {
+      setAutoVaultedNames([]);
     }
   }, [quickSwitcherOpen, loadContexts, loadVaultEntries]);
 
@@ -228,8 +243,8 @@ export function QuickSwitcher() {
     return vaultEntries.filter(v => v.name.toLowerCase().includes(q));
   }, [vaultEntries, vaultSearch]);
 
-  const leftItems = useMemo(() => [...active, ...archived], [active, archived]);
-  const currentListLength = focusPane === "left" ? leftItems.length : filteredVault.length;
+  const contextItems = useMemo(() => [...active, ...archived], [active, archived]);
+  const currentListLength = activeTab === "contexts" ? contextItems.length : filteredVault.length;
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -243,29 +258,16 @@ export function QuickSwitcher() {
   // Scroll selected item into view
   useEffect(() => {
     if (!quickSwitcherOpen) return;
-    let container: HTMLDivElement | null;
-    let adjustedIndex: number;
-    if (focusPane === "left") {
-      if (selectedIndex < active.length) {
-        container = activeScrollRef.current;
-        adjustedIndex = selectedIndex;
-      } else {
-        container = archivedScrollRef.current;
-        adjustedIndex = selectedIndex - active.length;
-      }
-    } else {
-      container = vaultScrollRef.current;
-      adjustedIndex = selectedIndex;
-    }
+    const container = activeTab === "contexts" ? listScrollRef.current : vaultScrollRef.current;
     if (!container) return;
     const items = container.querySelectorAll("[data-qs-row]");
-    const el = items[adjustedIndex];
+    const el = items[selectedIndex];
     if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
-  }, [selectedIndex, focusPane, quickSwitcherOpen, active.length]);
+  }, [selectedIndex, activeTab, quickSwitcherOpen]);
 
   if (!quickSwitcherOpen) return null;
 
-  const inVaultMode = focusPane === "vault";
+  const inVaultMode = activeTab === "vault";
 
   // ── Handlers ──
 
@@ -344,24 +346,75 @@ export function QuickSwitcher() {
     }
   };
 
-  const enterVaultSearch = () => {
-    setFocusPane("vault");
+  const switchToVault = (focusSearch = false) => {
+    setActiveTab("vault");
     setSelectedIndex(0);
-    setTimeout(() => vaultInputRef.current?.focus(), 0);
+    if (focusSearch) {
+      setTimeout(() => vaultInputRef.current?.focus(), 0);
+    }
   };
 
-  const exitVaultSearch = () => {
+  const switchToContexts = () => {
     setVaultSearch("");
-    setFocusPane("left");
+    setActiveTab("contexts");
     setSelectedIndex(0);
     vaultInputRef.current?.blur();
     panelRef.current?.focus();
+  };
+
+  // Build menu actions for a context (used by both render + keyboard)
+  const getMenuActions = (ctx: ContextSummary) => {
+    const isCtxActive = ctx.state === ContextStates.ACTIVE;
+    const actions: { label: string; icon: React.ReactNode; action: (e: React.MouseEvent) => void; danger?: boolean }[] = [
+      { label: t("quickSwitcher.button.export"), icon: <IcoExport />, action: (e) => handleExport(e, ctx) },
+      { label: t("quickSwitcher.button.exportPng"), icon: <IcoPng />, action: (e) => handleExportPng(e, ctx) },
+    ];
+    if (isCtxActive) {
+      actions.push({ label: t("quickSwitcher.button.archive"), icon: <IcoArchive />, action: (e) => { setMenuOpenId(null); handleArchive(e, ctx); } });
+    } else {
+      actions.push({ label: t("quickSwitcher.button.restore"), icon: <IcoRestore />, action: (e) => { setMenuOpenId(null); handleActivate(e, ctx); } });
+      actions.push({ label: t("quickSwitcher.button.vault"), icon: <IcoVault />, action: (e) => { setMenuOpenId(null); handleVault(e, ctx); } });
+    }
+    actions.push({ label: t("quickSwitcher.button.delete"), icon: <IcoDelete />, action: (e) => { setMenuOpenId(null); handleDelete(e, ctx); }, danger: true });
+    return actions;
   };
 
   // ── Keyboard ──
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     const isInVaultSearch = document.activeElement === vaultInputRef.current;
+
+    // ── When action menu is open: j/k navigate, Enter selects, Esc/h closes ──
+    if (menuOpenId) {
+      const ctx = contextItems.find(c => c.id === menuOpenId);
+      if (ctx) {
+        const actions = getMenuActions(ctx);
+        if (e.key === "j" || e.key === "ArrowDown") {
+          e.preventDefault();
+          setMenuSelectedIndex(i => Math.min(i + 1, actions.length - 1));
+          return;
+        }
+        if (e.key === "k" || e.key === "ArrowUp") {
+          e.preventDefault();
+          setMenuSelectedIndex(i => Math.max(i - 1, 0));
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const action = actions[menuSelectedIndex];
+          if (action) action.action({ stopPropagation: () => {} } as React.MouseEvent);
+          return;
+        }
+        if (e.key === "Escape" || e.key === "h" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          setMenuOpenId(null);
+          return;
+        }
+        // Block all other keys while menu is open
+        e.preventDefault();
+        return;
+      }
+    }
 
     // Down: j / ↓ / Ctrl+j / Ctrl+n
     if (
@@ -396,6 +449,20 @@ export function QuickSwitcher() {
       return;
     }
 
+    // h / l / ← / → — switch tabs
+    if (
+      !isInVaultSearch && !e.ctrlKey && !e.altKey && !e.metaKey &&
+      (e.key === "h" || e.key === "l" || e.key === "ArrowLeft" || e.key === "ArrowRight")
+    ) {
+      e.preventDefault();
+      if ((e.key === "l" || e.key === "ArrowRight") && !inVaultMode) {
+        switchToVault();
+      } else if ((e.key === "h" || e.key === "ArrowLeft") && inVaultMode) {
+        switchToContexts();
+      }
+      return;
+    }
+
     // Mod+N — create new context
     if (isModKey(e) && e.key === "n") {
       e.preventDefault();
@@ -403,12 +470,14 @@ export function QuickSwitcher() {
       return;
     }
 
-    // Enter — select (left pane only; vault items use button clicks)
+    // Enter — select context or restore vault entry
     if (e.key === "Enter") {
       e.preventDefault();
       if (e.nativeEvent.isComposing) return;
-      if (focusPane === "left" && leftItems[selectedIndex]) {
-        handleSelect(leftItems[selectedIndex]);
+      if (activeTab === "contexts" && contextItems[selectedIndex]) {
+        handleSelect(contextItems[selectedIndex]);
+      } else if (activeTab === "vault" && filteredVault[selectedIndex]) {
+        restoreFromVault(filteredVault[selectedIndex].id);
       }
       return;
     }
@@ -424,27 +493,42 @@ export function QuickSwitcher() {
     if (e.key === "Escape") {
       e.preventDefault();
       if (inVaultMode) {
-        exitVaultSearch();
+        switchToContexts();
         return;
       }
       closeQuickSwitcher();
       return;
     }
 
-    // "/" — focus vault search
-    if (!isInVaultSearch && e.key === "/") {
+    // "." — open action menu on selected context row
+    if (!isInVaultSearch && e.key === "." && activeTab === "contexts") {
       e.preventDefault();
-      enterVaultSearch();
+      const item = contextItems[selectedIndex];
+      if (item) {
+        if (menuOpenId === item.id) {
+          setMenuOpenId(null);
+        } else {
+          setMenuOpenId(item.id);
+          setMenuSelectedIndex(0);
+        }
+      }
       return;
     }
 
-    // Tab — toggle pane
+    // "/" — switch to vault tab + focus search
+    if (!isInVaultSearch && e.key === "/") {
+      e.preventDefault();
+      switchToVault(true);
+      return;
+    }
+
+    // Tab — toggle tab
     if (e.key === "Tab") {
       e.preventDefault();
-      if (focusPane === "left") {
-        enterVaultSearch();
+      if (inVaultMode) {
+        switchToContexts();
       } else {
-        exitVaultSearch();
+        switchToVault();
       }
       return;
     }
@@ -452,10 +536,10 @@ export function QuickSwitcher() {
 
   // ── Row renderers ──
 
-  const renderLeftRow = (ctx: ContextSummary, globalIdx: number) => {
+  const renderContextRow = (ctx: ContextSummary, globalIdx: number) => {
     const isActive = ctx.state === ContextStates.ACTIVE;
     const isCurrent = ctx.id === currentContextId;
-    const isSelected = !inVaultMode && globalIdx === selectedIndex;
+    const isSelected = activeTab === "contexts" && globalIdx === selectedIndex;
 
     return (
       <div
@@ -467,10 +551,10 @@ export function QuickSwitcher() {
           isCurrent && "bg-accent-primary/8",
         )}
         onClick={() => handleSelect(ctx)}
-        onMouseEnter={() => { if (!inVaultMode) setSelectedIndex(globalIdx); }}
+        onMouseEnter={() => { if (activeTab === "contexts") setSelectedIndex(globalIdx); }}
       >
         <span className={cn(
-          "text-[8px] w-[14px] shrink-0 text-center",
+          "text-[9px] w-[14px] shrink-0 text-center",
           isCurrent ? "text-accent-primary" : isActive ? "text-accent-primary" : "text-text-secondary",
         )}>
           {isCurrent ? "\u25B8" : isActive ? "\u25CF" : "\u25CB"}
@@ -494,7 +578,12 @@ export function QuickSwitcher() {
             )}
             onClick={(e) => {
               e.stopPropagation();
-              setMenuOpenId(menuOpenId === ctx.id ? null : ctx.id);
+              if (menuOpenId === ctx.id) {
+                setMenuOpenId(null);
+              } else {
+                setMenuOpenId(ctx.id);
+                setMenuSelectedIndex(0);
+              }
             }}
             title={t("quickSwitcher.button.more")}
             aria-label={t("quickSwitcher.button.more")}
@@ -502,83 +591,62 @@ export function QuickSwitcher() {
             <IcoMore />
           </button>
 
-          {menuOpenId === ctx.id && (
-            <div
-              ref={menuRef}
-              className="absolute right-0 top-full mt-1 z-50 min-w-[140px] bg-bg-elevated border border-border rounded-lg py-1 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
-            >
-              <button
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-colors cursor-pointer"
-                onClick={(e) => handleExportPng(e, ctx)}
+          {menuOpenId === ctx.id && (() => {
+            const actions = getMenuActions(ctx);
+            return (
+              <div
+                ref={menuRef}
+                className="absolute right-0 top-full mt-1 z-50 min-w-[140px] bg-bg-elevated border border-border rounded-lg py-1 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
               >
-                <IcoExport />
-                {t("quickSwitcher.button.exportPng")}
-              </button>
-              <button
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-colors cursor-pointer"
-                onClick={(e) => handleExport(e, ctx)}
-              >
-                <IcoExport />
-                {t("quickSwitcher.button.export")}
-              </button>
-              {isActive ? (
-                <button
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-colors cursor-pointer"
-                  onClick={(e) => { setMenuOpenId(null); handleArchive(e, ctx); }}
-                >
-                  <IcoArchive />
-                  {t("quickSwitcher.button.archive")}
-                </button>
-              ) : (
-                <>
+                {actions.map((action, ai) => (
                   <button
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-colors cursor-pointer"
-                    onClick={(e) => { setMenuOpenId(null); handleActivate(e, ctx); }}
+                    key={action.label}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-1.5 text-[12px] font-mono transition-colors cursor-pointer",
+                      ai === menuSelectedIndex
+                        ? action.danger ? "bg-[var(--color-hover)] text-[#FF4444]" : "bg-[var(--color-hover)] text-text-primary"
+                        : action.danger ? "text-text-secondary hover:bg-[var(--color-hover)] hover:text-[#FF4444]" : "text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary",
+                    )}
+                    onMouseEnter={() => setMenuSelectedIndex(ai)}
+                    onClick={(e) => action.action(e)}
                   >
-                    <IcoRestore />
-                    {t("quickSwitcher.button.restore")}
+                    {action.icon}
+                    {action.label}
                   </button>
-                  <button
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-colors cursor-pointer"
-                    onClick={(e) => { setMenuOpenId(null); handleVault(e, ctx); }}
-                  >
-                    <IcoVault />
-                    {t("quickSwitcher.button.vault")}
-                  </button>
-                </>
-              )}
-              <div className="h-px bg-border my-1" />
-              <button
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-[#FF4444] transition-colors cursor-pointer"
-                onClick={(e) => { setMenuOpenId(null); handleDelete(e, ctx); }}
-              >
-                <IcoDelete />
-                {t("quickSwitcher.button.delete")}
-              </button>
-            </div>
-          )}
+                ))}
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
   };
 
-  const renderVaultRow = (entry: VaultEntry) => {
+  const renderVaultRow = (entry: VaultEntry, idx: number) => {
+    const isSelected = activeTab === "vault" && idx === selectedIndex;
     return (
       <div
         key={entry.id}
         data-qs-row
-        className="group/row flex items-center px-3 py-[7px] transition-colors"
+        className={cn(
+          "group/row flex items-center px-3 py-[7px] transition-colors",
+          isSelected && "bg-[var(--color-hover)]",
+        )}
+        onMouseEnter={() => { if (activeTab === "vault") setSelectedIndex(idx); }}
       >
-        <span className="text-[8px] w-[14px] shrink-0 text-center text-text-secondary opacity-50">
+        <span className="text-[9px] w-[14px] shrink-0 text-center text-text-secondary opacity-50">
           {"\u25C6"}
         </span>
         <span className="text-[9px] text-text-secondary shrink-0 ml-1 mr-1.5 opacity-45 w-6">
           {timeAgo(entry.vaulted_at)}
         </span>
-        <span className="text-[11px] font-mono truncate flex-1 min-w-0 text-text-secondary">
+        <span className="text-[12px] font-mono truncate flex-1 min-w-0 text-text-secondary">
           {vaultSearch ? highlightMatch(entry.name, vaultSearch) : entry.name}
         </span>
-        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity ml-1">
+        <div className={cn(
+          "flex items-center gap-0.5 shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity ml-1",
+          isSelected && "opacity-100",
+        )}>
           <button
             className="w-[22px] h-[22px] rounded flex items-center justify-center text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-all cursor-pointer"
             onClick={(e) => handleRestoreFromVault(e, entry)}
@@ -610,8 +678,48 @@ export function QuickSwitcher() {
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        {/* Body */}
-        <div className="flex min-h-0 h-[420px]">
+        {/* ── Auto-vault banner ── */}
+        {autoVaultedNames.length > 0 && (
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-accent-primary/10 shrink-0" role="status">
+            <span className="text-accent-primary shrink-0"><IcoArchive /></span>
+            <span className="text-[12px] font-mono text-accent-primary/80 truncate">
+              {t("quickSwitcher.autoVaulted", { count: autoVaultedNames.length, names: autoVaultedNames.join(", ") })}
+            </span>
+          </div>
+        )}
+
+        {/* ── Tab bar ── */}
+        <div className="flex items-center px-3 pt-3 pb-0 shrink-0 gap-1">
+          <button
+            className={cn(
+              "px-3 py-1.5 text-[14px] tracking-[1.5px] font-heading rounded-t-md transition-colors cursor-pointer",
+              activeTab === "contexts"
+                ? "text-text-primary bg-[var(--color-hover)]"
+                : "text-text-secondary hover:text-text-primary",
+            )}
+            onClick={() => switchToContexts()}
+          >
+            {t("quickSwitcher.section.contexts")}
+          </button>
+          <button
+            className={cn(
+              "px-3 py-1.5 text-[14px] tracking-[1.5px] font-heading rounded-t-md transition-colors cursor-pointer flex items-center gap-1.5",
+              activeTab === "vault"
+                ? "text-text-primary bg-[var(--color-hover)]"
+                : "text-text-secondary hover:text-text-primary",
+            )}
+            onClick={() => switchToVault()}
+          >
+            {t("quickSwitcher.section.vault")}
+            {vaultEntries.length > 0 && (
+              <span className="text-[9px] text-text-secondary opacity-60">({vaultEntries.length})</span>
+            )}
+          </button>
+        </div>
+        <div className="h-px bg-border mx-3 shrink-0" />
+
+        {/* ── Body ── */}
+        <div className="flex flex-col min-h-0 h-[420px]">
           {showImportZone ? (
             /* ── Full-area import drop zone ── */
             <div className="flex-1 flex items-center justify-center p-6">
@@ -637,102 +745,75 @@ export function QuickSwitcher() {
                   {isDragging ? t("quickSwitcher.dropRelease") : t("quickSwitcher.dropZip")}
                 </span>
                 {importError && (
-                  <span className="text-[11px] font-mono text-red-400 max-w-[80%] text-center truncate">
+                  <span className="text-[12px] font-mono text-red-400 max-w-[80%] text-center truncate">
                     {t("quickSwitcher.importError")}: {importError}
                   </span>
                 )}
               </button>
             </div>
+          ) : activeTab === "contexts" ? (
+            /* ── Contexts tab: single scrollable list with sticky headers ── */
+            <div ref={listScrollRef} className="flex-1 overflow-y-auto">
+              {/* Active section */}
+              <div className="flex items-center justify-between px-3 pt-2.5 pb-1 sticky top-0 z-10 bg-bg-elevated">
+                <span className="text-[14px] font-bold text-text-secondary tracking-[2px] font-heading">
+                  {t("quickSwitcher.section.active")}
+                </span>
+                <span className="text-[9px] text-text-secondary opacity-50">{active.length}</span>
+              </div>
+              {active.map((ctx, i) => renderContextRow(ctx, i))}
+              {active.length === 0 && archived.length === 0 && (
+                <div className="px-3 py-6 text-center text-text-secondary text-[12px]">
+                  {t("quickSwitcher.empty")}
+                </div>
+              )}
+
+              {/* Archived section */}
+              <div className="flex items-center justify-between px-3 pt-2.5 pb-1 sticky top-0 z-10 bg-bg-elevated">
+                <span className="text-[14px] font-bold text-text-secondary tracking-[2px] font-heading">
+                  {t("quickSwitcher.section.archived")}
+                </span>
+                <span className="text-[9px] text-text-secondary opacity-50">{archived.length}</span>
+              </div>
+              {archived.map((ctx, i) => renderContextRow(ctx, active.length + i))}
+            </div>
           ) : (
-            <>
-              {/* ── Left pane: Active + Archived ── */}
-              <div className={cn(
-                "w-[70%] flex flex-col min-h-0 border-r border-border transition-opacity",
-                inVaultMode && "opacity-20 pointer-events-none",
-              )}>
-                {/* Active area (flex 7) */}
-                <div className="flex-[7] flex flex-col min-h-0 overflow-hidden">
-                  <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
-                    <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
-                      {t("quickSwitcher.section.active")}
-                    </span>
-                    <span className="text-[10px] text-text-secondary opacity-50">{active.length}</span>
-                  </div>
-                  <div ref={activeScrollRef} className="flex-1 overflow-y-auto">
-                    {active.map((ctx, i) => renderLeftRow(ctx, i))}
-                    {active.length === 0 && archived.length === 0 && (
-                      <div className="px-3 py-6 text-center text-text-secondary text-[11px]">
-                        {t("quickSwitcher.empty")}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Archived area (flex 3) */}
-                <div className="flex-[3] flex flex-col min-h-0 overflow-hidden border-t border-border">
-                  <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
-                    <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
-                      {t("quickSwitcher.section.archived")}
-                    </span>
-                    <span className="text-[10px] text-text-secondary opacity-50">{archived.length}</span>
-                  </div>
-                  <div ref={archivedScrollRef} className="flex-1 overflow-y-auto">
-                    {archived.map((ctx, i) => renderLeftRow(ctx, active.length + i))}
-                  </div>
-                </div>
+            /* ── Vault tab: search + list ── */
+            <div className="flex flex-col min-h-0 flex-1">
+              {/* Vault search */}
+              <div className="flex items-center mx-3 my-2 bg-bg-card rounded-md px-2 h-7 border border-text-secondary/30 shrink-0">
+                <span className="text-[9px] text-text-secondary opacity-40 mr-1.5 shrink-0">{"\u2315"}</span>
+                <input
+                  ref={vaultInputRef}
+                  value={vaultSearch}
+                  onChange={(e) => setVaultSearch(e.target.value)}
+                  onFocus={() => {
+                    if (activeTab !== "vault") {
+                      setActiveTab("vault");
+                      setSelectedIndex(0);
+                    }
+                  }}
+                  placeholder={t("quickSwitcher.vaultSearch")}
+                  className="flex-1 bg-transparent text-[12px] text-text-primary placeholder:text-text-secondary/35 outline-none font-mono min-w-0"
+                />
+                <span className="text-[9px] text-text-secondary opacity-30 bg-bg-elevated px-1 py-0.5 rounded-sm shrink-0">esc</span>
               </div>
 
-              {/* ── Right pane: Vault ── */}
-              <div className="w-[30%] flex flex-col min-h-0">
-                <div className="flex items-center justify-between px-3 pt-2.5 pb-1 shrink-0">
-                  <span className="text-[10px] font-bold text-text-secondary tracking-[2px] font-mono">
-                    {t("quickSwitcher.section.vault")}
-                  </span>
-                  <span className="text-[10px] text-text-secondary opacity-50">
-                    {vaultSearch ? `${filteredVault.length} / ${vaultEntries.length}` : vaultEntries.length}
-                  </span>
-                </div>
-
-                {/* Vault search */}
-                <div className={cn(
-                  "flex items-center mx-2 mb-1.5 bg-bg-card rounded-md px-2 h-7 border border-transparent transition-colors shrink-0",
-                  inVaultMode && "border-text-secondary/30",
-                )}>
-                  <span className="text-[10px] text-text-secondary opacity-40 mr-1.5 shrink-0">{"\u2315"}</span>
-                  <input
-                    ref={vaultInputRef}
-                    value={vaultSearch}
-                    onChange={(e) => setVaultSearch(e.target.value)}
-                    onFocus={() => {
-                      if (focusPane !== "vault") {
-                        setFocusPane("vault");
-                        setSelectedIndex(0);
-                      }
-                    }}
-                    placeholder={t("quickSwitcher.vaultSearch")}
-                    className="flex-1 bg-transparent text-[10px] text-text-primary placeholder:text-text-secondary/35 outline-none font-mono min-w-0"
-                  />
-                  <span className="text-[8px] text-text-secondary opacity-30 bg-bg-elevated px-1 py-0.5 rounded-sm shrink-0">
-                    {inVaultMode ? "esc" : "/"}
-                  </span>
-                </div>
-
-                {/* Vault list */}
-                <div ref={vaultScrollRef} className="flex-1 overflow-y-auto">
-                  {filteredVault.map((entry) => renderVaultRow(entry))}
-                  {filteredVault.length === 0 && vaultEntries.length > 0 && (
-                    <div className="px-3 py-4 text-center text-text-secondary text-[11px]">
-                      {t("quickSwitcher.noMatch")}
-                    </div>
-                  )}
-                  {vaultEntries.length === 0 && (
-                    <div className="px-3 py-4 text-center text-text-secondary/50 text-[10px]">
-                      {t("quickSwitcher.vaultEmpty")}
-                    </div>
-                  )}
-                </div>
+              {/* Vault list */}
+              <div ref={vaultScrollRef} className="flex-1 overflow-y-auto">
+                {filteredVault.map((entry, i) => renderVaultRow(entry, i))}
+                {filteredVault.length === 0 && vaultEntries.length > 0 && (
+                  <div className="px-3 py-4 text-center text-text-secondary text-[12px]">
+                    {t("quickSwitcher.noMatch")}
+                  </div>
+                )}
+                {vaultEntries.length === 0 && (
+                  <div className="px-3 py-4 text-center text-text-secondary/50 text-[9px]">
+                    {t("quickSwitcher.vaultEmpty")}
+                  </div>
+                )}
               </div>
-            </>
+            </div>
           )}
         </div>
 
@@ -741,7 +822,7 @@ export function QuickSwitcher() {
           <div className="flex items-center gap-1.5">
             <button
               onClick={handleCreate}
-              className="px-3 py-1.5 text-[11px] font-bold text-white bg-accent-primary rounded-md font-mono cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-1.5 text-[12px] font-bold text-white bg-accent-primary rounded-md font-mono cursor-pointer flex items-center gap-1.5"
             >
               {t("quickSwitcher.button.new")}
               <span className="text-[9px] opacity-70">{modSymbol}N</span>
@@ -749,7 +830,7 @@ export function QuickSwitcher() {
             <button
               onClick={() => setShowImportZone(!showImportZone)}
               className={cn(
-                "px-2.5 py-1.5 text-[11px] font-bold rounded-md font-mono cursor-pointer flex items-center gap-1 transition-all",
+                "px-2.5 py-1.5 text-[12px] font-bold rounded-md font-mono cursor-pointer flex items-center gap-1 transition-all",
                 showImportZone
                   ? "bg-text-secondary/20 text-text-primary"
                   : "bg-bg-elevated text-text-secondary hover:text-text-primary",
@@ -762,60 +843,58 @@ export function QuickSwitcher() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            {inVaultMode ? (
+            <span className="text-[9px] text-text-secondary opacity-40">
+              <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[9px] font-mono mr-0.5">j</kbd>
+              <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[9px] font-mono mr-1">k</kbd>
+              {t("quickSwitcher.hint.nav")}
+            </span>
+            <span className="text-[9px] text-text-secondary opacity-40">
+              <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[9px] font-mono mr-0.5">h</kbd>
+              <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[9px] font-mono mr-1">l</kbd>
+              {t("quickSwitcher.hint.tab")}
+            </span>
+            {!inVaultMode && (
               <span className="text-[9px] text-text-secondary opacity-40">
-                <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">esc</kbd>
-                {t("quickSwitcher.hint.clear")}
+                <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[9px] font-mono mr-1">.</kbd>
+                {t("quickSwitcher.hint.actions")}
               </span>
-            ) : (
-              <>
-                <span className="text-[9px] text-text-secondary opacity-40">
-                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-0.5">j</kbd>
-                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">k</kbd>
-                  {t("quickSwitcher.hint.nav")}
-                </span>
-                <span className="text-[9px] text-text-secondary opacity-40">
-                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">/</kbd>
-                  {t("quickSwitcher.hint.vaultSearch")}
-                </span>
-                <span className="text-[9px] text-text-secondary opacity-40">
-                  <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[8px] font-mono mr-1">esc</kbd>
-                  {t("quickSwitcher.hint.close")}
-                </span>
-              </>
             )}
+            <span className="text-[9px] text-text-secondary opacity-40">
+              <kbd className="bg-bg-elevated px-1 py-0.5 rounded-sm text-[9px] font-mono mr-1">esc</kbd>
+              {inVaultMode ? t("quickSwitcher.hint.clear") : t("quickSwitcher.hint.close")}
+            </span>
           </div>
 
           {/* Help button */}
           <div className="group/help relative shrink-0">
-            <button className="w-5 h-5 rounded-full border border-border text-text-secondary text-[10px] font-bold flex items-center justify-center opacity-40 hover:opacity-100 hover:border-text-secondary transition-all cursor-pointer">
+            <button className="w-5 h-5 rounded-full border border-border text-text-secondary text-[9px] font-bold flex items-center justify-center opacity-40 hover:opacity-100 hover:border-text-secondary transition-all cursor-pointer">
               ?
             </button>
             <div className="hidden group-hover/help:block absolute bottom-[calc(100%+8px)] right-0 w-[260px] bg-bg-card border border-border rounded-xl p-3 shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-10">
               <div className="mb-2.5">
-                <div className="text-[9px] font-bold tracking-[1.5px] text-text-secondary mb-0.5">
+                <div className="text-[9px] font-bold tracking-[1.5px] text-text-secondary mb-0.5 font-heading">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent-primary mr-1.5 align-middle relative -top-px" />
                   ACTIVE
                 </div>
-                <div className="text-[10px] leading-relaxed text-text-secondary/80">
+                <div className="text-[9px] leading-relaxed text-text-secondary/80">
                   {t("quickSwitcher.help.active")}
                 </div>
               </div>
               <div className="mb-2.5">
-                <div className="text-[9px] font-bold tracking-[1.5px] text-text-secondary mb-0.5">
+                <div className="text-[9px] font-bold tracking-[1.5px] text-text-secondary mb-0.5 font-heading">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-text-secondary mr-1.5 align-middle relative -top-px" />
                   ARCHIVED
                 </div>
-                <div className="text-[10px] leading-relaxed text-text-secondary/80">
+                <div className="text-[9px] leading-relaxed text-text-secondary/80">
                   {t("quickSwitcher.help.archived")}
                 </div>
               </div>
               <div>
-                <div className="text-[9px] font-bold tracking-[1.5px] text-text-secondary mb-0.5">
+                <div className="text-[9px] font-bold tracking-[1.5px] text-text-secondary mb-0.5 font-heading">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-text-secondary/50 mr-1.5 align-middle relative -top-px" />
                   VAULT
                 </div>
-                <div className="text-[10px] leading-relaxed text-text-secondary/80">
+                <div className="text-[9px] leading-relaxed text-text-secondary/80">
                   {t("quickSwitcher.help.vault")}
                 </div>
               </div>
