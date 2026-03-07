@@ -37,12 +37,17 @@ fn main() {
         .build()
         .expect("Failed to build HTTP client");
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_nspanel::init())
-        .manage(AppState {
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_nspanel::init());
+    }
+
+    builder.manage(AppState {
             db: Mutex::new(conn),
             http_client,
         })
