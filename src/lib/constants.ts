@@ -31,6 +31,7 @@ export const IpcCmd = {
   UPDATE_NODE: "update_node",
   DELETE_NODE: "delete_node",
   MOVE_NODE: "move_node",
+  WRITE_FILE_BYTES: "write_file_bytes",
   READ_FILE_BYTES: "read_file_bytes",
   SAVE_CLIPBOARD_IMAGE: "save_clipboard_image",
   IMPORT_IMAGE: "import_image",

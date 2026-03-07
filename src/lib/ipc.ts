@@ -47,6 +47,9 @@ export const ipc = {
   updateNode: (id: string, updates: { title?: string; content?: string; nodeType?: string; filePath?: string }) =>
     safeInvoke<void>(IpcCmd.UPDATE_NODE, { id, ...updates }),
 
+  writeFileBytes: (filePath: string, data: number[]) =>
+    safeInvoke<void>(IpcCmd.WRITE_FILE_BYTES, { filePath, data }),
+
   readFileBytes: (filePath: string) =>
     safeInvoke<number[]>(IpcCmd.READ_FILE_BYTES, { filePath }),
 

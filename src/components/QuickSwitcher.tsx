@@ -9,6 +9,8 @@ import { ContextStates } from "../lib/constants";
 import { cn } from "../lib/cn";
 import { ipc } from "../lib/ipc";
 import { isModKey, modSymbol } from "../lib/platform";
+import { exportTreeAsPng } from "../lib/exportPng";
+
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -297,6 +299,24 @@ export function QuickSwitcher() {
     await restoreFromVault(entry.id);
   };
 
+  const handleExportPng = async (e: React.MouseEvent, ctx: ContextSummary) => {
+    e.stopPropagation();
+    setMenuOpenId(null);
+    if (ctx.id !== currentContextId) {
+      await switchContext(ctx.id);
+    }
+    closeQuickSwitcher();
+    // Wait for tree to render after switcher closes
+    await new Promise((r) => setTimeout(r, 150));
+    const el = document.getElementById("tree-canvas");
+    if (!el) return;
+    try {
+      await exportTreeAsPng(el, ctx.name);
+    } catch (err) {
+      console.error("[export-png] Failed:", err);
+    }
+  };
+
   const handleExport = async (e: React.MouseEvent, ctx: ContextSummary) => {
     e.stopPropagation();
     setMenuOpenId(null);
@@ -487,6 +507,13 @@ export function QuickSwitcher() {
               ref={menuRef}
               className="absolute right-0 top-full mt-1 z-50 min-w-[140px] bg-bg-elevated border border-border rounded-lg py-1 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
             >
+              <button
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-colors cursor-pointer"
+                onClick={(e) => handleExportPng(e, ctx)}
+              >
+                <IcoExport />
+                {t("quickSwitcher.button.exportPng")}
+              </button>
               <button
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-[var(--color-hover)] hover:text-text-primary transition-colors cursor-pointer"
                 onClick={(e) => handleExport(e, ctx)}

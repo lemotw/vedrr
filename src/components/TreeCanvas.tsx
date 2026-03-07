@@ -448,7 +448,7 @@ export function TreeCanvas() {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="p-8 pl-15 overflow-auto h-full">
+        <div id="tree-canvas" className="p-8 pl-15 overflow-auto h-full">
           <TreeBranch data={tree} isRoot compactNodeIds={compactNodeIds} />
         </div>
         <DragOverlay dropAnimation={null}>

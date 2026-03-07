@@ -37,6 +37,7 @@
       "restore": "Restore",
       "vault": "Vault",
       "import": "匯入",
+      "exportPng": "匯出 PNG",
       "export": "匯出 ZIP",
       "more": "更多操作",
       "exporting": "匯出中...",

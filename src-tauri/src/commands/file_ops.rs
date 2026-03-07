@@ -14,6 +14,12 @@ pub fn md_file_path(context_id: &str, node_id: &str) -> Result<std::path::PathBu
 }
 
 #[tauri::command]
+pub fn write_file_bytes(file_path: String, data: Vec<u8>) -> Result<(), AppError> {
+    std::fs::write(&file_path, &data)?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn read_file_bytes(file_path: String) -> Result<Vec<u8>, AppError> {
     Ok(std::fs::read(&file_path)?)
 }

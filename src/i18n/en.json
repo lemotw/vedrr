@@ -37,6 +37,7 @@
       "restore": "Restore",
       "vault": "Vault",
       "import": "Import",
+      "exportPng": "Export PNG",
       "export": "Export ZIP",
       "more": "More actions",
       "exporting": "Exporting...",
