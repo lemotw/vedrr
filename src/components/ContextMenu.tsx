@@ -19,7 +19,15 @@ interface MenuItem {
   disabled?: boolean;
 }
 
-type MenuEntry = MenuItem | "separator";
+interface GroupHeader {
+  group: string;
+}
+
+type MenuEntry = MenuItem | "separator" | GroupHeader;
+
+function isGroup(e: MenuEntry): e is GroupHeader {
+  return typeof e === "object" && "group" in e;
+}
 
 const NBSP = "\u00A0";
 
@@ -74,6 +82,7 @@ export function ContextMenu() {
   };
 
   const items: MenuEntry[] = [
+    { group: "EDIT" },
     {
       key: "edit",
       label: t("contextMenu.edit"),
@@ -105,13 +114,13 @@ export function ContextMenu() {
       key: "copyMarkdown",
       label: t("contextMenu.copyMarkdown"),
       shortcut: "",
-      icon: "📋",
+      icon: "≡",
       action: () => exec(() => {
         const subtree = findNode(tree, contextMenuNodeId);
         if (subtree) copyTreeToClipboard(subtree);
       }),
     },
-    "separator",
+    { group: "STRUCTURE" },
     {
       key: "addChild",
       label: t("contextMenu.addChild"),
@@ -128,7 +137,7 @@ export function ContextMenu() {
       action: () => exec(() => addSibling(contextMenuNodeId, currentContextId)),
       disabled: isRoot || compactLocked,
     },
-    "separator",
+    { group: "CLIPBOARD" },
     {
       key: "copy",
       label: t("contextMenu.copy"),
@@ -161,7 +170,7 @@ export function ContextMenu() {
       action: () => exec(() => pasteNodeUnder(contextMenuNodeId, currentContextId)),
       disabled: !copiedNodeId || compactLocked,
     },
-    "separator",
+    { group: "MOVE" },
     {
       key: "moveUp",
       label: t("contextMenu.moveUp"),
@@ -178,11 +187,12 @@ export function ContextMenu() {
       action: () => exec(() => reorderNode(contextMenuNodeId, "down", currentContextId)),
       disabled: isRoot || compactLocked,
     },
+    { group: "AI" },
     {
       key: "aiCompact",
       label: t("contextMenu.aiCompact"),
       shortcut: "",
-      icon: "⚡",
+      icon: "✦",
       action: () => exec(() => useTreeStore.getState().triggerCompact(contextMenuNodeId)),
     },
     "separator",
@@ -199,23 +209,32 @@ export function ContextMenu() {
 
   // Filter out items based on root context
   const filtered = items.filter((item) => {
-    if (item === "separator") return true;
+    if (item === "separator" || isGroup(item)) return true;
     if (isRoot && ["addSibling", "copy", "cut", "moveUp", "moveDown", "delete"].includes(item.key)) return false;
     return true;
   });
 
-  // Remove consecutive separators and leading/trailing separators
+  // Remove empty groups (group header followed by another group/separator/end)
   const cleaned: MenuEntry[] = [];
-  for (const entry of filtered) {
+  for (let i = 0; i < filtered.length; i++) {
+    const entry = filtered[i];
     if (entry === "separator") {
       if (cleaned.length === 0) continue;
-      if (cleaned[cleaned.length - 1] === "separator") continue;
+      const last = cleaned[cleaned.length - 1];
+      if (last === "separator" || isGroup(last)) continue;
+      cleaned.push(entry);
+    } else if (isGroup(entry)) {
+      // Skip group if next entry is not a menu item
+      const next = filtered[i + 1];
+      if (!next || next === "separator" || isGroup(next)) continue;
+      // Replace trailing separator with group header
+      if (cleaned.length > 0 && cleaned[cleaned.length - 1] === "separator") cleaned.pop();
       cleaned.push(entry);
     } else {
       cleaned.push(entry);
     }
   }
-  if (cleaned[cleaned.length - 1] === "separator") cleaned.pop();
+  if (cleaned.length > 0 && (cleaned[cleaned.length - 1] === "separator" || isGroup(cleaned[cleaned.length - 1]))) cleaned.pop();
 
   return (
     <div className="fixed inset-0 z-50" onClick={closeContextMenu} onContextMenu={(e) => { e.preventDefault(); closeContextMenu(); }}>
@@ -233,12 +252,16 @@ export function ContextMenu() {
         {cleaned.map((item, i) =>
           item === "separator" ? (
             <div key={`sep-${i}`} className="h-px bg-border my-1 mx-2" />
+          ) : isGroup(item) ? (
+            <div key={`grp-${item.group}`} className={cn("px-3 pt-2.5 pb-1 text-[9px] font-mono font-bold tracking-[0.12em] text-text-secondary/50 select-none", i > 0 && "border-t border-border mt-1")}>
+              {item.group}
+            </div>
           ) : (
             <button
               key={item.key}
               className={cn(
                 "flex items-center w-full px-3 py-1.5 text-left gap-3 transition-colors cursor-pointer",
-                item.disabled ? "opacity-40 pointer-events-none" : "hover:bg-[var(--color-hover)]",
+                item.disabled ? "opacity-50 pointer-events-none cursor-not-allowed" : "hover:bg-[var(--color-hover)]",
                 item.danger ? "text-[#FF4444]" : "text-text-primary",
               )}
               onClick={item.action}
@@ -246,9 +269,16 @@ export function ContextMenu() {
             >
               <span className="w-4 text-center text-[12px] shrink-0 font-mono">{item.icon}</span>
               <span className="flex-1 text-[12px] font-mono font-medium">{item.label}</span>
-              <span className={cn("text-[11px] font-mono", item.danger ? "text-[#FF444488]" : "text-text-secondary")}>
-                {item.shortcut}
-              </span>
+              {item.shortcut && (
+                <span className={cn(
+                  "text-[10px] font-mono px-1.5 py-0.5 rounded",
+                  item.danger
+                    ? "text-[#FF444488] bg-[#FF444410]"
+                    : "text-text-secondary bg-bg-page/60",
+                )}>
+                  {item.shortcut}
+                </span>
+              )}
             </button>
           ),
         )}

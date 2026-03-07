@@ -189,7 +189,7 @@ export default function InboxTriage() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay" onClick={close}>
       <div
-        className="w-[500px] max-h-[80vh] rounded-2xl bg-bg-page border border-border flex flex-col overflow-hidden shadow-2xl"
+        className="w-[500px] max-h-[80vh] rounded-2xl bg-bg-elevated border border-border flex flex-col overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
