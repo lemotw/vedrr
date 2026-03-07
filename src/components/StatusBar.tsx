@@ -2,21 +2,51 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useContextStore } from "../stores/contextStore";
 import { useUIStore } from "../stores/uiStore";
-import { ContextStates, CompactStates } from "../lib/constants";
+import { CompactStates } from "../lib/constants";
 import { modSymbol } from "../lib/platform";
 import type { ModelStatus } from "../lib/types";
 import { ipc } from "../lib/ipc";
 
+function HintButton({
+  label,
+  shortcut,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  shortcut?: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`font-mono text-[11px] transition-colors ${
+        disabled
+          ? "text-text-secondary/40 cursor-not-allowed"
+          : "text-text-secondary cursor-pointer hover:text-text-primary"
+      }`}
+    >
+      {shortcut && <><span className={disabled ? "text-text-secondary/40" : "text-text-primary"}>{shortcut}</span>{" "}</>}{label}
+    </button>
+  );
+}
+
 export function StatusBar() {
   const { t } = useTranslation();
   const { contexts, currentContextId } = useContextStore();
-  const { openQuickSwitcher, openSettings } = useUIStore();
+  const { openQuickSwitcher, openSettings, openInboxTriage } = useUIStore();
   const compactState = useUIStore((s) => s.compactState);
 
   const current = contexts.find((c) => c.id === currentContextId);
-  const activeCount = contexts.filter((c) => c.state === ContextStates.ACTIVE).length;
 
   const locked = compactState !== CompactStates.IDLE;
+
+  const guardedAction = (action: () => void) => () => {
+    if (locked) { useUIStore.getState().flashCompactBanner(); return; }
+    action();
+  };
 
   // Poll model setup status — stop once ready or error
   const [modelStatus, setModelStatus] = useState<ModelStatus>({ status: "not_ready", progress: 0, queue_done: 0, queue_total: 0 });
@@ -43,45 +73,20 @@ export function StatusBar() {
 
   return (
     <div className="flex items-center justify-between h-11 px-5 bg-bg-card shrink-0">
-      <div className="flex items-center gap-2.5">
-        <span className="font-heading text-sm font-bold text-text-primary">
-          {current?.name ?? t("statusBar.noContext")}
-        </span>
-        <span className="text-xs text-text-secondary">
-          {t("statusBar.activeCount", { count: activeCount })}
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
+      <span className="font-heading text-sm font-bold text-text-primary">
+        {current?.name ?? t("statusBar.noContext")}
+      </span>
+      <div className="flex items-center gap-4">
         {setupLabel && (
-          <div className="flex items-center gap-1.5 mr-1">
+          <div className="flex items-center gap-1.5">
             <div className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-accent-primary border-t-transparent" />
             <span className="font-mono text-[10px] text-text-secondary">{setupLabel}</span>
           </div>
         )}
-        <button
-          onClick={() => {
-            if (locked) { useUIStore.getState().flashCompactBanner(); return; }
-            openSettings();
-          }}
-          disabled={locked}
-          className={`px-2 py-1 text-xs rounded transition-colors ${locked ? "text-text-secondary/40 bg-bg-elevated/50 cursor-not-allowed" : "text-text-secondary bg-bg-elevated cursor-pointer hover:text-text-primary"}`}
-          title={t("statusBar.tooltip.settings")}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </button>
-        <button
-          onClick={() => {
-            if (locked) { useUIStore.getState().flashCompactBanner(); return; }
-            openQuickSwitcher();
-          }}
-          disabled={locked}
-          className={`px-2 py-1 text-xs rounded transition-colors ${locked ? "text-text-secondary/40 bg-bg-elevated/50 cursor-not-allowed" : "text-text-secondary bg-bg-elevated cursor-pointer hover:bg-bg-card"}`}
-        >
-          {modSymbol}K
-        </button>
+        <HintButton shortcut={`${modSymbol}I`} label="inbox" onClick={guardedAction(openInboxTriage)} disabled={locked} />
+        <HintButton shortcut={`${modSymbol}K`} label="switch" onClick={guardedAction(openQuickSwitcher)} disabled={locked} />
+        <span className="text-border">│</span>
+        <HintButton label="settings" onClick={guardedAction(openSettings)} disabled={locked} />
       </div>
     </div>
   );
