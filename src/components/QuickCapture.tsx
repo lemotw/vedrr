@@ -34,6 +34,7 @@ export function QuickCapture() {
 
   // Focus on show, hide on blur (click-outside)
   useEffect(() => {
+    let cancelled = false;
     let unlisten: (() => void) | null = null;
     appWindow.current.onFocusChanged(({ payload: focused }) => {
       if (focused) {
@@ -42,9 +43,12 @@ export function QuickCapture() {
       } else {
         appWindow.current.hide();
       }
-    }).then((fn) => { unlisten = fn; });
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
     requestAnimationFrame(() => inputRef.current?.focus());
-    return () => { unlisten?.(); };
+    return () => { cancelled = true; unlisten?.(); };
   }, []);
 
   // Clear timers on unmount

@@ -41,6 +41,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_nspanel::init())
         .manage(AppState {
             db: Mutex::new(conn),
             http_client,
@@ -66,10 +67,8 @@ fn main() {
                 }
             });
 
-            // Force QC webview background to fully transparent (WKWebView defaults to white)
-            if let Some(qc) = app.get_webview_window("quickcapture") {
-                let _ = qc.set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
-            }
+            // Convert QC window to non-activating NSPanel (must happen before shortcut registration)
+            commands::shortcuts::init_qc_panel(app.handle());
 
             // Register Quick Capture global shortcut
             {
