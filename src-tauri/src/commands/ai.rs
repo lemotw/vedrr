@@ -406,8 +406,8 @@ pub async fn list_models(
                 Ok((json, cached_at)) if is_cache_fresh(&cached_at) => {
                     match serde_json::from_str::<Vec<ModelInfo>>(&json) {
                         Ok(models) => Some(models),
-                        Err(e) => {
-                            debug_log!("[list_models] cache JSON corrupt for {provider}: {e}");
+                        Err(_e) => {
+                            debug_log!("[list_models] cache JSON corrupt for {provider}: {_e}");
                             None
                         }
                     }
@@ -434,11 +434,11 @@ pub async fn list_models(
     // 5. Cache result (fail-open: log error but still return models)
     if let Ok(json) = serde_json::to_string(&models) {
         let db = state.db.lock().unwrap();
-        if let Err(e) = db.execute(
+        if let Err(_e) = db.execute(
             "INSERT OR REPLACE INTO model_cache (provider, models_json, cached_at) VALUES (?1, ?2, datetime('now'))",
             rusqlite::params![provider, json],
         ) {
-            debug_log!("[list_models] cache write failed for {provider}: {e}");
+            debug_log!("[list_models] cache write failed for {provider}: {_e}");
         }
     }
 
