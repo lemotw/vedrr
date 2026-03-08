@@ -1,0 +1,30 @@
+name: Translation
+description: Contribute or request a new language translation
+labels: ["i18n"]
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - "I want to contribute a translation"
+        - "I'm requesting a translation for a language"
+    validations:
+      required: true
+
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      description: The language you're contributing or requesting.
+      placeholder: "e.g. Japanese (ja), Korean (ko), Spanish (es)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Any additional context (partial translation, dialect preferences, etc.)
+    validations:
+      required: false
