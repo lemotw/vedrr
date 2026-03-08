@@ -52,7 +52,7 @@
       "resources/models/**/*": "models/"
     },
     "category": "Productivity",
-    "shortDescription": "ADHD-friendly knowledge management",
+    "shortDescription": "Keyboard-first knowledge tree manager with vim navigation",
     "windows": {
       "nsis": {
         "installMode": "both",
