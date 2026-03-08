@@ -1,0 +1,251 @@
+{
+  "common": {
+    "untitled": "無題",
+    "button": {
+      "save": "保存",
+      "cancel": "キャンセル",
+      "create": "作成",
+      "delete": "削除",
+      "close": "閉じる",
+      "reset": "リセット"
+    },
+    "loading": "読み込み中..."
+  },
+  "statusBar": {
+    "noContext": "コンテキストなし",
+    "activeCount": "{{count}} 件アクティブ",
+    "tooltip": {
+      "settings": "設定"
+    },
+    "setup": {
+      "loading": "検索エンジンを読み込み中...",
+      "warming": "ノードをインデックス中...",
+      "warmingProgress": "ノードをインデックス中 ({{done}}/{{total}})..."
+    }
+  },
+  "quickSwitcher": {
+    "ariaLabel": "クイックスイッチャー",
+    "section": {
+      "active": "ACTIVE",
+      "archived": "ARCHIVED",
+      "vault": "VAULT",
+      "contexts": "CONTEXTS"
+    },
+    "button": {
+      "new": "+ New",
+      "archive": "Archive",
+      "delete": "Delete",
+      "restore": "Restore",
+      "vault": "Vault",
+      "import": "インポート",
+      "exportPng": "PNG エクスポート",
+      "export": "ZIP エクスポート",
+      "more": "その他の操作",
+      "exporting": "エクスポート中...",
+      "exportDone": "エクスポート完了",
+      "exportError": "エクスポート失敗"
+    },
+    "empty": "コンテキストがありません",
+    "noMatch": "一致なし",
+    "vaultEmpty": "Vault にアイテムがありません",
+    "dropZip": ".zip をドロップまたはクリック",
+    "dropRelease": "ドロップしてインポート",
+    "importError": "インポート失敗",
+    "vaultSearch": "検索...",
+    "defaultName": "新しいコンテキスト",
+    "hint": {
+      "nav": "移動",
+      "vaultSearch": "vault 検索",
+      "close": "閉じる",
+      "results": "結果",
+      "restoreAction": "復元",
+      "clear": "クリア",
+      "tab": "タブ切替",
+      "actions": "操作"
+    },
+    "help": {
+      "active": "使用中のマインドマップ。いつでも切り替えて編集できます。最終アクセス順に並びます。",
+      "archived": "一時保管のマインドマップ。メイン画面には表示されませんが、いつでも Active に復元できます。",
+      "vault": "長期保管のマインドマップ。データは完全に保持され、検索・復元が可能です。"
+    },
+    "autoVaulted": "{{count}} 件を自動で Vault に移動：{{names}}",
+    "confirm": {
+      "deleteTitle": "削除の確認",
+      "deleteMessage": "「{{name}}」を完全に削除しますか？この操作は元に戻せません。"
+    }
+  },
+  "contextMenu": {
+    "edit": "編集",
+    "changeType": "タイプ変更",
+    "expand": "展開",
+    "collapse": "折りたたむ",
+    "copyMarkdown": "Markdown としてコピー",
+    "addChild": "子ノードを追加",
+    "addSibling": "兄弟ノードを追加",
+    "copy": "コピー",
+    "cut": "切り取り",
+    "paste": "貼り付け",
+    "moveUp": "上に移動",
+    "moveDown": "下に移動",
+    "aiCompact": "AI 再構成",
+    "delete": "削除"
+  },
+  "nodeCard": {
+    "tooltip": {
+      "changeType": "タイプ変更 (T)",
+      "revealFile": "Finder で表示 (O)",
+      "attachFile": "ファイルを添付 (O)",
+      "chooseImage": "画像を選択",
+      "openInBrowser": "ブラウザで開く"
+    },
+    "button": {
+      "open": "open",
+      "attach": "attach",
+      "pick": "pick"
+    }
+  },
+  "treeCanvas": {
+    "tooltip": {
+      "addChild": "子ノードを追加 (Tab)",
+      "addSibling": "兄弟ノードを追加 (Shift+Tab)",
+      "expand": "展開 (z)"
+    },
+    "empty": "{{key}} を押してコンテキストを作成・切替"
+  },
+  "nodeTypePopover": {
+    "title": "タイプ変更",
+    "hint": {
+      "switch": "切替",
+      "nav": "移動"
+    }
+  },
+  "quickCapture": {
+    "placeholder": "アイデアをすばやくメモ...",
+    "submit": "送信",
+    "enterAgain": "もう一度 Enter で送信"
+  },
+  "markdownEditor": {
+    "placeholder": "書き始める..."
+  },
+  "theme": {
+    "custom": "カスタム"
+  },
+  "nodeSearch": {
+    "placeholder": "すべてのコンテキストをセマンティック検索...",
+    "empty": "一致するノードがありません",
+    "loading": "検索中...",
+    "modelLoading": "検索エンジンを準備中..."
+  },
+  "settings": {
+    "title": "設定",
+    "tab": {
+      "general": "一般",
+      "ai": "AI",
+      "search": "検索",
+      "theme": "テーマ"
+    },
+    "general": {
+      "language": "言語",
+      "restartHint": "言語切替後、完全に反映するには再起動が必要な場合があります。",
+      "quickCaptureShortcut": "Quick Capture ショートカット",
+      "pressShortcut": "ショートカットを入力...",
+      "shortcutHint": "新しいグローバルショートカットを適用するにはアプリの再起動が必要です"
+    },
+    "ai": {
+      "apiKeys": "API Keys",
+      "profiles": "Profiles",
+      "systemPrompt": "System Prompt (Dev)",
+      "search": "検索"
+    },
+    "searchSettings": {
+      "modeTitle": "検索モード",
+      "modeText": "テキスト検索",
+      "modeSemantic": "セマンティック検索",
+      "modeDescText": "キーワードを照合します。高速です。",
+      "modeDescSemantic": "概念の意味を理解し、関連ノードを検出します。",
+      "semanticTitle": "セマンティック検索設定",
+      "formulaTitle": "スコア計算式",
+      "formulaLine1": "final = \u03b1 \u00d7 content + (1-\u03b1) \u00d7 path",
+      "formulaLine2": "content = cosine(query, node title)",
+      "formulaLine3": "path = cosine(query, ancestor chain)",
+      "alphaLabel": "Content 重み (\u03b1)",
+      "alphaHintLeft": "\u2190 構造を重視",
+      "alphaHintRight": "タイトルを重視 \u2192",
+      "minScoreLabel": "最低スコア閾値",
+      "minScoreDesc": "このスコア以下の結果は返されません。",
+      "displayLabel": "表示閾値",
+      "displayDesc": "このスコア以下の結果はグレー表示されます。",
+      "reset": "デフォルトにリセット"
+    }
+  },
+  "compactBanner": {
+    "summary": "AI が {{total}} 個のノードを再構成 — {{details}}",
+    "change": {
+      "added": "追加",
+      "edited": "編集",
+      "moved": "移動",
+      "editedMoved": "編集+移動",
+      "deleted": "削除"
+    },
+    "button": {
+      "undo": "元に戻す",
+      "expand": "詳細を表示",
+      "collapse": "折りたたむ",
+      "accept": "確定"
+    },
+    "detail": {
+      "title": "「{{title}}」",
+      "renamed": "「{{old}}」→「{{new}}」",
+      "movedFrom": "（「{{parent}}」から移動）"
+    }
+  },
+  "compactError": {
+    "title": "AI Compact エラー",
+    "loading": "AI がノートを再構成中..."
+  },
+  "aiSettings": {
+    "footer": "まず API Key を追加し、次に Profile を作成して AI Compact で使用します。",
+    "keys": {
+      "empty": "API Key がありません。",
+      "placeholder": {
+        "name": "Key 名 (例: Work Anthropic)",
+        "secret": "API key を貼り付け"
+      },
+      "button": {
+        "add": "+ Add Key"
+      },
+      "tooltip": {
+        "delete": "Key を削除"
+      }
+    },
+    "profiles": {
+      "empty": "Profile がありません。",
+      "placeholder": {
+        "name": "Profile 名"
+      },
+      "select": {
+        "key": "API Key を選択...",
+        "model": {
+          "placeholder": "まず Key を選択",
+          "loading": "モデルを読み込み中...",
+          "empty": "モデルが見つかりません"
+        }
+      },
+      "noKey": "Key なし",
+      "active": "ACTIVE",
+      "button": {
+        "add": "+ Add Profile"
+      },
+      "tooltip": {
+        "delete": "Profile を削除"
+      },
+      "error": {
+        "loadModels": "モデルの読み込みに失敗しました。API key を確認してください。",
+        "create": "Profile の作成に失敗しました。もう一度お試しください。"
+      }
+    },
+    "systemPrompt": {
+      "placeholder": "読み込み中..."
+    }
+  }
+}

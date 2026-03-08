@@ -18,14 +18,19 @@ const TABS: { id: SettingsTab; labelKey: string }[] = [
 ];
 
 const LOCALES = [
-  { id: "zh-TW", label: "繁體中文" },
   { id: "en", label: "English" },
+  { id: "zh-TW", label: "繁體中文" },
+  { id: "zh-CN", label: "简体中文" },
+  { id: "ja", label: "日本語" },
 ];
 
 function detectLocale(): string {
   const saved = localStorage.getItem("vedrr-locale");
   if (saved) return saved;
-  return navigator.language.startsWith("zh") ? "zh-TW" : "en";
+  if (navigator.language === "zh-CN" || navigator.language === "zh-SG") return "zh-CN";
+  if (navigator.language.startsWith("zh")) return "zh-TW";
+  if (navigator.language.startsWith("ja")) return "ja";
+  return "en";
 }
 
 // ── Shortcut Recorder ───────────────────────────────────

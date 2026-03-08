@@ -1,0 +1,251 @@
+{
+  "common": {
+    "untitled": "未命名",
+    "button": {
+      "save": "保存",
+      "cancel": "取消",
+      "create": "创建",
+      "delete": "删除",
+      "close": "关闭",
+      "reset": "重置"
+    },
+    "loading": "加载中..."
+  },
+  "statusBar": {
+    "noContext": "无 Context",
+    "activeCount": "{{count}} 个活跃",
+    "tooltip": {
+      "settings": "设置"
+    },
+    "setup": {
+      "loading": "加载搜索引擎...",
+      "warming": "建立节点索引...",
+      "warmingProgress": "建立节点索引 ({{done}}/{{total}})..."
+    }
+  },
+  "quickSwitcher": {
+    "ariaLabel": "快速切换",
+    "section": {
+      "active": "ACTIVE",
+      "archived": "ARCHIVED",
+      "vault": "VAULT",
+      "contexts": "CONTEXTS"
+    },
+    "button": {
+      "new": "+ New",
+      "archive": "Archive",
+      "delete": "Delete",
+      "restore": "Restore",
+      "vault": "Vault",
+      "import": "导入",
+      "exportPng": "导出 PNG",
+      "export": "导出 ZIP",
+      "more": "更多操作",
+      "exporting": "导出中...",
+      "exportDone": "导出完成",
+      "exportError": "导出失败"
+    },
+    "empty": "还没有 Context",
+    "noMatch": "找不到",
+    "vaultEmpty": "没有封存项目",
+    "dropZip": "拖放 .zip 或点击选择",
+    "dropRelease": "松开导入",
+    "importError": "导入失败",
+    "vaultSearch": "搜索...",
+    "defaultName": "新 Context",
+    "hint": {
+      "nav": "导航",
+      "vaultSearch": "vault 搜索",
+      "close": "关闭",
+      "results": "结果",
+      "restoreAction": "还原",
+      "clear": "清除",
+      "tab": "切换分页",
+      "actions": "操作"
+    },
+    "help": {
+      "active": "使用中的思维导图，可随时切换编辑。按最近访问时间排序。",
+      "archived": "暂时不用的思维导图。不会出现在主界面，但可以随时 restore 回 Active。",
+      "vault": "长期封存的思维导图。数据完整保留，不占用 Active 空间。需要时可搜索并 restore。"
+    },
+    "autoVaulted": "{{count}} 个已自动封存：{{names}}",
+    "confirm": {
+      "deleteTitle": "删除确认",
+      "deleteMessage": "确定要永久删除「{{name}}」？此操作无法撤销。"
+    }
+  },
+  "contextMenu": {
+    "edit": "编辑",
+    "changeType": "变更类型",
+    "expand": "展开",
+    "collapse": "收起",
+    "copyMarkdown": "复制为 Markdown",
+    "addChild": "新增子节点",
+    "addSibling": "新增同层节点",
+    "copy": "复制",
+    "cut": "剪切",
+    "paste": "粘贴",
+    "moveUp": "上移",
+    "moveDown": "下移",
+    "aiCompact": "AI 重组",
+    "delete": "删除"
+  },
+  "nodeCard": {
+    "tooltip": {
+      "changeType": "变更类型 (T)",
+      "revealFile": "在文件管理器中显示 (O)",
+      "attachFile": "附加文件 (O)",
+      "chooseImage": "选择图片",
+      "openInBrowser": "在浏览器中打开"
+    },
+    "button": {
+      "open": "open",
+      "attach": "attach",
+      "pick": "pick"
+    }
+  },
+  "treeCanvas": {
+    "tooltip": {
+      "addChild": "新增子节点 (Tab)",
+      "addSibling": "新增同层节点 (Shift+Tab)",
+      "expand": "展开 (z)"
+    },
+    "empty": "按 {{key}} 创建或切换 Context"
+  },
+  "nodeTypePopover": {
+    "title": "变更类型",
+    "hint": {
+      "switch": "切换",
+      "nav": "导航"
+    }
+  },
+  "quickCapture": {
+    "placeholder": "快速输入想法...",
+    "submit": "提交",
+    "enterAgain": "再按一次 Enter 提交"
+  },
+  "markdownEditor": {
+    "placeholder": "开始写作..."
+  },
+  "theme": {
+    "custom": "自定义"
+  },
+  "nodeSearch": {
+    "placeholder": "语义搜索所有 context...",
+    "empty": "找不到匹配的节点",
+    "loading": "搜索中...",
+    "modelLoading": "正在准备搜索引擎..."
+  },
+  "settings": {
+    "title": "设置",
+    "tab": {
+      "general": "通用",
+      "ai": "AI",
+      "search": "搜索",
+      "theme": "主题"
+    },
+    "general": {
+      "language": "语言",
+      "restartHint": "切换语言后可能需要重启以完整生效。",
+      "quickCaptureShortcut": "Quick Capture 快捷键",
+      "pressShortcut": "按下快捷键...",
+      "shortcutHint": "需要重启程序才会应用新的全局快捷键"
+    },
+    "ai": {
+      "apiKeys": "API Keys",
+      "profiles": "Profiles",
+      "systemPrompt": "System Prompt (Dev)",
+      "search": "搜索"
+    },
+    "searchSettings": {
+      "modeTitle": "搜索模式",
+      "modeText": "纯文本搜索",
+      "modeSemantic": "语义搜索",
+      "modeDescText": "匹配关键字，速度快。",
+      "modeDescSemantic": "理解概念语义，找到相关节点。",
+      "semanticTitle": "语义搜索设置",
+      "formulaTitle": "分数公式",
+      "formulaLine1": "final = \u03b1 \u00d7 content + (1-\u03b1) \u00d7 path",
+      "formulaLine2": "content = cosine(query, node title)",
+      "formulaLine3": "path = cosine(query, ancestor chain)",
+      "alphaLabel": "Content 权重 (\u03b1)",
+      "alphaHintLeft": "\u2190 偏重结构",
+      "alphaHintRight": "偏重标题 \u2192",
+      "minScoreLabel": "最低分数阈值",
+      "minScoreDesc": "低于此分数的结果不会返回。",
+      "displayLabel": "显示阈值",
+      "displayDesc": "低于此分数的结果会灰掉显示。",
+      "reset": "重置为默认值"
+    }
+  },
+  "compactBanner": {
+    "summary": "AI 重组了 {{total}} 个节点 — {{details}}",
+    "change": {
+      "added": "新增",
+      "edited": "编辑",
+      "moved": "移动",
+      "editedMoved": "编辑+移动",
+      "deleted": "删除"
+    },
+    "button": {
+      "undo": "撤销",
+      "expand": "展开详情",
+      "collapse": "收起",
+      "accept": "确认"
+    },
+    "detail": {
+      "title": "「{{title}}」",
+      "renamed": "「{{old}}」→「{{new}}」",
+      "movedFrom": "（从「{{parent}}」移出）"
+    }
+  },
+  "compactError": {
+    "title": "AI Compact 错误",
+    "loading": "AI 正在重组你的笔记..."
+  },
+  "aiSettings": {
+    "footer": "先添加 API Key，再创建 Profile 搭配 AI Compact 使用。",
+    "keys": {
+      "empty": "暂无 API Key。",
+      "placeholder": {
+        "name": "Key 名称 (例: Work Anthropic)",
+        "secret": "粘贴 API key"
+      },
+      "button": {
+        "add": "+ Add Key"
+      },
+      "tooltip": {
+        "delete": "删除 Key"
+      }
+    },
+    "profiles": {
+      "empty": "暂无 Profile。",
+      "placeholder": {
+        "name": "Profile 名称"
+      },
+      "select": {
+        "key": "选择 API Key...",
+        "model": {
+          "placeholder": "先选择 Key",
+          "loading": "加载模型中...",
+          "empty": "找不到模型"
+        }
+      },
+      "noKey": "无 Key",
+      "active": "ACTIVE",
+      "button": {
+        "add": "+ Add Profile"
+      },
+      "tooltip": {
+        "delete": "删除 Profile"
+      },
+      "error": {
+        "loadModels": "加载模型失败，请确认 API key 是否正确。",
+        "create": "创建 Profile 失败，请重试。"
+      }
+    },
+    "systemPrompt": {
+      "placeholder": "加载中..."
+    }
+  }
+}
