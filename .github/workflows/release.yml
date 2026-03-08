@@ -106,6 +106,7 @@ jobs:
           "
 
       - uses: tauri-apps/tauri-action@v0
+        id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_APP_VERSION: ${{ github.ref_name }}
@@ -116,3 +117,23 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      # Upload version-free copies so /releases/latest/download/{name} always works
+      - name: Upload stable download links
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          artifacts='${{ steps.tauri.outputs.artifactPaths }}'
+          for file in $(echo "$artifacts" | tr -d '[]"' | tr ',' '\n'); do
+            [ -f "$file" ] || continue
+            basename=$(basename "$file")
+            # Strip version pattern: vedrr_0.1.0_aarch64.dmg -> vedrr_aarch64.dmg
+            stable=$(echo "$basename" | sed -E 's/_[0-9]+\.[0-9]+\.[0-9]+//')
+            if [ "$stable" != "$basename" ]; then
+              cp "$file" "/tmp/$stable"
+              gh release upload "$TAG" "/tmp/$stable" --clobber
+              echo "Uploaded stable link: $stable"
+            fi
+          done
