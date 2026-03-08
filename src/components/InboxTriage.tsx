@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useUIStore } from "../stores/uiStore";
+import { useTreeStore } from "../stores/treeStore";
+import { useContextStore } from "../stores/contextStore";
 import { ipc } from "../lib/ipc";
 import type { InboxItem, InboxSuggestion, ContextSummary } from "../lib/types";
 
@@ -23,7 +25,8 @@ function timeAgo(dateStr: string): string {
 
 export default function InboxTriage() {
   const open = useUIStore((s) => s.inboxTriageOpen);
-  const close = useUIStore((s) => s.closeInboxTriage);
+  const rawClose = useUIStore((s) => s.closeInboxTriage);
+  const markDirty = useUIStore((s) => s.markInboxDirty);
 
   const [items, setItems] = useState<InboxItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -33,6 +36,14 @@ export default function InboxTriage() {
   const [loading, setLoading] = useState(false);
 
   const currentItem = items[currentIndex] ?? null;
+
+  const close = useCallback(() => {
+    if (useUIStore.getState().inboxTriageDirty) {
+      const ctxId = useContextStore.getState().currentContextId;
+      if (ctxId) useTreeStore.getState().loadTree(ctxId);
+    }
+    rawClose();
+  }, [rawClose]);
 
   // Build merged list: suggestions → divider → contexts
   const mergedList = useMemo<ListEntry[]>(() => {
@@ -94,6 +105,7 @@ export default function InboxTriage() {
       } else {
         await ipc.matchInboxToContext(currentItem.id, entry.data.id);
       }
+      markDirty();
       const remaining = items.filter((_, i) => i !== currentIndex);
       setItems(remaining);
       setCurrentIndex(Math.min(currentIndex, Math.max(remaining.length - 1, 0)));

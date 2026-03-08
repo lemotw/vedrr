@@ -56,8 +56,10 @@ interface UIStore {
   compactError: string | null;
   compactBannerFlash: number;
   inboxTriageOpen: boolean;
+  inboxTriageDirty: boolean;
   openInboxTriage: () => void;
   closeInboxTriage: () => void;
+  markInboxDirty: () => void;
   toggleQuickSwitcher: () => void;
   openQuickSwitcher: () => void;
   closeQuickSwitcher: () => void;
@@ -111,8 +113,10 @@ export const useUIStore = create<UIStore>((set) => ({
   compactError: null,
   compactBannerFlash: 0,
   inboxTriageOpen: false,
-  openInboxTriage: () => set({ inboxTriageOpen: true, quickSwitcherOpen: false, nodeSearchOpen: false, settingsOpen: false }),
-  closeInboxTriage: () => set({ inboxTriageOpen: false }),
+  inboxTriageDirty: false,
+  openInboxTriage: () => set({ inboxTriageOpen: true, inboxTriageDirty: false, quickSwitcherOpen: false, nodeSearchOpen: false, settingsOpen: false }),
+  closeInboxTriage: () => set({ inboxTriageOpen: false, inboxTriageDirty: false }),
+  markInboxDirty: () => set({ inboxTriageDirty: true }),
   toggleQuickSwitcher: () => set((s) => ({ quickSwitcherOpen: !s.quickSwitcherOpen, nodeSearchOpen: false })),
   openQuickSwitcher: () => set({ quickSwitcherOpen: true, nodeSearchOpen: false }),
   closeQuickSwitcher: () => set({ quickSwitcherOpen: false }),

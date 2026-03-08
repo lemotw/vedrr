@@ -50,6 +50,10 @@ export function useKeyboard() {
         if (isCompactBusy()) { useUIStore.getState().flashCompactBanner(); return; }
         const uiState = useUIStore.getState();
         if (uiState.inboxTriageOpen) {
+          if (uiState.inboxTriageDirty) {
+            const ctxId = useContextStore.getState().currentContextId;
+            if (ctxId) useTreeStore.getState().loadTree(ctxId);
+          }
           uiState.closeInboxTriage();
         } else {
           uiState.openInboxTriage();
