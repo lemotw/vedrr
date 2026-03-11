@@ -85,18 +85,16 @@ jobs:
               json.dump(conf, f, indent=2)
           "
 
+      # Build + sign only (no notarization — handled separately below)
       - uses: tauri-apps/tauri-action@v0
         id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_APP_VERSION: ${{ github.ref_name }}
-          # macOS code signing & notarization
+          # macOS code signing (no APPLE_ID/PASSWORD/TEAM_ID = skip notarization)
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'vedrr ${{ github.ref_name }}'
@@ -104,6 +102,45 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      # macOS: notarize DMG separately with retry (network can be flaky on runners)
+      - name: Notarize macOS DMG
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          artifacts='${{ steps.tauri.outputs.artifactPaths }}'
+          for file in $(echo "$artifacts" | tr -d '[]"' | tr ',' '\n'); do
+            [[ "$file" == *.dmg ]] || continue
+            [ -f "$file" ] || continue
+            echo "=== Notarizing: $file ==="
+
+            for attempt in 1 2 3; do
+              echo "Attempt $attempt/3..."
+              if xcrun notarytool submit "$file" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" \
+                --wait --timeout 15m; then
+                echo "Notarization succeeded!"
+                break
+              fi
+              if [ "$attempt" -lt 3 ]; then
+                echo "Attempt $attempt failed, retrying in 30s..."
+                sleep 30
+              else
+                echo "::error::Notarization failed after 3 attempts for $file"
+                exit 1
+              fi
+            done
+
+            echo "Stapling ticket to $file..."
+            xcrun stapler staple "$file"
+            echo "=== Done: $file ==="
+          done
 
       # Upload version-free copies so /releases/latest/download/{name} always works
       - name: Upload stable download links
@@ -123,4 +160,20 @@ jobs:
               gh release upload "$TAG" "/tmp/$stable" --clobber
               echo "Uploaded stable link: $stable"
             fi
+          done
+
+      # macOS: re-upload notarized DMG to release (replace the un-notarized version)
+      - name: Upload notarized DMG
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          artifacts='${{ steps.tauri.outputs.artifactPaths }}'
+          for file in $(echo "$artifacts" | tr -d '[]"' | tr ',' '\n'); do
+            [[ "$file" == *.dmg ]] || continue
+            [ -f "$file" ] || continue
+            gh release upload "$TAG" "$file" --clobber
+            echo "Uploaded notarized: $(basename "$file")"
           done
