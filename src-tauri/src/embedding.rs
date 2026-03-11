@@ -35,39 +35,6 @@ pub fn get_models_dir() -> PathBuf {
     dir
 }
 
-/// Copy bundled model from app resources to ~/vedrr/models/ if not already cached.
-/// In dev mode the bundled dir won't exist — silently skipped.
-pub fn bootstrap_bundled_model(resource_dir: &std::path::Path) {
-    if is_model_cached() {
-        return;
-    }
-    let source_dir = resource_dir.join("models").join(MODEL_CACHE_DIR_NAME);
-    if !source_dir.exists() {
-        // No bundled model (dev mode), will download at runtime
-        return;
-    }
-    let target_dir = get_models_dir().join(MODEL_CACHE_DIR_NAME);
-    eprintln!("[embedding] Copying bundled model to {}", target_dir.display());
-    if let Err(e) = copy_dir_recursive(&source_dir, &target_dir) {
-        eprintln!("[embedding] Failed to copy bundled model: {e}");
-    }
-}
-
-fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(dst)?;
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let src_path = entry.path();
-        let dst_path = dst.join(entry.file_name());
-        if src_path.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path)?;
-        } else {
-            std::fs::copy(&src_path, &dst_path)?;
-        }
-    }
-    Ok(())
-}
-
 /// Check if the model files are already cached on disk.
 pub fn is_model_cached() -> bool {
     let cache_dir = get_models_dir();

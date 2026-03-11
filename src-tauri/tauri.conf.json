@@ -48,9 +48,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": {
-      "resources/models/**/*": "models/"
-    },
+    "resources": {},
     "category": "Productivity",
     "shortDescription": "Keyboard-first knowledge tree manager with vim navigation",
     "windows": {

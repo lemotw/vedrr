@@ -49,6 +49,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - uses: actions/setup-python@v5
+        if: matrix.platform == 'windows-latest'
         with:
           python-version: '3.x'
 
@@ -57,27 +58,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: Cache embedding model
-        uses: actions/cache@v4
-        id: model-cache
-        with:
-          path: src-tauri/resources/models
-          key: embedding-model-multilingual-e5-small-v1
-
-      - name: Download embedding model
-        if: steps.model-cache.outputs.cache-hit != 'true'
-        shell: bash
-        run: |
-          pip install huggingface-hub
-          python -c "
-          from huggingface_hub import snapshot_download
-          snapshot_download(
-              'intfloat/multilingual-e5-small',
-              cache_dir='src-tauri/resources/models',
-              ignore_patterns=['*.safetensors', '*.bin', '*.h5', '*.pt', '*.ot']
-          )
-          "
 
       - run: pnpm install
 

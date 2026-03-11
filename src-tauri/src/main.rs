@@ -52,11 +52,6 @@ fn main() {
             http_client,
         })
         .setup(|app| {
-            // Copy bundled embedding model to ~/vedrr/models/ if not already cached
-            if let Ok(resource_dir) = app.path().resource_dir() {
-                embedding::bootstrap_bundled_model(&resource_dir);
-            }
-
             // Eagerly load embedding model + warm up embeddings in background.
             // Delay start so the webview can initialize without CPU contention from ONNX loading.
             let handle = app.handle().clone();
