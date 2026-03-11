@@ -116,7 +116,8 @@ jobs:
           for file in $(echo "$artifacts" | tr -d '[]"' | tr ',' '\n'); do
             [[ "$file" == *.dmg ]] || continue
             [ -f "$file" ] || continue
-            echo "=== Notarizing: $file ==="
+            dmg_size=$(du -h "$file" | cut -f1)
+            echo "=== Notarizing: $file (size: $dmg_size) ==="
 
             for attempt in 1 2 3; do
               echo "Attempt $attempt/3..."
@@ -124,7 +125,7 @@ jobs:
                 --apple-id "$APPLE_ID" \
                 --password "$APPLE_PASSWORD" \
                 --team-id "$APPLE_TEAM_ID" \
-                --wait --timeout 15m; then
+                --wait --timeout 3600s; then
                 echo "Notarization succeeded!"
                 break
               fi
