@@ -15,6 +15,7 @@ dist-ssr
 # Tauri
 src-tauri/target/
 src-tauri/gen/schemas/
+src-tauri/resources/models/models--*/
 
 # Internal docs (keep only docs/specs/ tracked)
 docs/archived/
