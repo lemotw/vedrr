@@ -416,6 +416,13 @@ export function QuickSwitcher() {
       }
     }
 
+    // Mod+N — create new context (must be checked before Ctrl+n navigation)
+    if (isModKey(e) && e.key === "n") {
+      e.preventDefault();
+      handleCreate();
+      return;
+    }
+
     // Down: j / ↓ / Ctrl+j / Ctrl+n
     if (
       e.key === "ArrowDown" ||
@@ -460,13 +467,6 @@ export function QuickSwitcher() {
       } else if ((e.key === "h" || e.key === "ArrowLeft") && inVaultMode) {
         switchToContexts();
       }
-      return;
-    }
-
-    // Mod+N — create new context
-    if (isModKey(e) && e.key === "n") {
-      e.preventDefault();
-      handleCreate();
       return;
     }
 

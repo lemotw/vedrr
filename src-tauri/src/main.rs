@@ -52,6 +52,21 @@ fn main() {
             http_client,
         })
         .setup(|app| {
+            // macOS: hide main window on close instead of destroying it,
+            // so clicking the dock icon can re-show it.
+            #[cfg(target_os = "macos")]
+            {
+                let main_window = app.get_webview_window("main")
+                    .expect("main window not found");
+                let win = main_window.clone();
+                main_window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = win.hide();
+                    }
+                });
+            }
+
             // Eagerly load embedding model + warm up embeddings in background.
             // Delay start so the webview can initialize without CPU contention from ONNX loading.
             let handle = app.handle().clone();
