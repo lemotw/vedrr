@@ -16,6 +16,12 @@ export const ContextStates = {
   ARCHIVED: "archived" as const,
 } satisfies Record<string, ContextState>;
 
+// ── Setting Keys ────────────────────────────────────────────
+export const SettingKeys = {
+  SEMANTIC_SEARCH_ENABLED: "semantic_search_enabled",
+  QUICK_CAPTURE_SHORTCUT: "quick_capture_shortcut",
+} as const;
+
 // ── IPC Commands (Tauri invoke names) ───────────────────────
 export const IpcCmd = {
   CREATE_CONTEXT: "create_context",
@@ -53,6 +59,7 @@ export const IpcCmd = {
   EMBED_SINGLE_NODE: "embed_single_node",
   GET_MODEL_STATUS: "get_model_status",
   ENSURE_EMBEDDING_MODEL: "ensure_embedding_model",
+  ENABLE_SEMANTIC_SEARCH: "enable_semantic_search",
   TEXT_SEARCH: "text_search",
   LIST_VAULT: "list_vault",
   RESTORE_FROM_VAULT: "restore_from_vault",

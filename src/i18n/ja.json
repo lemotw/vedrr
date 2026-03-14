@@ -247,5 +247,21 @@
     "systemPrompt": {
       "placeholder": "読み込み中..."
     }
+  },
+  "modelBanner": {
+    "title": "セマンティック検索を有効にしますか？",
+    "description": "小さな AI モデル（~130MB）をダウンロードして意味ベースの検索を有効にします。バックグラウンドでダウンロードします。",
+    "enable": "有効にする",
+    "skip": "スキップ"
+  },
+  "modelStatus": {
+    "title": "Embedding モデル",
+    "ready": "準備完了",
+    "downloading": "ダウンロード中...",
+    "indexing": "インデックス作成中...",
+    "error": "エラー",
+    "notDownloaded": "未ダウンロード",
+    "download": "ダウンロード",
+    "retry": "再試行"
   }
 }

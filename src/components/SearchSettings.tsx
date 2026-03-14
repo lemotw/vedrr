@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../lib/cn";
+import { ipc } from "../lib/ipc";
+import { useModelStatus } from "../hooks/useModelStatus";
 import {
   SearchDefaults,
   loadSearchSettings,
@@ -60,6 +62,75 @@ function SliderRow({
   );
 }
 
+function ModelStatusSection() {
+  const { t } = useTranslation();
+  const { status, enabled, markEnabled } = useModelStatus();
+
+  const handleDownload = async () => {
+    await ipc.enableSemanticSearch();
+    markEnabled();
+  };
+
+  const handleRetry = async () => {
+    await ipc.ensureEmbeddingModel();
+  };
+
+  const statusDot = status.status === "ready" ? "text-green-400"
+    : status.status === "error" ? "text-red-400"
+    : status.status === "downloading" || status.status === "warming_up" ? "text-yellow-400"
+    : "text-text-secondary";
+
+  const statusText = status.status === "ready" ? t("modelStatus.ready")
+    : status.status === "downloading" ? `${t("modelStatus.downloading")} ${status.progress}%`
+    : status.status === "warming_up"
+      ? status.queue_total > 0
+        ? `${t("modelStatus.indexing")} (${status.queue_done}/${status.queue_total})`
+        : t("modelStatus.indexing")
+    : status.status === "error" ? t("modelStatus.error")
+    : t("modelStatus.notDownloaded");
+
+  return (
+    <div className="space-y-2">
+      <span className="font-mono text-xs text-text-secondary uppercase tracking-wider">
+        {t("modelStatus.title")}
+      </span>
+      <div className="rounded-lg border border-border bg-bg-card px-3 py-2.5 space-y-2">
+        <p className="font-mono text-[11px] text-text-secondary">
+          multilingual-e5-small (~130MB)
+        </p>
+        <div className="flex items-center gap-2">
+          <span className={`text-[8px] ${statusDot}`}>&#9679;</span>
+          <span className="font-mono text-xs text-text-primary">{statusText}</span>
+        </div>
+        {status.status === "downloading" && (
+          <div className="w-full h-1.5 rounded-full bg-bg-page overflow-hidden">
+            <div
+              className="h-full bg-accent-primary rounded-full transition-all duration-300"
+              style={{ width: `${status.progress}%` }}
+            />
+          </div>
+        )}
+        {enabled === false && status.status === "not_ready" && (
+          <button
+            onClick={handleDownload}
+            className="px-3 py-1 rounded font-mono text-[11px] bg-accent-primary text-white hover:brightness-110 transition-all cursor-pointer"
+          >
+            {t("modelStatus.download")}
+          </button>
+        )}
+        {status.status === "error" && (
+          <button
+            onClick={handleRetry}
+            className="px-3 py-1 rounded font-mono text-[11px] bg-bg-elevated text-text-secondary hover:text-text-primary border border-border transition-colors cursor-pointer"
+          >
+            {t("modelStatus.retry")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function SearchSettingsTab() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<SearchSettings>(loadSearchSettings);
@@ -85,6 +156,9 @@ export function SearchSettingsTab() {
 
   return (
     <div className="px-6 py-4 space-y-6">
+      {/* Model Status */}
+      <ModelStatusSection />
+
       {/* Search Mode Toggle */}
       <div className="space-y-2">
         <span className="font-mono text-xs text-text-secondary uppercase tracking-wider">

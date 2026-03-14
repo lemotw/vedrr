@@ -1,9 +1,11 @@
 use serde::Serialize;
-use tauri::State;
+use tauri::{Manager, State};
 
 use crate::embedding;
 use crate::error::AppError;
 use crate::AppState;
+
+const SETTING_SEMANTIC_SEARCH: &str = "semantic_search_enabled";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ModelStatus {
@@ -38,10 +40,32 @@ pub fn get_model_status() -> ModelStatus {
 
 #[tauri::command]
 pub async fn ensure_embedding_model() -> Result<(), AppError> {
-    // Run model init on a blocking thread to avoid blocking the async runtime
     tokio::task::spawn_blocking(|| embedding::ensure_model())
         .await
         .map_err(|e| AppError::Other(format!("spawn_blocking failed: {e}")))?
+}
+
+#[tauri::command]
+pub async fn enable_semantic_search(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), AppError> {
+    {
+        let db = state.db.lock().unwrap();
+        db.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, 'true')",
+            [SETTING_SEMANTIC_SEARCH],
+        )?;
+    }
+    // Start model download + warmup on a background thread
+    tokio::task::spawn_blocking(move || {
+        if let Err(e) = embedding::ensure_model() {
+            eprintln!("[embedding] Model load failed: {e}");
+            return;
+        }
+        let state = app.state::<AppState>();
+        if let Err(e) = embedding::warmup_all(&state.db) {
+            eprintln!("[embedding] Warmup failed: {e}");
+        }
+    });
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize)]

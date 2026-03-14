@@ -1,11 +1,9 @@
-import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useContextStore } from "../stores/contextStore";
 import { useUIStore } from "../stores/uiStore";
 import { CompactStates } from "../lib/constants";
 import { modSymbol } from "../lib/platform";
-import type { ModelStatus } from "../lib/types";
-import { ipc } from "../lib/ipc";
+import { useModelStatus } from "../hooks/useModelStatus";
 
 function HintButton({
   label,
@@ -48,28 +46,15 @@ export function StatusBar() {
     action();
   };
 
-  // Poll model setup status — stop once ready or error
-  const [modelStatus, setModelStatus] = useState<ModelStatus>({ status: "not_ready", progress: 0, queue_done: 0, queue_total: 0 });
-  const settled = modelStatus.status === "ready" || modelStatus.status === "error";
-  useEffect(() => {
-    if (settled) return;
-    let cancelled = false;
-    const poll = () => {
-      ipc.getModelStatus().then((s) => {
-        if (!cancelled) setModelStatus(s);
-      }).catch(() => {});
-    };
-    poll();
-    const id = setInterval(poll, 1000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, [settled]);
+  const { status: modelStatus } = useModelStatus();
 
-  const setupBusy = modelStatus.status !== "ready" && modelStatus.status !== "error";
-  const setupLabel = modelStatus.status === "warming_up"
-    ? modelStatus.queue_total > 0
-      ? t("statusBar.setup.warmingProgress", { done: modelStatus.queue_done, total: modelStatus.queue_total })
-      : t("statusBar.setup.warming")
-    : setupBusy ? t("statusBar.setup.loading") : null;
+  const setupLabel = modelStatus.status === "downloading"
+    ? `${t("statusBar.setup.loading")} ${modelStatus.progress}%`
+    : modelStatus.status === "warming_up"
+      ? modelStatus.queue_total > 0
+        ? t("statusBar.setup.warmingProgress", { done: modelStatus.queue_done, total: modelStatus.queue_total })
+        : t("statusBar.setup.warming")
+      : null;
 
   return (
     <div className="flex items-center justify-between h-11 px-5 bg-bg-card shrink-0">
@@ -85,7 +70,7 @@ export function StatusBar() {
         )}
         <HintButton shortcut={`${modSymbol}I`} label="inbox" onClick={guardedAction(openInboxTriage)} disabled={locked} />
         <HintButton shortcut={`${modSymbol}K`} label="switch" onClick={guardedAction(openQuickSwitcher)} disabled={locked} />
-        <span className="text-border">│</span>
+        <span className="text-border">|</span>
         <HintButton label="settings" onClick={guardedAction(openSettings)} disabled={locked} />
       </div>
     </div>

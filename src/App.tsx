@@ -10,13 +10,12 @@ import { ContextMenu } from "./components/ContextMenu";
 import { SettingsPanel } from "./components/SettingsPanel";
 import InboxTriage from "./components/InboxTriage";
 import { CompactBanner } from "./components/CompactBanner";
+import { ModelBanner } from "./components/ModelBanner";
 import { useContextStore } from "./stores/contextStore";
 import { useTreeStore } from "./stores/treeStore";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useUIStore } from "./stores/uiStore";
-import { ipc } from "./lib/ipc";
 import { ContextStates, CompactStates } from "./lib/constants";
-import type { ModelStatus } from "./lib/types";
 
 export default function App() {
   const { t } = useTranslation();
@@ -25,22 +24,7 @@ export default function App() {
   const compactState = useUIStore((s) => s.compactState);
   const compactError = useUIStore((s) => s.compactError);
   const [appReady, setAppReady] = useState(false);
-  const [setupStatus, setSetupStatus] = useState<ModelStatus>({ status: "not_ready", progress: 0, queue_done: 0, queue_total: 0 });
   useKeyboard();
-
-  // Poll model status while app is loading
-  useEffect(() => {
-    if (appReady) return;
-    let cancelled = false;
-    const poll = () => {
-      ipc.getModelStatus().then((s) => {
-        if (!cancelled) setSetupStatus(s);
-      }).catch(() => {});
-    };
-    poll();
-    const id = setInterval(poll, 500);
-    return () => { cancelled = true; clearInterval(id); };
-  }, [appReady]);
 
   useEffect(() => {
     // Apply saved theme on startup
@@ -71,21 +55,12 @@ export default function App() {
     return unsub;
   }, []);
 
-  // Loading screen
   if (!appReady) {
-    const statusText = setupStatus.status === "warming_up"
-      ? setupStatus.queue_total > 0
-        ? t("statusBar.setup.warmingProgress", { done: setupStatus.queue_done, total: setupStatus.queue_total })
-        : t("statusBar.setup.warming")
-      : setupStatus.status === "downloading" || setupStatus.status === "not_ready"
-        ? t("statusBar.setup.loading")
-        : null;
-
     return (
       <div className="flex flex-col items-center justify-center h-screen w-screen bg-bg-page gap-4">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent-primary border-t-transparent" />
         <span className="font-mono text-[11px] text-text-secondary">
-          {statusText ?? t("common.loading")}
+          {t("common.loading")}
         </span>
       </div>
     );
@@ -94,6 +69,7 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen w-screen bg-bg-page">
       <StatusBar />
+      <ModelBanner />
       <CompactBanner />
       <main className="flex-1 overflow-hidden flex">
         <div className="flex-1 overflow-hidden">

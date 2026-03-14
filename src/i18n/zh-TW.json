@@ -248,5 +248,21 @@
     "systemPrompt": {
       "placeholder": "載入中..."
     }
+  },
+  "modelBanner": {
+    "title": "啟用語意搜尋？",
+    "description": "下載一個小型 AI 模型（~130MB）以啟用語意搜尋。將在背景下載。",
+    "enable": "啟用",
+    "skip": "略過"
+  },
+  "modelStatus": {
+    "title": "Embedding 模型",
+    "ready": "就緒",
+    "downloading": "下載中...",
+    "indexing": "索引中...",
+    "error": "錯誤",
+    "notDownloaded": "未下載",
+    "download": "下載",
+    "retry": "重試"
   }
 }

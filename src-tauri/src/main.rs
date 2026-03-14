@@ -68,11 +68,25 @@ fn main() {
                 });
             }
 
-            // Eagerly load embedding model + warm up embeddings in background.
-            // Delay start so the webview can initialize without CPU contention from ONNX loading.
+            // Load embedding model + warm up embeddings in background — only if user has opted in.
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_secs(2));
+                let enabled = {
+                    let state = handle.state::<AppState>();
+                    let db = state.db.lock().unwrap();
+                    db.query_row(
+                        "SELECT value FROM settings WHERE key = ?1",
+                        ["semantic_search_enabled"],
+                        |row| row.get::<_, String>(0),
+                    )
+                    .map(|v| v == "true")
+                    .unwrap_or(false)
+                };
+                if !enabled {
+                    eprintln!("[embedding] Semantic search not enabled, skipping model load");
+                    return;
+                }
                 if let Err(e) = embedding::ensure_model() {
                     eprintln!("[embedding] Background model load failed: {e}");
                     return;
@@ -150,6 +164,7 @@ fn main() {
             commands::search::embed_single_node,
             commands::search::get_model_status,
             commands::search::ensure_embedding_model,
+            commands::search::enable_semantic_search,
             commands::settings::get_setting,
             commands::settings::set_setting,
             commands::settings::update_shortcut,

@@ -248,5 +248,21 @@
     "systemPrompt": {
       "placeholder": "Loading..."
     }
+  },
+  "modelBanner": {
+    "title": "Enable Semantic Search?",
+    "description": "Download a small AI model (~130MB) to enable meaning-based search. Downloads in the background.",
+    "enable": "Enable",
+    "skip": "Skip"
+  },
+  "modelStatus": {
+    "title": "Embedding Model",
+    "ready": "Ready",
+    "downloading": "Downloading...",
+    "indexing": "Indexing nodes...",
+    "error": "Error",
+    "notDownloaded": "Not downloaded",
+    "download": "Download",
+    "retry": "Retry"
   }
 }

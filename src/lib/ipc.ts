@@ -135,6 +135,9 @@ export const ipc = {
   ensureEmbeddingModel: () =>
     safeInvoke<void>(IpcCmd.ENSURE_EMBEDDING_MODEL),
 
+  enableSemanticSearch: () =>
+    safeInvoke<void>(IpcCmd.ENABLE_SEMANTIC_SEARCH),
+
   listVault: () =>
     safeInvoke<VaultEntry[]>(IpcCmd.LIST_VAULT),
 
