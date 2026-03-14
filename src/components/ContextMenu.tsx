@@ -4,8 +4,9 @@ import { useUIStore } from "../stores/uiStore";
 import { useTreeStore, findNode } from "../stores/treeStore";
 import { useContextStore } from "../stores/contextStore";
 import { NodeTypes, CompactStates } from "../lib/constants";
-import type { TreeData } from "../lib/types";
 import { writeNodeToClipboard } from "../lib/clipboard";
+import { treeToMarkdown } from "../lib/treeMarkdown";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { cn } from "../lib/cn";
 import { modSymbol } from "../lib/platform";
 
@@ -27,19 +28,6 @@ type MenuEntry = MenuItem | "separator" | GroupHeader;
 
 function isGroup(e: MenuEntry): e is GroupHeader {
   return typeof e === "object" && "group" in e;
-}
-
-const NBSP = "\u00A0";
-
-function treeToMarkdownList(data: TreeData, depth = 0): string {
-  const indent = (NBSP + NBSP).repeat(depth);
-  const line = `${indent}-${NBSP}${data.node.title || "(untitled)"}`;
-  const childLines = data.children.map((c) => treeToMarkdownList(c, depth + 1));
-  return [line, ...childLines].join("\n");
-}
-
-function copyTreeToClipboard(tree: TreeData) {
-  navigator.clipboard.writeText(treeToMarkdownList(tree));
 }
 
 export function ContextMenu() {
@@ -115,9 +103,12 @@ export function ContextMenu() {
       label: t("contextMenu.copyMarkdown"),
       shortcut: "",
       icon: "≡",
-      action: () => exec(() => {
+      action: () => exec(async () => {
         const subtree = findNode(tree, contextMenuNodeId);
-        if (subtree) copyTreeToClipboard(subtree);
+        if (subtree) {
+          const md = await treeToMarkdown(subtree, { includeContent: true, includeType: false });
+          await writeText(md);
+        }
       }),
     },
     { group: "STRUCTURE" },
