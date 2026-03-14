@@ -18,7 +18,7 @@ function findNode(tree: TreeData, id: string): TreeData | null {
 
 export function ContentPanel() {
   const { tree, updateNodeTitle } = useTreeStore();
-  const { markdownEditorNodeId } = useUIStore();
+  const { markdownEditorNodeId, closeMarkdownEditor } = useUIStore();
   const [mdContent, setMdContent] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -77,34 +77,41 @@ export function ContentPanel() {
   if (!showPanel || !node) return null;
 
   return (
-    <div className="w-[480px] shrink-0 border-l border-border bg-bg-page flex flex-col h-full">
-      {/* Header with editable title */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border shrink-0">
-        <span className="text-[10px] font-mono font-bold text-node-markdown shrink-0">M</span>
-        <PanelTitle
-          key={node.id}
-          title={node.title}
-          onChange={handleTitleChange}
-          autoFocus
-        />
-        <span className="text-[10px] text-text-secondary font-mono shrink-0">Esc</span>
-      </div>
-
-      {loading ? (
-        <div className="flex-1 flex items-center justify-center text-text-secondary text-sm">Loading...</div>
-      ) : (
-        <MarkdownEditor
-          key={node.id}
-          content={mdContent}
-          onSave={handleSave}
-        />
-      )}
-
-      {saveError && (
-        <div className="px-3 py-1.5 text-[10px] text-red-400 bg-red-400/10 border-t border-red-400/20 shrink-0 font-mono truncate">
-          Save failed — {saveError}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) closeMarkdownEditor();
+      }}
+    >
+      <div className="w-[640px] max-w-[90vw] max-h-[80vh] rounded-xl border border-border bg-bg-elevated shadow-2xl flex flex-col">
+        {/* Header with editable title */}
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-border shrink-0">
+          <span className="text-[10px] font-mono font-bold text-node-markdown shrink-0">M</span>
+          <PanelTitle
+            key={node.id}
+            title={node.title}
+            onChange={handleTitleChange}
+            autoFocus
+          />
+          <span className="text-[10px] text-text-secondary font-mono shrink-0">Esc</span>
         </div>
-      )}
+
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center text-text-secondary text-sm py-12">Loading...</div>
+        ) : (
+          <MarkdownEditor
+            key={node.id}
+            content={mdContent}
+            onSave={handleSave}
+          />
+        )}
+
+        {saveError && (
+          <div className="px-3 py-1.5 text-[10px] text-red-400 bg-red-400/10 border-t border-red-400/20 shrink-0 font-mono truncate rounded-b-xl">
+            Save failed — {saveError}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

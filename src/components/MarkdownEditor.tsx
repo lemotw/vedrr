@@ -93,7 +93,7 @@ export function MarkdownEditor({ content, onSave }: Props) {
   if (!editor) return null;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col min-h-0 flex-1 overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center gap-1 px-3 py-2 border-b border-border shrink-0 flex-wrap">
         <ToolBtn
