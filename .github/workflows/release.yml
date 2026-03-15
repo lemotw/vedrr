@@ -61,6 +61,25 @@ jobs:
 
       - run: pnpm install
 
+      # Set version from git tag (strip leading 'v')
+      - name: Set version from tag
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Setting version to $VERSION"
+          # Update tauri.conf.json
+          node -e "
+            const fs = require('fs');
+            const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+            conf.version = '$VERSION';
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
+          "
+          # Update Cargo.toml
+          sed -i.bak 's/^version = ".*"/version = "'"$VERSION"'"/' src-tauri/Cargo.toml
+          rm -f src-tauri/Cargo.toml.bak
+          echo "tauri.conf.json version: $(node -p "require('./src-tauri/tauri.conf.json').version")"
+          echo "Cargo.toml version: $(grep '^version' src-tauri/Cargo.toml | head -1)"
+
       # Windows: bundle MSVC runtime DLLs so users don't need VC++ Redistributable
       - name: Bundle MSVC runtime (Windows)
         if: matrix.platform == 'windows-latest'
